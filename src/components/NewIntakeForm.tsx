@@ -28,6 +28,13 @@ const GENDERS = ['Male', 'Female', 'Other'];
 const MARITAL_STATUSES = ['Single', 'Married', 'Divorced', 'Widowed'];
 export const REFERRAL_SOURCES = ['Walk Ins', 'Marketing', 'Others'];
 
+// +1 (Canada/US, 10-digit NANP number) or +977 (Nepal, 10-digit mobile starting with 9).
+const PHONE_REGEX = /^(?:\+1[\s-]?\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{4}|\+977[\s-]?9\d{9})$/;
+
+function isValidPhone(phone: string): boolean {
+  return PHONE_REGEX.test(phone.trim());
+}
+
 interface NewIntakeFormProps {
   onSubmitted?: () => void;
   /** Renders as a bare card for embedding inside the dashboard instead of a standalone public page. */
@@ -60,9 +67,16 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
     marketing ? { ...EMPTY_FORM, referredThrough: 'Marketing' } : EMPTY_FORM
   );
   const [platformOther, setPlatformOther] = useState('');
+  const [phoneError, setPhoneError] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!isValidPhone(form.phone)) {
+      setPhoneError('Enter a valid number, e.g. +1 416 272 4274 or +977 98XXXXXXXX');
+      return;
+    }
+
     // "Others" keeps the typed platform name so reporting shows the real source.
     const platformSource =
       form.platformSource === 'Others' ? platformOther.trim() || 'Others' : form.platformSource;
@@ -74,6 +88,7 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
   const handleReset = () => {
     setForm(marketing ? { ...EMPTY_FORM, referredThrough: 'Marketing' } : EMPTY_FORM);
     setPlatformOther('');
+    setPhoneError('');
     setSubmitted(false);
   };
 
@@ -163,18 +178,27 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
 
           {/* Phone */}
           <div>
-            <label className="block text-sm font-medium text-navy mb-1.5">Phone number</label>
+            <label className="block text-sm font-medium text-navy mb-1.5">Phone / WhatsApp</label>
             <div className="relative">
               <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
               <input
                 type="tel"
                 required
                 value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                placeholder="+977 98X XXX XXXX"
-                className={fieldClass}
+                onChange={(e) => {
+                  setForm({ ...form, phone: e.target.value });
+                  if (phoneError) setPhoneError('');
+                }}
+                onBlur={() => {
+                  if (form.phone && !isValidPhone(form.phone)) {
+                    setPhoneError('Enter a valid number, e.g. +1 416 272 4274 or +977 98XXXXXXXX');
+                  }
+                }}
+                placeholder="+1 or +977 number"
+                className={`${fieldClass} ${phoneError ? 'border-red-400 focus:border-red-400 focus:ring-red-300' : ''}`}
               />
             </div>
+            {phoneError && <p className="mt-1 text-xs text-red-500">{phoneError}</p>}
           </div>
 
           {/* Email */}
