@@ -52,23 +52,18 @@ export default function CounselorOverview({ counselorName, counselorStudents, ap
     [applications, counselorName]
   );
 
-  // Treat the most recent submission among this counselor's students as "now" — the mock
-  // dataset has no live clock, so the latest timestamp anchors "this month" / wait times.
-  const now = useMemo(() => {
-    const timestamps = allMyStudents.map((s) => parseSubmittedAt(s.submittedAt)).filter((d): d is Date => d !== null);
-    if (timestamps.length === 0) return new Date();
-    return timestamps.reduce((latest, d) => (d > latest ? d : latest), timestamps[0]);
-  }, [allMyStudents]);
+  const now = useMemo(() => new Date(), []);
 
   const start = useMemo(() => periodStart(period, now), [period, now]);
   const suffix = periodSuffix(period);
 
+  // Scoped by assignedDate (when the client became this counselor's) rather than the
+  // original intake submittedAt — a client submitted long ago but only just assigned
+  // should still count as "mine" for the selected reporting period.
   const myStudents = useMemo(() => {
     if (!start) return allMyStudents;
-    return allMyStudents.filter((s) => {
-      const submitted = parseSubmittedAt(s.submittedAt);
-      return !!submitted && submitted >= start;
-    });
+    const startKey = dateKey(start);
+    return allMyStudents.filter((s) => s.assignedDate >= startKey);
   }, [allMyStudents, start]);
 
   const myApplications = useMemo(() => {
