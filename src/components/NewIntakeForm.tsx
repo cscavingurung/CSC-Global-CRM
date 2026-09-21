@@ -171,7 +171,7 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
                 required
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                placeholder="+61 4XX XXX XXX"
+                placeholder="+977 98X XXX XXXX"
                 className={fieldClass}
               />
             </div>
