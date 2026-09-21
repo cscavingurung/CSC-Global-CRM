@@ -25,7 +25,7 @@ const CONSULTATION_STATUS_STYLES: Record<string, string> = {
 };
 
 export default function StudentList({ students, counselors, counselorStudents = [], onAssign, branches, showBranchFilter }: StudentListProps) {
-  const csMap = useMemo(() => new Map(counselorStudents.map((cs) => [cs.email, cs])), [counselorStudents]);
+  const csMap = useMemo(() => new Map(counselorStudents.map((cs) => [cs.id, cs])), [counselorStudents]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [branchFilter, setBranchFilter] = useState<string>('all');
@@ -38,7 +38,7 @@ export default function StudentList({ students, counselors, counselorStudents = 
   // Beyond the intake's own New/Assigned state, the later stages come from the client's
   // counselor record: proceeding = enrolled, follow up = followup, not proceeding = archived.
   const stageOf = (s: IntakeStudent): StatusFilter => {
-    const cs = csMap.get(s.email);
+    const cs = csMap.get(s.id);
     if (!cs) return s.status;
     if (cs.outcome === 'Not Proceeding') return 'Archive';
     if (cs.outcome === 'Proceeding') return 'Enrolled';
@@ -54,7 +54,7 @@ export default function StudentList({ students, counselors, counselorStudents = 
         s.phone.toLowerCase().includes(search.toLowerCase());
       const matchesStatus = statusFilter === 'all' || stageOf(s) === statusFilter;
       const matchesBranch = !showBranchFilter || branchFilter === 'all' || s.branch === branchFilter;
-      const visit = csMap.get(s.email)?.visitDateTime ?? s.visitDateTime ?? s.submittedAt;
+      const visit = csMap.get(s.id)?.visitDateTime ?? s.visitDateTime ?? s.submittedAt;
       const matchesDate = matchesDateRange(visit, dateFrom, dateTo);
       return matchesSearch && matchesStatus && matchesBranch && matchesDate;
     });
@@ -173,7 +173,7 @@ export default function StudentList({ students, counselors, counselorStudents = 
               </thead>
               <tbody>
                 {filtered.map((s, i) => {
-                  const cs = csMap.get(s.email);
+                  const cs = csMap.get(s.id);
                   const statusLabel = cs?.consultationStatus || s.status;
                   return (
                     <tr key={s.id} className="odd:bg-white even:bg-grey-bg/40 hover:bg-blue-50 transition-colors">
@@ -230,7 +230,7 @@ export default function StudentList({ students, counselors, counselorStudents = 
           </thead>
           <tbody>
             {filtered.map((s) => {
-              const cs = csMap.get(s.email);
+              const cs = csMap.get(s.id);
               const consultationStatus = cs?.consultationStatus;
               const canReassign = !consultationStatus || consultationStatus === 'Awaiting Consultation';
               return (
@@ -295,7 +295,7 @@ export default function StudentList({ students, counselors, counselorStudents = 
       {/* Card list — mobile */}
       <div className="lg:hidden space-y-3">
         {filtered.map((s) => {
-          const cs = csMap.get(s.email);
+          const cs = csMap.get(s.id);
           const consultationStatus = cs?.consultationStatus;
           const canReassign = !consultationStatus || consultationStatus === 'Awaiting Consultation';
           return (
