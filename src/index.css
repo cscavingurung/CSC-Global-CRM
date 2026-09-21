@@ -1,0 +1,84 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root,
+  html[data-theme='csc-navy'] {
+    --navy: 22 40 61;
+    --navy-light: 59 90 120;
+    --navy-dark: 15 28 46;
+  }
+  html[data-theme='csc-red'] {
+    --navy: 200 16 46;
+    --navy-light: 216 50 76;
+    --navy-dark: 143 11 32;
+  }
+  html[data-theme='midnight'] {
+    --navy: 11 27 43;
+    --navy-light: 42 70 100;
+    --navy-dark: 6 17 28;
+  }
+  html[data-theme='harbour'] {
+    --navy: 30 58 95;
+    --navy-light: 72 108 148;
+    --navy-dark: 19 39 66;
+  }
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  body {
+    @apply bg-grey-bg text-navy antialiased;
+  }
+  /* Fast, subtle dissolve on every interactive click. */
+  button,
+  a,
+  [role='button'],
+  select {
+    transition: opacity 120ms ease-out, background-color 150ms ease-out, color 150ms ease-out,
+      border-color 150ms ease-out, transform 120ms ease-out;
+  }
+  button:active,
+  a:active,
+  [role='button']:active {
+    opacity: 0.72;
+    transform: scale(0.985);
+  }
+}
+
+@layer components {
+  .nav-item {
+    @apply flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 cursor-pointer;
+  }
+  .nav-item-inactive {
+    @apply text-white/70 hover:text-white hover:bg-navy-light;
+  }
+  .nav-item-active {
+    @apply text-white bg-navy-light;
+  }
+  .stat-card {
+    @apply bg-white rounded-xl border border-grey-border p-6 transition-colors hover:border-navy-light/40;
+  }
+  .role-badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-navy text-white;
+  }
+  /* Panel/tab content dissolve — used on tab switches and page swaps. */
+  .dissolve-in {
+    animation: dissolve-in 160ms ease-out;
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translate(-50%, 10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+@keyframes dissolve-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
