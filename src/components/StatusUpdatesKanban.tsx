@@ -3,12 +3,15 @@ import { CheckCircle, AlertTriangle } from 'lucide-react';
 import { ApplicationRecord, OfferApplication, OfferStatus, VisaApplication, VisaStageStatus } from '../types';
 import { getActiveOfferApplication, isVisaUnlocked, isChecklistComplete, emptyVisaChecklist, today } from '../clientPipeline';
 
+type BoardTab = 'offer' | 'visa';
+
 interface StatusUpdatesKanbanProps {
   applications: ApplicationRecord[];
   onUpdateApplication: (id: string, updates: Partial<ApplicationRecord>) => void;
+  /** Which board opens first — set when arriving from the Offer/Visa Applications page's
+   * own Status Updates tab, so it lands on the matching board instead of always "offer". */
+  initialTab?: BoardTab;
 }
-
-type BoardTab = 'offer' | 'visa';
 
 const OFFER_COLUMNS: { status: OfferStatus; label: string; dotColor: string; headerColor: string }[] = [
   { status: 'Enrolled', label: 'Enrolled', dotColor: 'bg-gray-400', headerColor: 'text-gray-600' },
@@ -32,8 +35,8 @@ const VISA_TERMINAL: VisaStageStatus[] = ['Visa Approved', 'Visa Refused'];
 
 interface OfferCardData { app: ApplicationRecord; offerApp: OfferApplication }
 
-export default function StatusUpdatesKanban({ applications, onUpdateApplication }: StatusUpdatesKanbanProps) {
-  const [tab, setTab] = useState<BoardTab>('offer');
+export default function StatusUpdatesKanban({ applications, onUpdateApplication, initialTab }: StatusUpdatesKanbanProps) {
+  const [tab, setTab] = useState<BoardTab>(initialTab ?? 'offer');
   const [pendingOfferMove, setPendingOfferMove] = useState<{ card: OfferCardData; newStatus: OfferStatus } | null>(null);
   const [pendingVisaMove, setPendingVisaMove] = useState<{ app: ApplicationRecord; newStatus: VisaStageStatus } | null>(null);
   const [showToast, setShowToast] = useState(false);

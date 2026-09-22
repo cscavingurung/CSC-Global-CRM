@@ -82,3 +82,17 @@
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* Edge/IE render their own reveal/clear icons inside password fields, which sit right on
+   top of our custom show/hide button and intercept clicks meant for it. Hide the native ones
+   so only the custom toggle is clickable. */
+input[type='password']::-ms-reveal,
+input[type='password']::-ms-clear {
+  display: none;
+}
+input::-webkit-credentials-auto-fill-button {
+  visibility: hidden;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+}

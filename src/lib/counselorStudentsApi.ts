@@ -22,6 +22,7 @@ interface CounselorStudentRow {
   referred_through: string | null;
   platform_source: string | null;
   revisited_at: string | null;
+  visit_history: string[] | null;
   assigned_date: string;
   assigned_counselor: string;
   consultation_status: CounselorStudent['consultationStatus'];
@@ -64,6 +65,7 @@ function fromRow(row: CounselorStudentRow): CounselorStudent {
     referredThrough: row.referred_through ?? undefined,
     platformSource: row.platform_source ?? undefined,
     revisitedAt: row.revisited_at ?? undefined,
+    visitHistory: row.visit_history ?? undefined,
     assignedDate: row.assigned_date,
     assignedCounselor: row.assigned_counselor,
     consultationStatus: row.consultation_status,
@@ -97,6 +99,7 @@ function toRowUpdates(updates: Partial<CounselorStudent>): Record<string, unknow
   if (updates.referredThrough !== undefined) row.referred_through = updates.referredThrough;
   if (updates.platformSource !== undefined) row.platform_source = updates.platformSource;
   if (updates.revisitedAt !== undefined) row.revisited_at = updates.revisitedAt;
+  if (updates.visitHistory !== undefined) row.visit_history = updates.visitHistory;
   if (updates.assignedDate !== undefined) row.assigned_date = updates.assignedDate;
   if (updates.assignedCounselor !== undefined) row.assigned_counselor = updates.assignedCounselor;
   if (updates.consultationStatus !== undefined) row.consultation_status = updates.consultationStatus;
@@ -131,6 +134,7 @@ function toRow(cs: CounselorStudent): CounselorStudentRow {
     referred_through: cs.referredThrough ?? null,
     platform_source: cs.platformSource ?? null,
     revisited_at: cs.revisitedAt ?? null,
+    visit_history: cs.visitHistory ?? null,
     assigned_date: cs.assignedDate,
     assigned_counselor: cs.assignedCounselor,
     consultation_status: cs.consultationStatus,

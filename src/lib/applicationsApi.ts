@@ -59,6 +59,7 @@ function normalizeOfferApplications(raw: unknown): OfferApplication[] {
       intake: typeof o.intake === 'string' ? o.intake : undefined,
       clientRefId: typeof o.clientRefId === 'string' ? o.clientRefId : undefined,
       studentId: typeof o.studentId === 'string' ? o.studentId : undefined,
+      enrolledDate: typeof o.enrolledDate === 'string' ? o.enrolledDate : undefined,
       appliedDate: typeof o.appliedDate === 'string' ? o.appliedDate : undefined,
       outcomeDate: typeof o.outcomeDate === 'string' ? o.outcomeDate : undefined,
       feePaidDate: typeof o.feePaidDate === 'string' ? o.feePaidDate : undefined,
@@ -82,6 +83,8 @@ function normalizeVisaApplication(raw: unknown, includeHistory = true): VisaAppl
       financial: !!checklist.financial,
       policeReport: !!checklist.policeReport,
     },
+    preparingDocsDate: typeof o.preparingDocsDate === 'string' ? o.preparingDocsDate : undefined,
+    fileReadyDate: typeof o.fileReadyDate === 'string' ? o.fileReadyDate : undefined,
     appliedDate: typeof o.appliedDate === 'string' ? o.appliedDate : undefined,
     outcomeDate: typeof o.outcomeDate === 'string' ? o.outcomeDate : undefined,
     statusUpdatedAt: typeof o.statusUpdatedAt === 'string' ? o.statusUpdatedAt

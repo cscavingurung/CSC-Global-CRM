@@ -52,6 +52,9 @@ export default function App() {
 
   const [user, setUser] = useState<MockUser | null>(null);
   const [activeKey, setActiveKey] = useState<string>('overview');
+  // Which board Status Updates opens on when reached from the Offer/Visa Applications
+  // page's own Status Updates tab — set right before navigating there.
+  const [statusUpdatesTab, setStatusUpdatesTab] = useState<'offer' | 'visa'>('offer');
   // Bumped on every sidebar click so the page remounts — this closes any open client
   // profile instead of leaving it on top of the newly selected page.
   const [navSeq, setNavSeq] = useState(0);
@@ -225,7 +228,7 @@ export default function App() {
 
     const notification = createIntakeNotification(newStudent.name, newStudent.country, newStudent.purpose, newStudent.branch);
     const managerNotification = createBranchManagerNotification(
-      'new-intake', newStudent.name, 'New intake from ', ` — ${newStudent.country}, ${newStudent.purpose}`, newStudent.branch, 'students'
+      'new-intake', newStudent.name, 'New lead from ', ` — ${newStudent.country}, ${newStudent.purpose}`, newStudent.branch, 'students'
     );
     setNotifications((prev) => [managerNotification, notification, ...prev]);
     insertNotification(notification).catch((err) => console.error('Failed to insert notification in Supabase', err));
@@ -349,8 +352,24 @@ export default function App() {
   /** Front desk logs a returning client's visit — stamped on whichever record(s) exist. */
   const handleLogRevisit = (clientId: string) => {
     const stamp = formatSubmittedAt(new Date());
-    setStudents((prev) => prev.map((s) => (s.id === clientId ? { ...s, revisitedAt: stamp } : s)));
-    setCounselorStudents((prev) => prev.map((c) => (c.id === clientId ? { ...c, revisitedAt: stamp } : c)));
+
+    const student = students.find((s) => s.id === clientId);
+    if (student) {
+      // Push the visit being replaced onto history first, so logging a new visit never
+      // erases the only record of when the client was last seen.
+      const previousVisit = student.revisitedAt ?? student.visitDateTime ?? student.submittedAt;
+      const updates = { revisitedAt: stamp, visitHistory: [...(student.visitHistory ?? []), previousVisit] };
+      setStudents((prev) => prev.map((s) => (s.id === clientId ? { ...s, ...updates } : s)));
+      updateStudent(clientId, updates).catch((err) => console.error('Failed to update student in Supabase', err));
+    }
+
+    const counselorStudent = counselorStudents.find((c) => c.id === clientId);
+    if (counselorStudent) {
+      const previousVisit = counselorStudent.revisitedAt ?? counselorStudent.visitDateTime ?? counselorStudent.submittedAt;
+      const updates = { revisitedAt: stamp, visitHistory: [...(counselorStudent.visitHistory ?? []), previousVisit] };
+      setCounselorStudents((prev) => prev.map((c) => (c.id === clientId ? { ...c, ...updates } : c)));
+      updateCounselorStudent(clientId, updates).catch((err) => console.error('Failed to update counselor_students in Supabase', err));
+    }
   };
 
   const handleUpdateCounselorStudent = (id: string, updates: Partial<CounselorStudent>) => {
@@ -384,6 +403,7 @@ export default function App() {
               intake: e.intake,
               status: 'Enrolled' as const,
               statusUpdatedAt: date,
+              enrolledDate: date,
             }))
           : [];
         const newApplication: ApplicationRecord = {
@@ -436,7 +456,7 @@ export default function App() {
     );
   };
 
-  const handleAddStaff = (member: StaffMember, counselorCountry?: string) => {
+  const handleAddStaff = (member: StaffMember, counselorCountries?: string[]) => {
     setStaff((prev) => [...prev, member]);
     insertStaff(member).catch((err) => console.error('Failed to insert staff in Supabase', err));
     if (member.role === 'Branch Manager') {
@@ -454,7 +474,7 @@ export default function App() {
       const newCounselor: Counselor = {
         id: `c${Date.now()}`,
         name: member.name,
-        country: counselorCountry ?? '',
+        countries: counselorCountries ?? [],
         activeAssignments: 0,
         availability: 'Available',
       };
@@ -578,6 +598,15 @@ export default function App() {
     return counselorsWithLiveCounts.filter((c) => counselorBranchByName.get(c.name) === user.branch);
   }, [counselorsWithLiveCounts, staff, user]);
 
+  // Same branch resolution as branchCounselors, applied to counselor_students rows —
+  // used wherever a branch-scoped role (Receptionist, Branch Manager) needs the raw list of
+  // assigned clients rather than just aggregate counts, so no other branch's clients leak in.
+  const branchCounselorStudents = useMemo(() => {
+    if (!user || user.role === 'super_admin') return counselorStudents;
+    const counselorBranchByName = new Map(staff.filter((s) => s.role === 'Counselor').map((s) => [s.name, s.branch]));
+    return counselorStudents.filter((cs) => counselorBranchByName.get(cs.assignedCounselor) === user.branch);
+  }, [counselorStudents, staff, user]);
+
 
   const upcomingConsultations = useMemo(() => {
     const pending = counselorStudents.filter((s) => s.consultationStatus !== 'Consultation Complete');
@@ -626,7 +655,7 @@ export default function App() {
           <BranchManagerOverview
             branch={user.branch}
             students={branchStudents}
-            counselorStudents={counselorStudents}
+            counselorStudents={branchCounselorStudents}
             applications={branchApplications}
             counselors={branchCounselors}
             staff={staff}
@@ -707,7 +736,7 @@ export default function App() {
     if (activeKey === 'assign-counselor')
       return <AssignCounselorPage students={branchStudents} counselors={branchCounselors} onAssign={handleAssign} />;
     if (activeKey === 'assigned')
-      return <AssignedClientsPage counselorStudents={counselorStudents} />;
+      return <AssignedClientsPage counselorStudents={branchCounselorStudents} />;
     if (activeKey === 'visitors')
       return <VisitorsPage students={branchStudents} counselorStudents={counselorStudents} onLogRevisit={handleLogRevisit} />;
     if (activeKey === 'partners')
@@ -765,6 +794,7 @@ export default function App() {
           currentUser={user}
           stageScope="Offer"
           excludePendingOffers={user.role === 'application_officer'}
+          onOpenStatusUpdates={(tab) => { setStatusUpdatesTab(tab); handleNavigate('status-updates'); }}
         />
       );
     if (activeKey === 'visa-applications')
@@ -775,10 +805,11 @@ export default function App() {
           partners={partners}
           currentUser={user}
           stageScope="Visa"
+          onOpenStatusUpdates={(tab) => { setStatusUpdatesTab(tab); handleNavigate('status-updates'); }}
         />
       );
     if (activeKey === 'status-updates')
-      return <StatusUpdatesKanban applications={branchApplications} onUpdateApplication={handleUpdateApplication} />;
+      return <StatusUpdatesKanban applications={branchApplications} onUpdateApplication={handleUpdateApplication} initialTab={statusUpdatesTab} />;
     if (activeKey === 'commissions')
       return (
         <CommissionsPage
@@ -797,7 +828,7 @@ export default function App() {
           branches={branchNames}
           showBranchFilter={isSuperAdmin}
           currentUserEmail={user.email}
-          counselorStudents={counselorStudents}
+          counselorStudents={branchCounselorStudents}
           applications={branchApplications}
           showActivity={user.role === 'branch_manager'}
           partners={partners}

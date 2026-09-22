@@ -39,7 +39,7 @@ const ACTIVITY_COLORS: Record<ActivityEntry['type'], string> = {
 
 const ACTIVITY_FILTERS: { value: ActivityFilter; label: string }[] = [
   { value: 'all', label: 'All' },
-  { value: 'intake', label: 'Intakes' },
+  { value: 'intake', label: 'Leads' },
   { value: 'assignment', label: 'Assignments' },
   { value: 'status', label: 'Status Changes' },
 ];

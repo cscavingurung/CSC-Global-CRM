@@ -13,7 +13,7 @@ import {
   getActiveOfferApplication, isChecklistComplete, checklistCompleteCount, checklistTotalCount,
   getClientStatusLabel, getStatusTone, STATUS_TONE_STYLES, OFFER_STATUS_STYLES,
   pipelineStepsFor, getPipelineStep, canEditClientProfile, today, isStudyCase,
-  emptyVisaChecklist,
+  emptyVisaChecklist, type PipelineStepKey,
 } from '../clientPipeline';
 import { clientIdFor } from '../clientId';
 import { ROLE_LABELS, ROLE_BADGE_STYLES } from '../mockData';
@@ -149,6 +149,7 @@ function ApplyToInstitutionModal({
       intake: intake.trim() || undefined,
       status: 'Enrolled',
       statusUpdatedAt: today(),
+      enrolledDate: today(),
       notes: notes.trim() || undefined,
     });
   };
@@ -377,6 +378,7 @@ function StatusTracker({
   const newVisaAttempt = (date: string, history: VisaApplication[] = []): VisaApplication => ({
     status: 'Preparing Documents',
     statusUpdatedAt: date,
+    preparingDocsDate: date,
     checklist: emptyVisaChecklist(),
     customChecklist: [],
     notes: '',
@@ -420,7 +422,7 @@ function StatusTracker({
         }
         break;
       case 'file-ready':
-        if (visa) onUpdate({ visaApplication: { ...visa, status: 'File Ready for Visa', statusUpdatedAt: date } });
+        if (visa) onUpdate({ visaApplication: { ...visa, status: 'File Ready for Visa', statusUpdatedAt: date, fileReadyDate: date } });
         break;
       case 'visa-applied':
         if (visa) onUpdate({ visaApplication: { ...visa, status: 'Visa Applied', statusUpdatedAt: date, appliedDate: date } });
@@ -539,12 +541,36 @@ function StatusTracker({
             return 3;
           };
 
+          // Date shown beside each step's label — undefined leaves the step's date blank
+          // rather than guessing, since older records saved before these fields existed
+          // won't have them.
+          const offerStepDate = (key: PipelineStepKey, offer: typeof active) => {
+            if (!offer) return undefined;
+            switch (key) {
+              case 'enrolled': return offer.enrolledDate ?? (offer.status === 'Enrolled' ? offer.statusUpdatedAt : undefined);
+              case 'applied': return offer.appliedDate;
+              case 'offer_outcome': return offer.outcomeDate;
+              case 'fee_paid': return offer.feePaidDate;
+              default: return undefined;
+            }
+          };
+          const visaStepDate = (i: number, attempt: VisaApplication) => {
+            switch (i) {
+              case 0: return attempt.preparingDocsDate ?? (attempt.status === 'Preparing Documents' ? attempt.statusUpdatedAt : undefined);
+              case 1: return attempt.fileReadyDate ?? (attempt.status === 'File Ready for Visa' ? attempt.statusUpdatedAt : undefined);
+              case 2: return attempt.appliedDate;
+              case 3: return attempt.outcomeDate;
+              default: return undefined;
+            }
+          };
+
           if (!visa || visaAttemptCount <= 1) {
             return steps.map((step, i) => ({
               key: step.key,
               label: step.key === 'offer_outcome' && negative && i === stepIndex ? 'Offer Rejected'
                 : step.key === 'visa_outcome' && negative && i === stepIndex ? 'Visa Refused'
                   : step.label,
+              date: visaStepKeys.includes(step.key) && visa ? visaStepDate(visaStepKeys.indexOf(step.key), visa) : offerStepDate(step.key, active),
               // The final "Visa Approved" step stays on `stepIndex` forever once reached (there's
               // no later step to advance to), so it needs its own check to ever show dark-filled —
               // completing enrollment is what confirms the client's journey is actually finished.
@@ -563,6 +589,7 @@ function StatusTracker({
             ...baseSteps.map((step) => ({
               key: step.key,
               label: step.label,
+              date: offerStepDate(step.key, active),
               isDone: true,
               isCurrent: false,
               isCurrentNegative: false,
@@ -584,6 +611,7 @@ function StatusTracker({
                 return {
                   key: `visa-${attemptIndex}-${i}`,
                   label: `${prefix}${terminalRefused ? 'Visa Refused' : baseLabel}`,
+                  date: visaStepDate(i, attempt),
                   isDone: !activeAttempt || i < currentIndex || isFinalStepDone,
                   isCurrent: activeAttempt && i === currentIndex,
                   isCurrentNegative: terminalRefused,
@@ -615,8 +643,13 @@ function StatusTracker({
                 </div>
                 {!isLast && <div className={`w-px flex-1 min-h-[18px] ${isDone ? 'bg-navy' : 'bg-gray-200'}`} />}
               </div>
-              <div className="pb-4">
-                <p className={`text-sm font-medium ${isCurrentNegative ? 'text-red-600' : isDone || isCurrent ? 'text-navy' : 'text-gray-400'}`}>{step.label}</p>
+              <div className="pb-4 flex-1 min-w-0">
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className={`text-sm font-medium ${isCurrentNegative ? 'text-red-600' : isDone || isCurrent ? 'text-navy' : 'text-gray-400'}`}>{step.label}</p>
+                  {step.date && (
+                    <span className={`text-xs flex-shrink-0 ${isCurrentNegative ? 'text-red-500' : isDone || isCurrent ? 'text-gray-500' : 'text-gray-300'}`}>{step.date}</span>
+                  )}
+                </div>
                 {step.isChecklistStep && visa && (
                   <div className="mt-2.5 space-y-2">
                     <div className="flex items-center justify-between">

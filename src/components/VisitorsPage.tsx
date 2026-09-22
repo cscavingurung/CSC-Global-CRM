@@ -46,34 +46,47 @@ export default function VisitorsPage({ students, counselorStudents, onLogRevisit
   const rows = useMemo<VisitorRow[]>(() => {
     const assignedIds = new Set(counselorStudents.map((c) => c.id));
 
-    const walkIns: VisitorRow[] = students.map((s) => ({
-      id: `s-${s.id}`,
-      name: s.name,
-      phone: s.phone,
-      email: s.email,
-      country: s.country,
-      purpose: s.purpose,
-      visit: s.revisitedAt ?? s.visitDateTime ?? s.submittedAt,
-      // A lead that already has a counselor, or that the desk logged back in, has been here before.
-      kind: s.revisitedAt || assignedIds.has(s.id) ? 'Returning' : 'Walk-in',
-      handledBy: s.addedBy ?? 'Front Desk',
-      referredThrough: s.referredThrough ?? 'Walk Ins',
-    }));
+    // Every past visit (visitHistory) plus the current one, oldest first — visitHistory
+    // already ends with the visit just before `latest`, so this never duplicates an entry.
+    const visitEvents = (latest: string, history: string[]) =>
+      history.length > 0 ? [...history, latest] : [latest];
+
+    const walkIns: VisitorRow[] = students.flatMap((s) => {
+      const latest = s.revisitedAt ?? s.visitDateTime ?? s.submittedAt;
+      // A lead that already has a counselor, or that the desk has logged back in before, has
+      // been here before — otherwise only their very first visit counts as a fresh walk-in.
+      const everReturning = !!s.revisitedAt || assignedIds.has(s.id);
+      return visitEvents(latest, s.visitHistory ?? []).map((visit, i) => ({
+        id: `s-${s.id}-${i}`,
+        name: s.name,
+        phone: s.phone,
+        email: s.email,
+        country: s.country,
+        purpose: s.purpose,
+        visit,
+        kind: (i === 0 && !everReturning ? 'Walk-in' : 'Returning') as VisitorKind,
+        handledBy: s.addedBy ?? 'Front Desk',
+        referredThrough: s.referredThrough ?? 'Walk Ins',
+      }));
+    });
 
     const returning: VisitorRow[] = counselorStudents
       .filter((c) => !students.some((s) => s.id === c.id))
-      .map((c) => ({
-        id: `c-${c.id}`,
-        name: c.name,
-        phone: c.phone,
-        email: c.email,
-        country: c.country,
-        purpose: c.purpose,
-        visit: c.revisitedAt ?? c.visitDateTime ?? c.submittedAt,
-        kind: 'Returning' as VisitorKind,
-        handledBy: c.assignedCounselor,
-        referredThrough: c.referredThrough ?? 'Walk Ins',
-      }));
+      .flatMap((c) => {
+        const latest = c.revisitedAt ?? c.visitDateTime ?? c.submittedAt;
+        return visitEvents(latest, c.visitHistory ?? []).map((visit, i) => ({
+          id: `c-${c.id}-${i}`,
+          name: c.name,
+          phone: c.phone,
+          email: c.email,
+          country: c.country,
+          purpose: c.purpose,
+          visit,
+          kind: 'Returning' as VisitorKind,
+          handledBy: c.assignedCounselor,
+          referredThrough: c.referredThrough ?? 'Walk Ins',
+        }));
+      });
 
     return [...walkIns, ...returning].sort((a, b) => b.visit.localeCompare(a.visit));
   }, [students, counselorStudents]);
@@ -91,13 +104,21 @@ export default function VisitorsPage({ students, counselorStudents, onLogRevisit
 
   // Everyone already on file, so the desk can log a repeat visit without re-typing details.
   const knownClients = useMemo(() => {
-    const byId = new Map<string, { id: string; name: string; phone: string; country: string; purpose: string; lastVisit: string }>();
+    const byId = new Map<string, { id: string; name: string; phone: string; country: string; purpose: string; lastVisit: string; previousVisit: string | null }>();
     counselorStudents.forEach((c) =>
-      byId.set(c.id, { id: c.id, name: c.name, phone: c.phone, country: c.country, purpose: c.purpose, lastVisit: c.revisitedAt ?? c.visitDateTime ?? c.submittedAt })
+      byId.set(c.id, {
+        id: c.id, name: c.name, phone: c.phone, country: c.country, purpose: c.purpose,
+        lastVisit: c.revisitedAt ?? c.visitDateTime ?? c.submittedAt,
+        previousVisit: c.visitHistory && c.visitHistory.length > 0 ? c.visitHistory[c.visitHistory.length - 1] : null,
+      })
     );
     students.forEach((s) => {
       if (!byId.has(s.id)) {
-        byId.set(s.id, { id: s.id, name: s.name, phone: s.phone, country: s.country, purpose: s.purpose, lastVisit: s.revisitedAt ?? s.visitDateTime ?? s.submittedAt });
+        byId.set(s.id, {
+          id: s.id, name: s.name, phone: s.phone, country: s.country, purpose: s.purpose,
+          lastVisit: s.revisitedAt ?? s.visitDateTime ?? s.submittedAt,
+          previousVisit: s.visitHistory && s.visitHistory.length > 0 ? s.visitHistory[s.visitHistory.length - 1] : null,
+        });
       }
     });
     const q = revisitSearch.trim().toLowerCase();
@@ -261,6 +282,9 @@ export default function VisitorsPage({ students, counselorStudents, onLogRevisit
                     <p className="truncate text-sm font-medium text-navy">{c.name}</p>
                     <p className="truncate text-xs text-gray-400">{c.phone} · {c.country} — {c.purpose}</p>
                     <p className="text-xs text-gray-400">Last visit: {c.lastVisit}</p>
+                    {c.previousVisit && (
+                      <p className="text-xs text-gray-400">Before that: {c.previousVisit}</p>
+                    )}
                   </div>
                   <button
                     onClick={() => logRevisit(c.id, c.name)}

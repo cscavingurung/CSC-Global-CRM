@@ -54,6 +54,8 @@ export interface IntakeStudent {
   claimedAt?: string;
   /** Latest repeat visit logged by the front desk ("Add Revisited Client"). */
   revisitedAt?: string;
+  /** Every earlier visit timestamp, oldest first — so logging a new visit never erases the last one. */
+  visitHistory?: string[];
   status: 'New' | 'Assigned';
   assignedCounselor: string | null;
   branch: string;
@@ -64,7 +66,8 @@ export type CounselorAvailability = 'Available' | 'In Session' | 'Away';
 export interface Counselor {
   id: string;
   name: string;
-  country: string;
+  /** Countries this counselor specializes in — a counselor can cover more than one. */
+  countries: string[];
   activeAssignments: number;
   availability: CounselorAvailability;
 }
@@ -111,6 +114,8 @@ export interface CounselorStudent {
   platformSource?: string;
   /** Latest repeat visit logged by the front desk ("Add Revisited Client"). */
   revisitedAt?: string;
+  /** Every earlier visit timestamp, oldest first — so logging a new visit never erases the last one. */
+  visitHistory?: string[];
   assignedDate: string;
   assignedCounselor: string;
   consultationStatus: ConsultationStatus;
@@ -148,6 +153,8 @@ export interface OfferApplication {
   clientRefId?: string;
   /** Institution-issued Student ID, captured when the fee is confirmed paid. */
   studentId?: string;
+  /** Set when the offer attempt is first added — the Status Tracker's "Enrolled" date. */
+  enrolledDate?: string;
   /** Set when status moves to 'Applied to Institution'. */
   appliedDate?: string;
   /** Set when status reaches 'Offer Received' or 'Rejected'. */
@@ -188,6 +195,10 @@ export interface VisaApplication {
   /** Previous visa attempts kept after re-apply, so refusals remain visible in the tracker. */
   history?: VisaApplication[];
   checklist: VisaChecklist;
+  /** Set when the visa case is first opened — the Status Tracker's "Preparing Documents" date. */
+  preparingDocsDate?: string;
+  /** Set when status moves to 'File Ready for Visa'. */
+  fileReadyDate?: string;
   /** Set when status moves to 'Visa Applied'. */
   appliedDate?: string;
   /** Set when status reaches 'Visa Approved' or 'Visa Refused'. */

@@ -8,9 +8,11 @@ import StaffActivityPanel from './StaffActivityPanel';
 import { isValidEmail, PASSWORD_PATTERN } from '../validation';
 import { COUNTRIES } from '../mockData';
 
+const COUNTRY_OPTIONS = [...COUNTRIES, 'Others'];
+
 interface StaffManagementProps {
   staff: StaffMember[];
-  onAddStaff: (member: StaffMember, counselorCountry?: string) => void;
+  onAddStaff: (member: StaffMember, counselorCountries?: string[]) => void;
   onUpdateStaff: (id: string, updates: Partial<StaffMember>) => void;
   onRemoveStaff: (id: string) => void;
   branches?: string[];
@@ -63,7 +65,9 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
   // submitting it would assign the new staff member to a branch that doesn't exist.
   const defaultNewStaffBranch = () =>
     showBranchFilter ? (branches && branches[0]) || '' : currentUser?.branch || '';
-  const [newStaff, setNewStaff] = useState({ name: '', email: '', password: '', role: 'Front Desk Officer' as StaffRole, branch: defaultNewStaffBranch(), country: COUNTRIES[0] });
+  const [newStaff, setNewStaff] = useState({ name: '', email: '', password: '', role: 'Front Desk Officer' as StaffRole, branch: defaultNewStaffBranch(), countries: [] as string[] });
+  // Freeform extra countries (e.g. Europe) not in the preset list — comma-separated.
+  const [countriesOther, setCountriesOther] = useState('');
   const newStaffEmailRef = useRef<HTMLInputElement>(null);
 
   const [editingCredentials, setEditingCredentials] = useState(false);
@@ -115,8 +119,13 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
       status: 'Active',
       branch: newStaff.branch,
     };
-    onAddStaff(member, newStaff.role === 'Counselor' ? newStaff.country : undefined);
-    setNewStaff({ name: '', email: '', password: '', role: 'Front Desk Officer', branch: defaultNewStaffBranch(), country: COUNTRIES[0] });
+    const extraCountries = countriesOther.split(',').map((c) => c.trim()).filter(Boolean);
+    const counselorCountries = Array.from(
+      new Set([...newStaff.countries.filter((c) => c !== 'Others'), ...extraCountries])
+    );
+    onAddStaff(member, newStaff.role === 'Counselor' ? counselorCountries : undefined);
+    setNewStaff({ name: '', email: '', password: '', role: 'Front Desk Officer', branch: defaultNewStaffBranch(), countries: [] });
+    setCountriesOther('');
     setShowPassword(false);
     setShowAddForm(false);
   };
@@ -388,8 +397,9 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
                   />
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-navy transition-colors"
+                    tabIndex={-1}
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 z-10 p-1 text-gray-400 hover:text-navy transition-colors"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -408,26 +418,54 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
                     <option value="Counselor">Counselor</option>
                     <option value="V/A Officer">V/A Officer</option>
                     {showBranchFilter && <option value="Branch Manager">Branch Manager</option>}
+                    {showBranchFilter && <option value="Marketing">Marketing</option>}
+                    {showBranchFilter && <option value="Finance">Finance</option>}
                   </select>
                   <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
                 </div>
               </div>
               {newStaff.role === 'Counselor' && (
                 <div>
-                  <label className="block text-sm font-medium text-navy mb-1.5">Specialization Country</label>
-                  <div className="relative">
-                    <select
-                      value={newStaff.country}
-                      onChange={(e) => setNewStaff({ ...newStaff, country: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-grey-border rounded-lg text-sm focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light transition-colors appearance-none bg-white"
-                    >
-                      {COUNTRIES.map((c) => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                  <label className="block text-sm font-medium text-navy mb-1.5">Specialization Countries</label>
+                  <p className="text-xs text-gray-400 mb-2">A counselor can specialize in more than one country — select all that apply.</p>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-2 p-3 border border-grey-border rounded-lg">
+                    {COUNTRY_OPTIONS.map((c) => {
+                      const checked = newStaff.countries.includes(c);
+                      return (
+                        <label key={c} className="flex items-center gap-2 text-sm text-navy cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() =>
+                              setNewStaff({
+                                ...newStaff,
+                                countries: checked
+                                  ? newStaff.countries.filter((v) => v !== c)
+                                  : [...newStaff.countries, c],
+                              })
+                            }
+                            className="rounded border-grey-border text-navy focus:ring-navy-light"
+                          />
+                          {c}
+                        </label>
+                      );
+                    })}
                   </div>
                   <p className="text-xs text-gray-400 mt-1.5">Adds this counselor to the roster used on Assign Counselor.</p>
+                </div>
+              )}
+              {newStaff.role === 'Counselor' && newStaff.countries.includes('Others') && (
+                <div>
+                  <label className="block text-sm font-medium text-navy mb-1.5">Specify Other Countries</label>
+                  <input
+                    type="text"
+                    required
+                    value={countriesOther}
+                    onChange={(e) => setCountriesOther(e.target.value)}
+                    placeholder="e.g. Germany, France, Ireland"
+                    className="w-full px-4 py-2.5 border border-grey-border rounded-lg text-sm focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light transition-colors"
+                  />
+                  <p className="text-xs text-gray-400 mt-1.5">Comma-separate any countries not listed above, e.g. European destinations.</p>
                 </div>
               )}
               {showBranchFilter && branches && (
@@ -597,8 +635,9 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
                         />
                         <button
                           type="button"
-                          onClick={() => setEditShowPassword(!editShowPassword)}
-                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-navy transition-colors"
+                          tabIndex={-1}
+                          onClick={() => setEditShowPassword((prev) => !prev)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 z-10 p-1 text-gray-400 hover:text-navy transition-colors"
                         >
                           {editShowPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>

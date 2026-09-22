@@ -24,6 +24,10 @@ interface ApplicationsListProps {
   /** Offer queue only — hides offers still sitting at "Enrolled" (they live on the
    * V/A Officer's Enrolled staging tab until the application is actually submitted). */
   excludePendingOffers?: boolean;
+  /** Passed only on the Offer/Visa queue pages (application officer) — the toolbar's Status
+   * Updates tab calls this with the matching board ('offer'/'visa') so it opens on the same
+   * stage instead of always defaulting to the Offer board. */
+  onOpenStatusUpdates?: (tab: 'offer' | 'visa') => void;
 }
 
 type StageFilter = 'all' | ClientStage | 'Withdrawn';
@@ -87,7 +91,7 @@ interface Row {
   offer: OfferApplication | null;
 }
 
-export default function ApplicationsList({ applications, onUpdateApplication, branches, showBranchFilter, partners, currentUser, stageScope, excludePendingOffers }: ApplicationsListProps) {
+export default function ApplicationsList({ applications, onUpdateApplication, branches, showBranchFilter, partners, currentUser, stageScope, excludePendingOffers, onOpenStatusUpdates }: ApplicationsListProps) {
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState<StageFilter>('all');
   const [offerFilter, setOfferFilter] = useState<OfferFilter>('all');
@@ -301,6 +305,15 @@ export default function ApplicationsList({ applications, onUpdateApplication, br
               <Sheet size={14} />
               Excel View
             </button>
+            {onOpenStatusUpdates && currentUser.role === 'application_officer' && (
+              <button
+                type="button"
+                onClick={() => onOpenStatusUpdates(isVisaQueue ? 'visa' : 'offer')}
+                className="rounded-md px-3 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:text-navy"
+              >
+                Status Updates
+              </button>
+            )}
           </div>
         </div>
       )}

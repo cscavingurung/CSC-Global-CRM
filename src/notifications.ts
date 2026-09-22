@@ -11,7 +11,7 @@ export function createIntakeNotification(studentName: string, country: string, p
     id: nextId(),
     trigger: 'new-intake',
     studentName,
-    messageBefore: 'New intake from ',
+    messageBefore: 'New lead from ',
     messageAfter: ` — ${country}, ${purpose}`,
     createdAt: new Date(),
     read: false,

@@ -33,7 +33,7 @@ export default function AssignCounselorPage({ students, counselors, onAssign }: 
             <div key={c.id} className="bg-white rounded-xl border border-grey-border p-4 flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-navy truncate">{c.name}</p>
-                <p className="text-xs text-gray-500 truncate">{c.country}</p>
+                <p className="text-xs text-gray-500 truncate">{c.countries.join(', ') || '—'}</p>
                 <p className="text-xs text-gray-400 mt-1">{c.activeAssignments} assigned clients</p>
               </div>
               <span

@@ -98,8 +98,19 @@ export default function StudentDetailDrawer({ student, onClose, onUpdate }: Stud
   const [temperature, setTemperature] = useState<LeadTemperature | ''>(student.leadTemperature ?? '');
   const [followUpNote, setFollowUpNote] = useState(student.followUpNote ?? '');
   const [showEnrolmentModal, setShowEnrolmentModal] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<ConsultationStatus | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+
+  // Once a client has had a follow-up, they can only move forward to Consultation Complete —
+  // not back to In Progress/Awaiting Consultation. And once Consultation Complete, the status
+  // is final and can't be changed at all (mirrors the outcome lock below).
+  const isStatusLocked = status === 'Consultation Complete';
+  const isStatusOptionDisabled = (opt: ConsultationStatus) => {
+    if (isStatusLocked) return opt !== status;
+    if (status === 'Follow Up') return opt !== 'Follow Up' && opt !== 'Consultation Complete';
+    return false;
+  };
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -121,6 +132,23 @@ export default function StudentDetailDrawer({ student, onClose, onUpdate }: Stud
       updates.completedDate = new Date().toISOString().split('T')[0];
     }
     onUpdate(updates);
+  };
+
+  // Marking a client Consultation Complete locks the status for good, so confirm it first
+  // rather than applying it straight from the button click.
+  const requestStatusChange = (newStatus: ConsultationStatus) => {
+    if (isStatusOptionDisabled(newStatus) || newStatus === status) return;
+    if (newStatus === 'Consultation Complete') {
+      setPendingStatus(newStatus);
+      return;
+    }
+    handleStatusChange(newStatus);
+  };
+
+  const confirmPendingStatus = () => {
+    if (!pendingStatus) return;
+    handleStatusChange(pendingStatus);
+    setPendingStatus(null);
   };
 
   const handleConfirmFollowUp = () => {
@@ -254,20 +282,36 @@ export default function StudentDetailDrawer({ student, onClose, onUpdate }: Stud
           <div className="bg-white rounded-2xl border border-grey-border p-6">
             <h3 className="text-sm font-semibold text-navy mb-4">Consultation Status</h3>
             <div className="grid grid-cols-2 gap-2">
-              {STATUS_OPTIONS.map((opt) => (
-                <button
-                  key={opt}
-                  onClick={() => handleStatusChange(opt)}
-                  className={`flex items-center gap-2.5 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
-                    status === opt ? STATUS_STYLES[opt] : 'border-grey-border text-gray-500 hover:bg-grey-bg'
-                  }`}
-                >
-                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${status === opt ? 'bg-current' : 'bg-gray-300'}`} />
-                  <span className="truncate">{opt}</span>
-                  {status === opt && <CheckCircle className="ml-auto flex-shrink-0" size={15} />}
-                </button>
-              ))}
+              {STATUS_OPTIONS.map((opt) => {
+                const disabled = isStatusOptionDisabled(opt);
+                return (
+                  <button
+                    key={opt}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => requestStatusChange(opt)}
+                    className={`flex items-center gap-2.5 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
+                      status === opt ? STATUS_STYLES[opt] : 'border-grey-border text-gray-500 hover:bg-grey-bg'
+                    } ${disabled ? 'opacity-40 cursor-not-allowed hover:bg-transparent' : ''}`}
+                  >
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${status === opt ? 'bg-current' : 'bg-gray-300'}`} />
+                    <span className="truncate">{opt}</span>
+                    {status === opt && <CheckCircle className="ml-auto flex-shrink-0" size={15} />}
+                  </button>
+                );
+              })}
             </div>
+            {isStatusLocked && (
+              <p className="mt-3 flex items-center gap-1.5 text-xs text-gray-400">
+                <Lock size={12} />
+                Consultation is complete — status is final and can't be changed.
+              </p>
+            )}
+            {!isStatusLocked && status === 'Follow Up' && (
+              <p className="mt-3 text-xs text-gray-400">
+                Once a follow-up is set, the client can only move forward to Consultation Complete.
+              </p>
+            )}
           </div>
 
           {/* Follow-up scheduling — shown when status is Follow Up */}
@@ -400,6 +444,33 @@ export default function StudentDetailDrawer({ student, onClose, onUpdate }: Stud
 
       {showEnrolmentModal && (
         <EnrolmentModal onConfirm={handleConfirmEnrolment} onClose={() => setShowEnrolmentModal(false)} />
+      )}
+
+      {pendingStatus && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-xl border border-grey-border bg-white p-5">
+            <h3 className="text-base font-semibold text-navy">Mark Consultation Complete?</h3>
+            <p className="mt-2 text-sm text-gray-500">
+              This locks the client's status for good — it can't be moved back or changed afterward.
+            </p>
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setPendingStatus(null)}
+                className="flex-1 rounded-lg border border-grey-border py-2.5 text-sm font-medium text-navy hover:bg-grey-bg"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmPendingStatus}
+                className="flex-1 rounded-lg bg-navy py-2.5 text-sm font-semibold text-white hover:bg-navy-light"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Toast */}

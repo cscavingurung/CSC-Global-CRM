@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useRef, useLayoutEffect } from 'react';
 import {
   Mountain, CheckCircle, User, Phone, Mail, Globe, Target, Calendar,
   Users, Heart, GraduationCap, Languages, Briefcase, Share2, Megaphone,
 } from 'lucide-react';
 import { COUNTRIES, PURPOSES } from '../mockData';
 import { PLATFORM_SOURCES } from '../marketing';
+import { today } from '../clientPipeline';
 
 export interface IntakeFormData {
   name: string;
@@ -33,6 +34,57 @@ const PHONE_REGEX = /^(?:\+1[\s-]?\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{4}|\+977[\s-]?9
 
 function isValidPhone(phone: string): boolean {
   return PHONE_REGEX.test(phone.trim());
+}
+
+// The "+1"/"+977" country code we prepend is synthetic, not typed by the user — since the
+// input is controlled, our own formatted output becomes next keystroke's raw value, so the
+// digit(s) inside that prefix ("1", or "977") must never be re-counted as dialed digits.
+function staticPrefixLength(value: string): number {
+  if (value.startsWith('+977')) return 4;
+  if (value.startsWith('+1')) return 2;
+  return 0;
+}
+
+// Live-formats digits as they're typed — a 9-leading number becomes a Nepal +977 mobile
+// number, anything else is treated as a NANP +1 number, matching the input on
+// cscglobalcanada.ca/contact so staff never have to type the country code or punctuation.
+function formatPhoneInput(raw: string): string {
+  const digits = raw.slice(staticPrefixLength(raw)).replace(/\D/g, '').slice(0, 10);
+  if (!digits) return '';
+  if (digits[0] === '9') return `+977 ${digits}`;
+
+  const area = digits.slice(0, 3);
+  const mid = digits.slice(3, 6);
+  const last = digits.slice(6, 10);
+  let out = `+1 (${area}`;
+  if (area.length === 3) out += ')';
+  if (mid) out += ` ${mid}`;
+  if (last) out += `-${last}`;
+  return out;
+}
+
+// How many real (dialed) digits sit before the caret in the raw, pre-format input value.
+function dialedDigitsBeforeCaret(raw: string, caretIndex: number): number {
+  const prefixLen = staticPrefixLength(raw);
+  if (caretIndex <= prefixLen) return 0;
+  return raw.slice(prefixLen, caretIndex).replace(/\D/g, '').length;
+}
+
+// Re-formatting on every keystroke changes the string length (adding "(", ")", "-", "+977 "),
+// which resets the browser's cursor to the wrong spot unless we restore it ourselves — this
+// finds where the caret belongs in the new formatted string by counting real dialed digits,
+// skipping the synthetic country-code prefix so its digit(s) don't throw the count off.
+function caretPositionForDigitCount(formatted: string, digitCount: number): number {
+  const prefixLen = staticPrefixLength(formatted);
+  if (digitCount <= 0) return prefixLen;
+  let seen = 0;
+  for (let i = prefixLen; i < formatted.length; i++) {
+    if (/\d/.test(formatted[i])) {
+      seen++;
+      if (seen === digitCount) return i + 1;
+    }
+  }
+  return formatted.length;
 }
 
 interface NewIntakeFormProps {
@@ -68,6 +120,14 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
   );
   const [platformOther, setPlatformOther] = useState('');
   const [phoneError, setPhoneError] = useState('');
+  const phoneInputRef = useRef<HTMLInputElement>(null);
+  const phoneCaretRef = useRef<number | null>(null);
+
+  useLayoutEffect(() => {
+    if (phoneCaretRef.current === null || !phoneInputRef.current) return;
+    phoneInputRef.current.setSelectionRange(phoneCaretRef.current, phoneCaretRef.current);
+    phoneCaretRef.current = null;
+  }, [form.phone]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -182,11 +242,17 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
             <div className="relative">
               <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
               <input
+                ref={phoneInputRef}
                 type="tel"
                 required
                 value={form.phone}
                 onChange={(e) => {
-                  setForm({ ...form, phone: e.target.value });
+                  const raw = e.target.value;
+                  const caretPos = e.target.selectionStart ?? raw.length;
+                  const digitsBeforeCaret = dialedDigitsBeforeCaret(raw, caretPos);
+                  const formatted = formatPhoneInput(raw);
+                  phoneCaretRef.current = caretPositionForDigitCount(formatted, digitsBeforeCaret);
+                  setForm({ ...form, phone: formatted });
                   if (phoneError) setPhoneError('');
                 }}
                 onBlur={() => {
@@ -225,8 +291,23 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
               <input
                 type="date"
                 required
+                min="1900-01-01"
+                max={today()}
                 value={form.dob}
                 onChange={(e) => setForm({ ...form, dob: e.target.value })}
+                onClick={(e) => e.currentTarget.showPicker?.()}
+                onBlur={(e) => {
+                  // The year segment of a native date input isn't capped at 4 digits by the
+                  // browser (Chrome allows up to 6) — min/max only affect validity, not how
+                  // much you can type. Clamp once the field is left, rather than mid-keystroke
+                  // (blocking onChange fights the widget and breaks normal typing).
+                  const value = e.target.value;
+                  if (!value) return;
+                  const year = Number(value.slice(0, 4));
+                  const maxYear = new Date().getFullYear();
+                  if (year > maxYear) setForm((f) => ({ ...f, dob: today() }));
+                  else if (year < 1900) setForm((f) => ({ ...f, dob: '1900-01-01' }));
+                }}
                 className={fieldClass}
               />
             </div>

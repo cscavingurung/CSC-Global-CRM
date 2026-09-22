@@ -230,7 +230,7 @@ export default function ReceptionistOverview({ students, upcomingConsultations, 
               <div key={c.id} className="flex items-center justify-between py-2.5 border-b border-grey-border last:border-0">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-navy truncate">{c.name}</p>
-                  <p className="text-xs text-gray-500 truncate">{c.country}</p>
+                  <p className="text-xs text-gray-500 truncate">{c.countries.join(', ') || '—'}</p>
                   <p className="text-xs text-gray-400 mt-0.5">{c.activeAssignments} assigned clients</p>
                 </div>
                 <span className={`text-xs font-medium px-2.5 py-1 rounded-full flex-shrink-0 ml-2 ${AVAILABILITY_STYLES[c.availability]}`}>

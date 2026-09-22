@@ -24,6 +24,7 @@ interface StudentRow {
   claimed_by: string | null;
   claimed_at: string | null;
   revisited_at: string | null;
+  visit_history: string[] | null;
   status: IntakeStudent['status'];
   assigned_counselor: string | null;
   branch: string;
@@ -53,6 +54,7 @@ function fromRow(row: StudentRow): IntakeStudent {
     claimedBy: row.claimed_by,
     claimedAt: row.claimed_at ?? undefined,
     revisitedAt: row.revisited_at ?? undefined,
+    visitHistory: row.visit_history ?? undefined,
     status: row.status,
     assignedCounselor: row.assigned_counselor,
     branch: row.branch,
@@ -83,6 +85,7 @@ function toRow(student: IntakeStudent): StudentRow {
     claimed_by: student.claimedBy ?? null,
     claimed_at: student.claimedAt ?? null,
     revisited_at: student.revisitedAt ?? null,
+    visit_history: student.visitHistory ?? null,
     status: student.status,
     assigned_counselor: student.assignedCounselor,
     branch: student.branch,
@@ -112,6 +115,7 @@ function toRowUpdates(updates: Partial<IntakeStudent>): Record<string, unknown> 
   if (updates.claimedBy !== undefined) row.claimed_by = updates.claimedBy;
   if (updates.claimedAt !== undefined) row.claimed_at = updates.claimedAt;
   if (updates.revisitedAt !== undefined) row.revisited_at = updates.revisitedAt;
+  if (updates.visitHistory !== undefined) row.visit_history = updates.visitHistory;
   if (updates.status !== undefined) row.status = updates.status;
   if (updates.assignedCounselor !== undefined) row.assigned_counselor = updates.assignedCounselor;
   if (updates.branch !== undefined) row.branch = updates.branch;

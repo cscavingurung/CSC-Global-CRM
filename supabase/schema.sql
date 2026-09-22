@@ -22,6 +22,7 @@ create table if not exists students (
   claimed_by text,
   claimed_at text,
   revisited_at text,
+  visit_history text[],
   status text not null default 'New',
   assigned_counselor text,
   branch text not null default ''
@@ -36,6 +37,7 @@ alter table students add column if not exists broadcast_at text;
 alter table students add column if not exists claimed_by text;
 alter table students add column if not exists claimed_at text;
 alter table students add column if not exists revisited_at text;
+alter table students add column if not exists visit_history text[];
 
 alter table students enable row level security;
 drop policy if exists "anon full access" on students;
@@ -52,9 +54,12 @@ create table if not exists counselors (
   id text primary key,
   name text not null,
   country text not null default '',
+  countries text[] not null default '{}',
   active_assignments integer not null default 0,
   availability text not null default 'Available'
 );
+
+alter table counselors add column if not exists countries text[] not null default '{}';
 
 alter table counselors enable row level security;
 drop policy if exists "anon full access" on counselors;
@@ -88,6 +93,7 @@ create table if not exists counselor_students (
   referred_through text,
   platform_source text,
   revisited_at text,
+  visit_history text[],
   assigned_date text not null,
   assigned_counselor text not null,
   consultation_status text not null default 'Awaiting Consultation',
@@ -106,6 +112,7 @@ alter table counselor_students add column if not exists visit_date_time text;
 alter table counselor_students add column if not exists referred_through text;
 alter table counselor_students add column if not exists platform_source text;
 alter table counselor_students add column if not exists revisited_at text;
+alter table counselor_students add column if not exists visit_history text[];
 alter table counselor_students add column if not exists lead_temperature text;
 alter table counselor_students add column if not exists follow_up_note text;
 

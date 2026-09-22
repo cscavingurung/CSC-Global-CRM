@@ -28,7 +28,7 @@ export default function AssignCounselorModal({
   // just sorted first and badged, never disabled or de-emphasized. Within each group,
   // available counselors sort before in-session/away ones.
   const { matching, others } = useMemo(() => {
-    const isMatch = (c: Counselor) => c.country === student.country;
+    const isMatch = (c: Counselor) => c.countries.includes(student.country);
     return {
       matching: sortByAvailability(counselors.filter(isMatch)),
       others: sortByAvailability(counselors.filter((c) => !isMatch(c))),
@@ -130,6 +130,7 @@ export default function AssignCounselorModal({
                         counselor={c}
                         selected={c.name === selectedCounselor}
                         isSpecialist
+                        studentCountry={student.country}
                         onSelect={() => {
                           setSelectedCounselor(c.name);
                           setDropdownOpen(false);
@@ -147,6 +148,7 @@ export default function AssignCounselorModal({
                         counselor={c}
                         selected={c.name === selectedCounselor}
                         isSpecialist={false}
+                        studentCountry={student.country}
                         onSelect={() => {
                           setSelectedCounselor(c.name);
                           setDropdownOpen(false);
@@ -187,6 +189,7 @@ interface CounselorOptionProps {
   counselor: Counselor;
   selected: boolean;
   isSpecialist: boolean;
+  studentCountry: string;
   onSelect: () => void;
 }
 
@@ -195,7 +198,7 @@ interface CounselorOptionProps {
 // white-on-navy overlay treatment when selected rather than keeping their normal colors
 // (a navy "In Session" badge, for instance, would otherwise disappear against the selected
 // row's own navy background).
-function CounselorOption({ counselor: c, selected, isSpecialist, onSelect }: CounselorOptionProps) {
+function CounselorOption({ counselor: c, selected, isSpecialist, studentCountry, onSelect }: CounselorOptionProps) {
   const overlayBadge = 'bg-white/20 text-white';
 
   return (
@@ -211,11 +214,11 @@ function CounselorOption({ counselor: c, selected, isSpecialist, onSelect }: Cou
           <p className="font-medium truncate">{c.name}</p>
           {isSpecialist && (
             <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${selected ? overlayBadge : 'bg-navy text-white'}`}>
-              {c.country} specialist
+              {studentCountry} specialist
             </span>
           )}
         </div>
-        <p className={`text-xs mt-0.5 ${selected ? 'text-white/60' : 'text-gray-400'}`}>{c.country}</p>
+        <p className={`text-xs mt-0.5 ${selected ? 'text-white/60' : 'text-gray-400'}`}>{c.countries.join(', ') || '—'}</p>
         <p className={`text-[11px] mt-1 ${selected ? 'text-white/60' : 'text-gray-400'}`}>{c.activeAssignments} assigned clients</p>
       </div>
       <div className="flex flex-col items-end gap-1.5 flex-shrink-0 ml-2">
