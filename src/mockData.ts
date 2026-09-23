@@ -87,10 +87,8 @@ export const NAV_CONFIG: NavConfig = {
   application_officer: [
     { key: 'overview', label: 'Dashboard', icon: 'LayoutDashboard' },
     { key: 'applications', label: 'Clients', icon: 'FileText' },
-    { key: 'enrolled-queue', label: 'Enrolled', icon: 'GraduationCap' },
     { key: 'offer-applications', label: 'Offer Applications', icon: 'Building2' },
     { key: 'visa-applications', label: 'Visa Applications', icon: 'Stamp' },
-    { key: 'status-updates', label: 'Status Updates', icon: 'RefreshCw' },
   ],
 };
 

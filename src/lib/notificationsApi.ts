@@ -1,7 +1,7 @@
 import { supabase } from './supabaseClient';
 import { AppNotification } from '../types';
 
-interface NotificationRow {
+export interface NotificationRow {
   id: string;
   trigger: AppNotification['trigger'];
   student_name: string;
@@ -16,7 +16,7 @@ interface NotificationRow {
   lead_id: string | null;
 }
 
-function fromRow(row: NotificationRow): AppNotification {
+export function fromRow(row: NotificationRow): AppNotification {
   return {
     id: row.id,
     trigger: row.trigger,

@@ -21,7 +21,6 @@ import EnrolledQueuePage from './components/EnrolledQueuePage';
 import CounselorClientsPage from './components/CounselorClientsPage';
 import ConsultationsPage from './components/ConsultationsPage';
 import ApplicationsList from './components/ApplicationsList';
-import StatusUpdatesKanban from './components/StatusUpdatesKanban';
 import StaffManagement from './components/StaffManagement';
 import ArchivePage from './components/ArchivePage';
 import FollowUpsPage from './components/FollowUpsPage';
@@ -30,31 +29,28 @@ import MarketingOverview from './components/MarketingOverview';
 import MarketingBroadcastPage from './components/MarketingBroadcastPage';
 import MarketingClientsPage from './components/MarketingClientsPage';
 import { MockUser, IntakeStudent, CounselorStudent, ApplicationRecord, OfferApplication, StaffMember, Branch, CommissionRecord, Partner, AppNotification, Counselor } from './types';
-import { isStudyCase } from './clientPipeline';
+import { isStudyCase, getClientStatusLabel } from './clientPipeline';
 import { clientIdFor, generateClientId } from './clientId';
 import { NAV_CONFIG } from './mockData';
-import { createIntakeNotification, createAssignmentNotification, createConsultationReadyNotification, createBranchManagerNotification, createLeadBroadcastNotification } from './notifications';
+import { createIntakeNotification, createAssignmentNotification, createConsultationReadyNotification, createBranchManagerNotification, createLeadBroadcastNotification, createStatusUpdateNotification } from './notifications';
 import { formatSubmittedAt } from './dateTime';
-import { fetchNotifications, insertNotification, markNotificationRead, markNotificationsRead } from './lib/notificationsApi';
-import { fetchCounselorStudents, updateCounselorStudent, upsertCounselorStudent } from './lib/counselorStudentsApi';
-import { fetchStudents, insertStudent, updateStudent } from './lib/studentsApi';
+import { fetchNotifications, insertNotification, markNotificationRead, markNotificationsRead, fromRow as notificationFromRow, NotificationRow } from './lib/notificationsApi';
+import { fetchCounselorStudents, updateCounselorStudent, upsertCounselorStudent, fromRow as counselorStudentFromRow, CounselorStudentRow } from './lib/counselorStudentsApi';
+import { fetchStudents, insertStudent, updateStudent, fromRow as studentFromRow, StudentRow } from './lib/studentsApi';
 import { isMarketingLead } from './marketing';
-import { fetchCounselors, insertCounselor, deleteCounselor } from './lib/counselorsApi';
-import { fetchApplications, updateApplication, insertApplication } from './lib/applicationsApi';
-import { fetchStaff, insertStaff, updateStaff, deleteStaff } from './lib/staffApi';
-import { fetchBranches, insertBranch, updateBranch, deleteBranch } from './lib/branchesApi';
-import { fetchCommissions, updateCommission } from './lib/commissionsApi';
-import { fetchPartners, insertPartner, updatePartner, deletePartner } from './lib/partnersApi';
-import { subscribeToTable } from './lib/realtimeSubscribe';
+import { fetchCounselors, insertCounselor, deleteCounselor, fromRow as counselorFromRow, CounselorRow } from './lib/counselorsApi';
+import { fetchApplications, updateApplication, insertApplication, fromRow as applicationFromRow, ApplicationRow } from './lib/applicationsApi';
+import { fetchStaff, insertStaff, updateStaff, deleteStaff, fromRow as staffFromRow, StaffRow } from './lib/staffApi';
+import { fetchBranches, insertBranch, updateBranch, deleteBranch, fromRow as branchFromRow, BranchRow } from './lib/branchesApi';
+import { fetchCommissions, updateCommission, fromRow as commissionFromRow, CommissionRow } from './lib/commissionsApi';
+import { fetchPartners, insertPartner, updatePartner, deletePartner, fromRow as partnerFromRow, PartnerRow } from './lib/partnersApi';
+import { subscribeToTable, applyRealtimeChange } from './lib/realtimeSubscribe';
 
 export default function App() {
   const isIntakeForm = window.location.pathname === '/intake';
 
   const [user, setUser] = useState<MockUser | null>(null);
   const [activeKey, setActiveKey] = useState<string>('overview');
-  // Which board Status Updates opens on when reached from the Offer/Visa Applications
-  // page's own Status Updates tab — set right before navigating there.
-  const [statusUpdatesTab, setStatusUpdatesTab] = useState<'offer' | 'visa'>('offer');
   // Bumped on every sidebar click so the page remounts — this closes any open client
   // profile instead of leaving it on top of the newly selected page.
   const [navSeq, setNavSeq] = useState(0);
@@ -69,85 +65,100 @@ export default function App() {
   const [partners, setPartners] = useState<Partner[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
+  // Each table loads in full once on mount, then stays in sync via realtime — but instead of
+  // refetching the whole table on every INSERT/UPDATE/DELETE (which used to mean one staff
+  // member's status update made every other open tab re-download the entire table), each
+  // change is applied to the local list in place via applyRealtimeChange. The `sortBy` passed
+  // to each call re-applies the same ordering the initial fetch's `.order(...)` used, so lists
+  // don't drift out of order as changes come in from other staff.
   useEffect(() => {
-    const load = () =>
-      fetchCounselorStudents()
-        .then(setCounselorStudents)
-        .catch((err) => console.error('Failed to fetch counselor_students from Supabase', err));
-    load();
-    return subscribeToTable('counselor_students', load);
+    fetchCounselorStudents()
+      .then(setCounselorStudents)
+      .catch((err) => console.error('Failed to fetch counselor_students from Supabase', err));
+    return subscribeToTable<CounselorStudentRow>('counselor_students', (change) => {
+      setCounselorStudents((prev) => applyRealtimeChange(prev, change, counselorStudentFromRow,
+        (a, b) => (a.assignedDate < b.assignedDate ? -1 : a.assignedDate > b.assignedDate ? 1 : 0)));
+    });
   }, []);
 
   useEffect(() => {
-    const load = () =>
-      fetchStudents()
-        .then(setStudents)
-        .catch((err) => console.error('Failed to fetch students from Supabase', err));
-    load();
-    return subscribeToTable('students', load);
+    fetchStudents()
+      .then(setStudents)
+      .catch((err) => console.error('Failed to fetch students from Supabase', err));
+    return subscribeToTable<StudentRow>('students', (change) => {
+      setStudents((prev) => applyRealtimeChange(prev, change, studentFromRow,
+        (a, b) => (a.submittedAt < b.submittedAt ? 1 : a.submittedAt > b.submittedAt ? -1 : 0)));
+    });
   }, []);
 
   useEffect(() => {
-    const load = () =>
-      fetchCounselors()
-        .then(setCounselors)
-        .catch((err) => console.error('Failed to fetch counselors from Supabase', err));
-    load();
-    return subscribeToTable('counselors', load);
+    fetchCounselors()
+      .then(setCounselors)
+      .catch((err) => console.error('Failed to fetch counselors from Supabase', err));
+    return subscribeToTable<CounselorRow>('counselors', (change) => {
+      setCounselors((prev) => applyRealtimeChange(prev, change, counselorFromRow,
+        (a, b) => a.name.localeCompare(b.name)));
+    });
   }, []);
 
   useEffect(() => {
-    const load = () =>
-      fetchApplications()
-        .then(setApplications)
-        .catch((err) => console.error('Failed to fetch applications from Supabase', err));
-    load();
-    return subscribeToTable('applications', load);
+    fetchApplications()
+      .then(setApplications)
+      .catch((err) => console.error('Failed to fetch applications from Supabase', err));
+    return subscribeToTable<ApplicationRow>('applications', (change) => {
+      setApplications((prev) => applyRealtimeChange(prev, change, applicationFromRow,
+        (a, b) => (a.consultationDate < b.consultationDate ? 1 : a.consultationDate > b.consultationDate ? -1 : 0)));
+    });
   }, []);
 
   useEffect(() => {
-    const load = () =>
-      fetchStaff()
-        .then(setStaff)
-        .catch((err) => console.error('Failed to fetch staff from Supabase', err));
-    load();
-    return subscribeToTable('staff', load);
+    fetchStaff()
+      .then(setStaff)
+      .catch((err) => console.error('Failed to fetch staff from Supabase', err));
+    return subscribeToTable<StaffRow>('staff', (change) => {
+      setStaff((prev) => applyRealtimeChange(prev, change, staffFromRow,
+        (a, b) => a.name.localeCompare(b.name)));
+    });
   }, []);
 
   useEffect(() => {
-    const load = () =>
-      fetchBranches()
-        .then(setBranches)
-        .catch((err) => console.error('Failed to fetch branches from Supabase', err));
-    load();
-    return subscribeToTable('branches', load);
+    fetchBranches()
+      .then(setBranches)
+      .catch((err) => console.error('Failed to fetch branches from Supabase', err));
+    return subscribeToTable<BranchRow>('branches', (change) => {
+      setBranches((prev) => applyRealtimeChange(prev, change, branchFromRow,
+        (a, b) => a.name.localeCompare(b.name)));
+    });
   }, []);
 
   useEffect(() => {
-    const load = () =>
-      fetchNotifications()
-        .then(setNotifications)
-        .catch((err) => console.error('Failed to fetch notifications from Supabase', err));
-    load();
-    return subscribeToTable('notifications', load);
+    fetchNotifications()
+      .then(setNotifications)
+      .catch((err) => console.error('Failed to fetch notifications from Supabase', err));
+    return subscribeToTable<NotificationRow>('notifications', (change) => {
+      setNotifications((prev) => applyRealtimeChange(prev, change, notificationFromRow,
+        (a, b) => b.createdAt.getTime() - a.createdAt.getTime()));
+    });
   }, []);
 
   useEffect(() => {
-    const load = () =>
-      fetchCommissions()
-        .then(setCommissions)
-        .catch((err) => console.error('Failed to fetch commissions from Supabase', err));
-    load();
-    return subscribeToTable('commissions', load);
+    fetchCommissions()
+      .then(setCommissions)
+      .catch((err) => console.error('Failed to fetch commissions from Supabase', err));
+    return subscribeToTable<CommissionRow>('commissions', (change) => {
+      setCommissions((prev) => applyRealtimeChange(prev, change, commissionFromRow,
+        (a, b) => a.studentName.localeCompare(b.studentName)));
+    });
   }, []);
 
   useEffect(() => {
-    const load = () =>
-      fetchPartners()
-        .then(setPartners)
-        .catch((err) => console.error('Failed to fetch partners from Supabase', err));
-    load();
-    return subscribeToTable('partners', load);
+    fetchPartners()
+      .then(setPartners)
+      .catch((err) => console.error('Failed to fetch partners from Supabase', err));
+    return subscribeToTable<PartnerRow>('partners', (change) => {
+      setPartners((prev) => applyRealtimeChange(prev, change, partnerFromRow,
+        (a, b) => a.name.localeCompare(b.name)));
+    });
   }, []);
 
   const handleLogin = (mockUser: MockUser) => {
@@ -454,6 +465,20 @@ export default function App() {
     updateApplication(id, updates).catch((err) =>
       console.error('Failed to update application in Supabase', err)
     );
+
+    // Surface offer/visa status tracker moves to the branch manager's Today's Activity —
+    // compare the unified status label before and after rather than diffing individual
+    // fields, so unrelated edits (notes, checklist ticks, deferred intake) stay silent.
+    const prevApp = applications.find((a) => a.id === id);
+    if (prevApp) {
+      const prevLabel = getClientStatusLabel(prevApp);
+      const nextLabel = getClientStatusLabel({ ...prevApp, ...updates });
+      if (nextLabel !== prevLabel) {
+        const notification = createStatusUpdateNotification(prevApp.name, nextLabel, prevApp.branch);
+        setNotifications((prev) => [notification, ...prev]);
+        insertNotification(notification).catch((err) => console.error('Failed to insert notification in Supabase', err));
+      }
+    }
   };
 
   const handleAddStaff = (member: StaffMember, counselorCountries?: string[]) => {
@@ -794,7 +819,6 @@ export default function App() {
           currentUser={user}
           stageScope="Offer"
           excludePendingOffers={user.role === 'application_officer'}
-          onOpenStatusUpdates={(tab) => { setStatusUpdatesTab(tab); handleNavigate('status-updates'); }}
         />
       );
     if (activeKey === 'visa-applications')
@@ -805,11 +829,8 @@ export default function App() {
           partners={partners}
           currentUser={user}
           stageScope="Visa"
-          onOpenStatusUpdates={(tab) => { setStatusUpdatesTab(tab); handleNavigate('status-updates'); }}
         />
       );
-    if (activeKey === 'status-updates')
-      return <StatusUpdatesKanban applications={branchApplications} onUpdateApplication={handleUpdateApplication} initialTab={statusUpdatesTab} />;
     if (activeKey === 'commissions')
       return (
         <CommissionsPage

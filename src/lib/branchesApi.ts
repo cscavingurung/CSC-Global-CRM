@@ -1,14 +1,14 @@
 import { supabase } from './supabaseClient';
 import { Branch } from '../types';
 
-interface BranchRow {
+export interface BranchRow {
   id: string;
   name: string;
   location: string;
   manager: string | null;
 }
 
-function fromRow(row: BranchRow): Branch {
+export function fromRow(row: BranchRow): Branch {
   return {
     id: row.id,
     name: row.name,

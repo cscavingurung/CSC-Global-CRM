@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Check, Search, X, ChevronDown, ChevronUp, ExternalLink, LayoutGrid, Sheet } from 'lucide-react';
 import { ApplicationRecord, MockUser, OfferApplication, Partner, VisaStageStatus } from '../types';
 import ClientProfile from './ClientProfile';
+import StatusUpdatesKanban from './StatusUpdatesKanban';
 import CompactDateRangeFilter from './CompactDateRangeFilter';
 import { matchesDateRange } from '../dateFilter';
 import {
@@ -24,10 +25,6 @@ interface ApplicationsListProps {
   /** Offer queue only — hides offers still sitting at "Enrolled" (they live on the
    * V/A Officer's Enrolled staging tab until the application is actually submitted). */
   excludePendingOffers?: boolean;
-  /** Passed only on the Offer/Visa queue pages (application officer) — the toolbar's Status
-   * Updates tab calls this with the matching board ('offer'/'visa') so it opens on the same
-   * stage instead of always defaulting to the Offer board. */
-  onOpenStatusUpdates?: (tab: 'offer' | 'visa') => void;
 }
 
 type StageFilter = 'all' | ClientStage | 'Withdrawn';
@@ -73,7 +70,7 @@ function CaseTypeBadge({ purpose }: { purpose: string }) {
 
 type SortKey = 'date' | 'name' | 'institution' | 'country';
 type VisaStatusFilter = 'Pending' | 'Applied' | 'Approved' | 'Refused';
-type ViewMode = 'simple' | 'sheet';
+type ViewMode = 'simple' | 'sheet' | 'kanban';
 
 const VISA_STATUS_FILTER_OPTIONS: VisaStatusFilter[] = ['Pending', 'Applied', 'Approved', 'Refused'];
 
@@ -91,7 +88,7 @@ interface Row {
   offer: OfferApplication | null;
 }
 
-export default function ApplicationsList({ applications, onUpdateApplication, branches, showBranchFilter, partners, currentUser, stageScope, excludePendingOffers, onOpenStatusUpdates }: ApplicationsListProps) {
+export default function ApplicationsList({ applications, onUpdateApplication, branches, showBranchFilter, partners, currentUser, stageScope, excludePendingOffers }: ApplicationsListProps) {
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState<StageFilter>('all');
   const [offerFilter, setOfferFilter] = useState<OfferFilter>('all');
@@ -176,7 +173,9 @@ export default function ApplicationsList({ applications, onUpdateApplication, br
 
   return (
     <div className="space-y-5">
-      {/* Search & filter bar */}
+      {/* Search & filter bar — hidden in Status Updates (kanban) view, which shows every
+          client on its own boards rather than a filtered list. */}
+      {viewMode !== 'kanban' && (
       <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -284,10 +283,11 @@ export default function ApplicationsList({ applications, onUpdateApplication, br
         )}
         <CompactDateRangeFilter from={dateFrom} to={dateTo} onFromChange={setDateFrom} onToChange={setDateTo} />
       </div>
+      )}
 
       {(isOfferQueue || isVisaQueue) && (
         <div className="hidden lg:flex items-center justify-between">
-          <p className="text-xs text-gray-400">{rows.length} application{rows.length === 1 ? '' : 's'}</p>
+          <p className="text-xs text-gray-400">{viewMode === 'kanban' ? 'Status Updates' : `${rows.length} application${rows.length === 1 ? '' : 's'}`}</p>
           <div className="inline-flex rounded-lg border border-grey-border bg-white p-0.5">
             <button
               type="button"
@@ -305,11 +305,11 @@ export default function ApplicationsList({ applications, onUpdateApplication, br
               <Sheet size={14} />
               Excel View
             </button>
-            {onOpenStatusUpdates && currentUser.role === 'application_officer' && (
+            {currentUser.role === 'application_officer' && (
               <button
                 type="button"
-                onClick={() => onOpenStatusUpdates(isVisaQueue ? 'visa' : 'offer')}
-                className="rounded-md px-3 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:text-navy"
+                onClick={() => setViewMode('kanban')}
+                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${viewMode === 'kanban' ? 'bg-navy text-white' : 'text-gray-500 hover:text-navy'}`}
               >
                 Status Updates
               </button>
@@ -444,6 +444,7 @@ export default function ApplicationsList({ applications, onUpdateApplication, br
       </div>
 
       {/* Card list — mobile */}
+      {viewMode !== 'kanban' && (
       <div className="lg:hidden space-y-3">
         {rows.map(({ key, app: a, offer }) => (
           <div key={key} className="bg-white rounded-xl border border-grey-border p-4">
@@ -484,6 +485,16 @@ export default function ApplicationsList({ applications, onUpdateApplication, br
           <div className="py-12 text-center text-sm text-gray-400">No applications found.</div>
         )}
       </div>
+      )}
+
+      {/* Status Updates — embedded kanban, replaces the list entirely while active */}
+      {viewMode === 'kanban' && (isOfferQueue || isVisaQueue) && (
+        <StatusUpdatesKanban
+          applications={applications}
+          onUpdateApplication={onUpdateApplication}
+          lockTab={isVisaQueue ? 'visa' : 'offer'}
+        />
+      )}
 
       {/* Client profile */}
       {selectedApp && (

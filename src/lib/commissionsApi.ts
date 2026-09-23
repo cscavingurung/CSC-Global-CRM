@@ -1,7 +1,7 @@
 import { supabase } from './supabaseClient';
 import { CommissionRecord } from '../types';
 
-interface CommissionRow {
+export interface CommissionRow {
   id: string;
   student_name: string;
   branch: string;
@@ -12,7 +12,7 @@ interface CommissionRow {
   commission_status: CommissionRecord['commissionStatus'];
 }
 
-function fromRow(row: CommissionRow): CommissionRecord {
+export function fromRow(row: CommissionRow): CommissionRecord {
   return {
     id: row.id,
     studentName: row.student_name,

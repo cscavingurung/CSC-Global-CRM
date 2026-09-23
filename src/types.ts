@@ -324,7 +324,7 @@ export interface CommissionRecord {
   commissionStatus: CommissionStatus;
 }
 
-export type NotificationTrigger = 'new-intake' | 'assigned-to-counselor' | 'consultation-ready' | 'lead-broadcast';
+export type NotificationTrigger = 'new-intake' | 'assigned-to-counselor' | 'consultation-ready' | 'lead-broadcast' | 'status-update';
 
 export interface AppNotification {
   id: string;

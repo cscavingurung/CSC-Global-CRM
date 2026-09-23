@@ -4,15 +4,15 @@ import {
   AlertTriangle, Building2, FileText, UserX,
   Phone, Mail, Globe, Target, User, Cake, IdCard,
   Users, Heart, GraduationCap, BookOpen, Briefcase,
-  ListChecks, MessageSquare, Banknote, type LucideIcon,
+  ListChecks, MessageSquare, Banknote, Plus, type LucideIcon,
 } from 'lucide-react';
 import {
   ApplicationRecord, OfferApplication, VisaApplication, Partner, MockUser, ClientNote, CustomChecklistItem,
 } from '../types';
 import {
-  getActiveOfferApplication, isChecklistComplete, checklistCompleteCount, checklistTotalCount,
+  getActiveOfferApplication, getFeePaidOffer, isChecklistComplete, checklistCompleteCount, checklistTotalCount,
   getClientStatusLabel, getStatusTone, STATUS_TONE_STYLES, OFFER_STATUS_STYLES,
-  pipelineStepsFor, getPipelineStep, canEditClientProfile, today, isStudyCase,
+  pipelineStepsFor, getPipelineStep, getOfferPipelineStep, canEditClientProfile, canWithdrawClient, today, isStudyCase,
   emptyVisaChecklist, type PipelineStepKey,
 } from '../clientPipeline';
 import { clientIdFor } from '../clientId';
@@ -266,45 +266,29 @@ interface StatusAction {
   disabledReason?: string;
 }
 
-function getAvailableActions(application: ApplicationRecord): StatusAction[] {
+// `selectedOffer` is whichever institution card is currently selected in the tracker. For a
+// study case, only the institution whose fee was actually paid drives the visa journey — the
+// others are backup applications that just progress through their own offer stage and go
+// read-only (no more actions) once a different institution has been chosen for the visa case.
+function getAvailableActions(application: ApplicationRecord, selectedOffer: OfferApplication | null): StatusAction[] {
   const visa = application.visaApplication;
   const study = isStudyCase(application.purpose);
-  if (visa) {
-    switch (visa.status) {
-      case 'Preparing Documents': {
-        const done = isChecklistComplete(visa);
-        return [{ value: 'file-ready', label: 'Mark File Ready for Visa', kind: 'advance', disabled: !done, disabledReason: 'Complete every checklist item first' }];
-      }
-      case 'File Ready for Visa':
-        return [{ value: 'visa-applied', label: 'Mark Visa Applied', kind: 'advance' }];
-      case 'Visa Applied':
-        return [
-          { value: 'visa-approved', label: 'Mark Visa Approved', kind: 'confirm-positive' },
-          { value: 'visa-refused', label: 'Mark Visa Refused', kind: 'confirm-negative' },
-        ];
-      case 'Visa Approved':
-        return visa.enrollmentCompleted
-          ? []
-          : [{ value: 'complete-enrollment', label: 'Complete Enrollment', kind: 'advance' }];
-      case 'Visa Refused': {
-        const actions: StatusAction[] = [];
-        if (!visa.refundRequested) actions.push({ value: 'refund', label: 'Request Refund', kind: 'refund' });
-        actions.push({ value: 'reapply-docs', label: 'Re-apply (New Document Attempt)', kind: 'advance' });
-        if (study) actions.push({ value: 'reapply', label: 'Re-apply to a New Institution', kind: 'reapply-modal' });
-        return actions;
-      }
-      default:
-        return [];
-    }
+
+  if (!study) {
+    // SOWP and Visit cases skip the offer stages entirely.
+    if (!visa) return [{ value: 'start-docs', label: 'Start Preparing Documents', kind: 'advance' }];
+    return getVisaActions(visa, study);
   }
 
-  // SOWP and Visit cases skip the offer stages entirely.
-  if (!study) return [{ value: 'start-docs', label: 'Start Preparing Documents', kind: 'advance' }];
+  const feePaidOffer = getFeePaidOffer(application);
+  if (feePaidOffer) {
+    if (!selectedOffer || selectedOffer.id !== feePaidOffer.id) return [];
+    return visa ? getVisaActions(visa, study) : [];
+  }
 
-  const active = getActiveOfferApplication(application);
-  if (!active) return [{ value: 'apply', label: 'Apply to Institution', kind: 'apply-modal' }];
+  if (!selectedOffer) return [{ value: 'apply', label: 'Apply to Institution', kind: 'apply-modal' }];
 
-  switch (active.status) {
+  switch (selectedOffer.status) {
     case 'Enrolled':
       return [{ value: 'applied', label: 'Mark Applied to Institution', kind: 'advance' }];
     case 'Applied to Institution':
@@ -328,6 +312,35 @@ function getAvailableActions(application: ApplicationRecord): StatusAction[] {
   }
 }
 
+function getVisaActions(visa: VisaApplication, study: boolean): StatusAction[] {
+  switch (visa.status) {
+    case 'Preparing Documents': {
+      const done = isChecklistComplete(visa);
+      return [{ value: 'file-ready', label: 'Mark File Ready for Visa', kind: 'advance', disabled: !done, disabledReason: 'Complete every checklist item first' }];
+    }
+    case 'File Ready for Visa':
+      return [{ value: 'visa-applied', label: 'Mark Visa Applied', kind: 'advance' }];
+    case 'Visa Applied':
+      return [
+        { value: 'visa-approved', label: 'Mark Visa Approved', kind: 'confirm-positive' },
+        { value: 'visa-refused', label: 'Mark Visa Refused', kind: 'confirm-negative' },
+      ];
+    case 'Visa Approved':
+      return visa.enrollmentCompleted
+        ? []
+        : [{ value: 'complete-enrollment', label: 'Complete Enrollment', kind: 'advance' }];
+    case 'Visa Refused': {
+      const actions: StatusAction[] = [];
+      if (!visa.refundRequested) actions.push({ value: 'refund', label: 'Request Refund', kind: 'refund' });
+      actions.push({ value: 'reapply-docs', label: 'Re-apply (New Document Attempt)', kind: 'advance' });
+      if (study) actions.push({ value: 'reapply', label: 'Re-apply to a New Institution', kind: 'reapply-modal' });
+      return actions;
+    }
+    default:
+      return [];
+  }
+}
+
 function StatusTracker({
   application, canEdit, currentUser, onUpdate,
 }: { application: ApplicationRecord; canEdit: boolean; currentUser: MockUser; onUpdate: (u: Partial<ApplicationRecord>) => void }) {
@@ -338,14 +351,26 @@ function StatusTracker({
   const [deferOfferId, setDeferOfferId] = useState<string | null>(null);
   const [deferValue, setDeferValue] = useState('');
   const [newItemLabel, setNewItemLabel] = useState('');
+  const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
 
   const { index: stepIndex, negative } = getPipelineStep(application);
   const steps = pipelineStepsFor(application);
+  const study = isStudyCase(application.purpose);
   const visa = application.visaApplication;
   const visaHistory = visa?.history ?? [];
   const visaAttemptCount = visa ? visaHistory.length + 1 : 0;
   const active = getActiveOfferApplication(application);
   const attempts = application.offerApplications;
+  // The offer actually driving the visa case — the fee-paid one once there is one, otherwise
+  // whichever offer is currently active. Card selection defaults here; picking a different
+  // (backup) institution card overrides it for viewing/acting on that offer instead — but
+  // once a fee's been paid, the other institutions are locked and unselectable, so a stale
+  // selection from before the fee was paid must not keep pointing at one of them.
+  const feePaidOffer = getFeePaidOffer(application);
+  const primaryOffer = feePaidOffer ?? active;
+  const selectedOffer = feePaidOffer
+    ? feePaidOffer
+    : (selectedOfferId ? attempts.find((o) => o.id === selectedOfferId) : null) ?? primaryOffer;
   // Offers eligible for the fee payment — anything with an offer in hand, so a client
   // holding several can have the right institution picked.
   const feePaidCandidates = attempts.filter((o) => o.status === 'Offer Received' || o.status === 'Enrolled' || o.status === 'Applied to Institution' || o.status === 'Further Information Required');
@@ -366,7 +391,7 @@ function StatusTracker({
   const removeCustomItem = (v: VisaApplication, id: string) =>
     setCustom(v, (v.customChecklist ?? []).filter((c) => c.id !== id));
 
-  const actions = getAvailableActions(application);
+  const actions = getAvailableActions(application, selectedOffer);
   const effectiveValue = actions.some((a) => a.value === selectedValue) ? selectedValue : (actions[0]?.value ?? '');
   const selectedAction = actions.find((a) => a.value === effectiveValue) ?? null;
 
@@ -389,21 +414,21 @@ function StatusTracker({
     const date = today();
     switch (value) {
       case 'applied':
-        if (active) updateOffer(active.id, { status: 'Applied to Institution', statusUpdatedAt: date, appliedDate: date });
+        if (selectedOffer) updateOffer(selectedOffer.id, { status: 'Applied to Institution', statusUpdatedAt: date, appliedDate: date });
         break;
       case 'further-info':
-        if (active) updateOffer(active.id, { status: 'Further Information Required', statusUpdatedAt: date, furtherInfoRequired: true });
+        if (selectedOffer) updateOffer(selectedOffer.id, { status: 'Further Information Required', statusUpdatedAt: date, furtherInfoRequired: true });
         break;
       case 'offer-received':
-        if (active) updateOffer(active.id, { status: 'Offer Received', statusUpdatedAt: date, outcomeDate: date });
+        if (selectedOffer) updateOffer(selectedOffer.id, { status: 'Offer Received', statusUpdatedAt: date, outcomeDate: date });
         break;
       case 'offer-rejected':
-        if (active) updateOffer(active.id, { status: 'Rejected', statusUpdatedAt: date, outcomeDate: date });
+        if (selectedOffer) updateOffer(selectedOffer.id, { status: 'Rejected', statusUpdatedAt: date, outcomeDate: date });
         break;
       case 'fee-paid':
-        if (active) {
+        if (selectedOffer) {
           onUpdate({
-            offerApplications: attempts.map((o) => (o.id === active.id ? { ...o, status: 'Fee Paid', statusUpdatedAt: date, feePaidDate: date } : o)),
+            offerApplications: attempts.map((o) => (o.id === selectedOffer.id ? { ...o, status: 'Fee Paid', statusUpdatedAt: date, feePaidDate: date } : o)),
             visaApplication: newVisaAttempt(date, visaHistory),
           });
         }
@@ -486,8 +511,35 @@ function StatusTracker({
       {/* Offer attempt history — institution, program and intake, with a deferrable intake */}
       {attempts.length > 0 && (
         <div className="mb-5 pb-5 border-b border-grey-border space-y-3">
-          {[...attempts].reverse().map((o) => (
-            <div key={o.id} className="space-y-1.5">
+          {/* Students often apply to more than one institution in parallel — always available,
+              independent of how far the primary offer/visa attempt has progressed. */}
+          {canEdit && study && !application.withdrawn && (
+            <button
+              onClick={() => setShowApplyModal(true)}
+              className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-dashed border-grey-border text-sm font-medium text-navy hover:bg-grey-bg transition-colors"
+            >
+              <Plus size={14} />
+              Add Institution
+            </button>
+          )}
+          {[...attempts].reverse().map((o) => {
+            // Once a fee's been paid on one institution, that one alone drives the case —
+            // every other institution is a dead backup with nothing left to select, view,
+            // or edit, so it's locked out instead of staying clickable.
+            const locked = study && !!feePaidOffer && feePaidOffer.id !== o.id;
+            // Selecting a card only matters once there's more than one institution to choose
+            // between — it picks which offer the stepper/actions below describe.
+            const selectable = study && attempts.length > 1 && !locked;
+            const isSelected = selectable && selectedOffer?.id === o.id;
+            return (
+            <div
+              key={o.id}
+              onClick={selectable ? () => setSelectedOfferId(o.id) : undefined}
+              className={`space-y-1.5 rounded-lg p-2 -mx-2 transition-colors ${
+                locked ? 'opacity-50 grayscale cursor-not-allowed'
+                : selectable ? `cursor-pointer ${isSelected ? 'bg-navy/5 ring-1 ring-navy-light' : 'hover:bg-grey-bg'}` : ''
+              }`}
+            >
               <div className="flex items-center gap-2.5">
                 <Building2 className="text-gray-400 flex-shrink-0" size={14} />
                 <span className="text-sm text-navy truncate flex-1">{o.institution}</span>
@@ -499,21 +551,23 @@ function StatusTracker({
                 {o.course && <p className="text-xs text-gray-500">Course: <span className="text-gray-700">{o.course}</span></p>}
                 {/* "Further Information Required" is now a pipeline status, shown in the badge above. */}
                 {deferOfferId === o.id ? (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <input
                       type="text"
                       value={deferValue}
                       onChange={(e) => setDeferValue(e.target.value)}
                       placeholder="New intake, e.g. Jul 2027"
-                      className="flex-1 border border-grey-border rounded-lg px-2.5 py-1.5 text-xs text-navy focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light"
+                      className="flex-1 min-w-0 border border-grey-border rounded-lg px-2.5 py-1.5 text-xs text-navy focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light"
                     />
-                    <button onClick={() => saveDeferredIntake(o.id)} disabled={!deferValue.trim()} className="px-2.5 py-1.5 rounded-lg bg-navy text-white text-xs font-semibold hover:bg-navy-light disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Save</button>
-                    <button onClick={() => { setDeferOfferId(null); setDeferValue(''); }} className="px-2.5 py-1.5 rounded-lg border border-grey-border text-xs font-medium text-gray-500 hover:bg-grey-bg transition-colors">Cancel</button>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button onClick={() => saveDeferredIntake(o.id)} disabled={!deferValue.trim()} className="px-2.5 py-1.5 rounded-lg bg-navy text-white text-xs font-semibold hover:bg-navy-light disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Save</button>
+                      <button onClick={() => { setDeferOfferId(null); setDeferValue(''); }} className="px-2.5 py-1.5 rounded-lg border border-grey-border text-xs font-medium text-gray-500 hover:bg-grey-bg transition-colors">Cancel</button>
+                    </div>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
                     <p className="text-xs text-gray-500">Intake: <span className="text-gray-700">{o.intake ?? 'Not set'}</span></p>
-                    {canEdit && !application.withdrawn && (
+                    {canEdit && !application.withdrawn && !locked && (
                       <button
                         onClick={() => { setDeferOfferId(o.id); setDeferValue(o.intake ?? ''); }}
                         className="text-xs font-semibold text-navy hover:text-navy-light transition-colors"
@@ -525,7 +579,8 @@ function StatusTracker({
                 )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -564,13 +619,35 @@ function StatusTracker({
             }
           };
 
+          // A backup institution (anything besides the one whose fee was paid, or — before any
+          // fee is paid — whichever offer is the active one) never touches the visa stage, so it
+          // gets its own short offer-only stepper instead of the merged offer+visa journey below.
+          if (study && selectedOffer && primaryOffer && selectedOffer.id !== primaryOffer.id) {
+            const offerOnlySteps = steps.filter((step) => !visaStepKeys.includes(step.key));
+            const offerKeys = offerOnlySteps.map((step) => step.key);
+            const { key: curKey, negative: curNegative } = getOfferPipelineStep(selectedOffer);
+            const curIdx = offerKeys.indexOf(curKey);
+            return offerOnlySteps.map((step, i) => ({
+              key: step.key,
+              label: step.key === 'offer_outcome' && curNegative && i === curIdx ? 'Offer Rejected' : step.label,
+              date: offerStepDate(step.key, selectedOffer),
+              isDone: i < curIdx,
+              isCurrent: i === curIdx,
+              isCurrentNegative: i === curIdx && curNegative,
+              isChecklistStep: false,
+              showEnrollmentComplete: false,
+              showRefund: false,
+              showVisaMarkers: false,
+            }));
+          }
+
           if (!visa || visaAttemptCount <= 1) {
             return steps.map((step, i) => ({
               key: step.key,
               label: step.key === 'offer_outcome' && negative && i === stepIndex ? 'Offer Rejected'
                 : step.key === 'visa_outcome' && negative && i === stepIndex ? 'Visa Refused'
                   : step.label,
-              date: visaStepKeys.includes(step.key) && visa ? visaStepDate(visaStepKeys.indexOf(step.key), visa) : offerStepDate(step.key, active),
+              date: visaStepKeys.includes(step.key) && visa ? visaStepDate(visaStepKeys.indexOf(step.key), visa) : offerStepDate(step.key, primaryOffer),
               // The final "Visa Approved" step stays on `stepIndex` forever once reached (there's
               // no later step to advance to), so it needs its own check to ever show dark-filled —
               // completing enrollment is what confirms the client's journey is actually finished.
@@ -589,7 +666,7 @@ function StatusTracker({
             ...baseSteps.map((step) => ({
               key: step.key,
               label: step.label,
-              date: offerStepDate(step.key, active),
+              date: offerStepDate(step.key, primaryOffer),
               isDone: true,
               isCurrent: false,
               isCurrentNegative: false,
@@ -910,6 +987,7 @@ export default function ClientProfile({ application, currentUser, onClose, onUpd
   const statusLabel = getClientStatusLabel(application);
   const tone = getStatusTone(application);
   const canEdit = canEditClientProfile(currentUser.role);
+  const canWithdraw = canWithdrawClient(currentUser.role);
 
   return (
     <div className="fixed inset-y-0 left-0 right-0 lg:left-64 z-50 bg-grey-bg flex flex-col">
@@ -929,7 +1007,7 @@ export default function ClientProfile({ application, currentUser, onClose, onUpd
           </div>
         </div>
         <Badge className={STATUS_TONE_STYLES[tone]}>{statusLabel}</Badge>
-        {canEdit && !application.withdrawn && (
+        {canWithdraw && !application.withdrawn && (
           <button
             onClick={() => setConfirmWithdraw(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-500 border border-grey-border hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-colors flex-shrink-0"

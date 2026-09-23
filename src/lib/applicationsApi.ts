@@ -1,7 +1,7 @@
 import { supabase } from './supabaseClient';
 import { ApplicationRecord, ClientNote, OfferApplication, OfferStatus, Role, VisaApplication, VisaStageStatus } from '../types';
 
-interface ApplicationRow {
+export interface ApplicationRow {
   id: string;
   client_id: string | null;
   name: string;
@@ -108,7 +108,7 @@ function normalizeVisaApplication(raw: unknown, includeHistory = true): VisaAppl
   };
 }
 
-function fromRow(row: ApplicationRow): ApplicationRecord {
+export function fromRow(row: ApplicationRow): ApplicationRecord {
   return {
     id: row.id,
     clientId: row.client_id ?? undefined,

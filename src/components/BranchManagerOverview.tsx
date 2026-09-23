@@ -51,14 +51,15 @@ const STALE_STUDENT_HOURS = 24;
 type ActivityFilter = 'all' | ActivityEntry['type'];
 
 // Today's Activity is derived live from the branch-scoped notifications created alongside
-// New Intake / Assign Counselor / Consultation Ready (see createBranchManagerNotification in
-// src/notifications.ts) rather than the static, never-written-to activity_feed table. There's
-// no notification for application status changes yet, so the 'status' filter has no entries.
+// New Intake / Assign Counselor / Consultation Ready / Status Tracker updates (see
+// createBranchManagerNotification and createStatusUpdateNotification in src/notifications.ts)
+// rather than the static, never-written-to activity_feed table.
 const TRIGGER_TO_ACTIVITY_TYPE: Record<AppNotification['trigger'], ActivityEntry['type']> = {
   'new-intake': 'intake',
   'assigned-to-counselor': 'assignment',
   'consultation-ready': 'consultation',
   'lead-broadcast': 'intake',
+  'status-update': 'status',
 };
 
 function isSameDay(a: Date, b: Date): boolean {

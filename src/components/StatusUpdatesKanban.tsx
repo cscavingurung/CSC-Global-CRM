@@ -8,9 +8,10 @@ type BoardTab = 'offer' | 'visa';
 interface StatusUpdatesKanbanProps {
   applications: ApplicationRecord[];
   onUpdateApplication: (id: string, updates: Partial<ApplicationRecord>) => void;
-  /** Which board opens first — set when arriving from the Offer/Visa Applications page's
-   * own Status Updates tab, so it lands on the matching board instead of always "offer". */
-  initialTab?: BoardTab;
+  /** Locks the board to just this one and hides the Offer/Visa tab switcher — set when this
+   * is embedded inside the Offer/Visa Applications page's own Status Updates view, which is
+   * already scoped to one stage. */
+  lockTab?: BoardTab;
 }
 
 const OFFER_COLUMNS: { status: OfferStatus; label: string; dotColor: string; headerColor: string }[] = [
@@ -35,8 +36,9 @@ const VISA_TERMINAL: VisaStageStatus[] = ['Visa Approved', 'Visa Refused'];
 
 interface OfferCardData { app: ApplicationRecord; offerApp: OfferApplication }
 
-export default function StatusUpdatesKanban({ applications, onUpdateApplication, initialTab }: StatusUpdatesKanbanProps) {
-  const [tab, setTab] = useState<BoardTab>(initialTab ?? 'offer');
+export default function StatusUpdatesKanban({ applications, onUpdateApplication, lockTab }: StatusUpdatesKanbanProps) {
+  const [tab, setTab] = useState<BoardTab>(lockTab ?? 'offer');
+  const activeTab = lockTab ?? tab;
   const [pendingOfferMove, setPendingOfferMove] = useState<{ card: OfferCardData; newStatus: OfferStatus } | null>(null);
   const [pendingVisaMove, setPendingVisaMove] = useState<{ app: ApplicationRecord; newStatus: VisaStageStatus } | null>(null);
   const [showToast, setShowToast] = useState(false);
@@ -103,20 +105,22 @@ export default function StatusUpdatesKanban({ applications, onUpdateApplication,
 
   return (
     <div className="space-y-4">
-      {/* Tabs */}
-      <div className="inline-flex bg-grey-bg border border-grey-border rounded-lg p-1">
-        {(['offer', 'visa'] as BoardTab[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === t ? 'bg-white text-navy' : 'text-gray-500 hover:text-navy'}`}
-          >
-            {t === 'offer' ? 'Offer Applications' : 'Visa Applications'}
-          </button>
-        ))}
-      </div>
+      {/* Tabs — hidden when locked to a single board (already scoped by the embedding page) */}
+      {!lockTab && (
+        <div className="inline-flex bg-grey-bg border border-grey-border rounded-lg p-1">
+          {(['offer', 'visa'] as BoardTab[]).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === t ? 'bg-white text-navy' : 'text-gray-500 hover:text-navy'}`}
+            >
+              {t === 'offer' ? 'Offer Applications' : 'Visa Applications'}
+            </button>
+          ))}
+        </div>
+      )}
 
-      {tab === 'offer' && (
+      {activeTab === 'offer' && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           {OFFER_COLUMNS.map((col) => {
             const colCards = activeOfferCards.filter((c) => c.offerApp.status === col.status);
@@ -173,7 +177,7 @@ export default function StatusUpdatesKanban({ applications, onUpdateApplication,
         </div>
       )}
 
-      {tab === 'visa' && (
+      {activeTab === 'visa' && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
           {VISA_COLUMNS.map((col) => {
             const colApps = visaCards.filter((a) => a.visaApplication?.status === col.status);

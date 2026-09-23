@@ -1,7 +1,7 @@
 import { supabase } from './supabaseClient';
 import { Counselor } from '../types';
 
-interface CounselorRow {
+export interface CounselorRow {
   id: string;
   name: string;
   /** Legacy single-country column, still populated on old rows. */
@@ -11,7 +11,7 @@ interface CounselorRow {
   availability: Counselor['availability'];
 }
 
-function fromRow(row: CounselorRow): Counselor {
+export function fromRow(row: CounselorRow): Counselor {
   return {
     id: row.id,
     name: row.name,

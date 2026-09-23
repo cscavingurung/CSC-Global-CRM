@@ -263,8 +263,29 @@ export function getPipelineStep(app: ApplicationRecord): { index: number; negati
   }
 }
 
+// Per-offer step, independent of any visa data — used when a specific institution attempt
+// (not necessarily the one whose fee was paid) is selected for display, since only one
+// offer's fee ever becomes the client's actual enrollment/visa case.
+export function getOfferPipelineStep(offer: OfferApplication): { key: PipelineStepKey; negative: boolean } {
+  switch (offer.status) {
+    case 'Enrolled': return { key: 'enrolled', negative: false };
+    case 'Applied to Institution':
+    case 'Further Information Required': return { key: 'applied', negative: false };
+    case 'Offer Received': return { key: 'offer_outcome', negative: false };
+    case 'Rejected': return { key: 'offer_outcome', negative: true };
+    case 'Fee Paid': return { key: 'fee_paid', negative: false };
+  }
+}
+
 // Roles allowed to edit a client's status/notes on the Client Profile page — everyone
 // except the front desk, who gets a read-only view.
 export function canEditClientProfile(role: Role): boolean {
   return role === 'application_officer' || role === 'counselor' || role === 'branch_manager' || role === 'super_admin';
+}
+
+// Withdrawing a client is narrower than general edit access — only their counselor or a
+// branch manager (or an admin) can pull them out of the pipeline; the V/A officer, who only
+// handles the offer/visa stages, cannot.
+export function canWithdrawClient(role: Role): boolean {
+  return role === 'counselor' || role === 'branch_manager' || role === 'super_admin';
 }

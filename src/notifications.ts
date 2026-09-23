@@ -69,6 +69,23 @@ export function createLeadBroadcastNotification(leadId: string, country: string,
   };
 }
 
+// A client's status tracker (offer stage or visa stage) advanced — branch manager only, since
+// no other role needs a push for their own case work.
+export function createStatusUpdateNotification(studentName: string, statusLabel: string, branch: string): AppNotification {
+  return {
+    id: nextId(),
+    trigger: 'status-update',
+    studentName,
+    messageBefore: '',
+    messageAfter: ` status updated to ${statusLabel}`,
+    createdAt: new Date(),
+    read: false,
+    role: 'branch_manager',
+    branch,
+    navigateTo: 'applications',
+  };
+}
+
 // A branch-scoped copy of one of the three events above, addressed to the Branch Manager —
 // none of the three factories above ever set role: 'branch_manager', so without this a
 // manager never sees a notification for activity in their own branch.

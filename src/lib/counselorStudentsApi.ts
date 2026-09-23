@@ -1,7 +1,7 @@
 import { supabase } from './supabaseClient';
 import { CounselorStudent } from '../types';
 
-interface CounselorStudentRow {
+export interface CounselorStudentRow {
   id: string;
   client_id: string | null;
   enrolments: unknown;
@@ -43,7 +43,7 @@ function normalizeEnrolments(raw: unknown): CounselorStudent['enrolments'] {
   }));
 }
 
-function fromRow(row: CounselorStudentRow): CounselorStudent {
+export function fromRow(row: CounselorStudentRow): CounselorStudent {
   return {
     id: row.id,
     clientId: row.client_id ?? undefined,

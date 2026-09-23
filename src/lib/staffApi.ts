@@ -1,7 +1,7 @@
 import { supabase } from './supabaseClient';
 import { StaffMember } from '../types';
 
-interface StaffRow {
+export interface StaffRow {
   id: string;
   name: string;
   email: string;
@@ -11,7 +11,7 @@ interface StaffRow {
   branch: string;
 }
 
-function fromRow(row: StaffRow): StaffMember {
+export function fromRow(row: StaffRow): StaffMember {
   return {
     id: row.id,
     name: row.name,
