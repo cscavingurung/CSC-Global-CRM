@@ -5,6 +5,8 @@ import StudentDetailDrawer from './StudentDetailDrawer';
 import { LEAD_TEMPERATURE_STYLES } from '../leadTemperature';
 import { downloadSheet } from '../exportSheet';
 import { clientIdFor } from '../clientId';
+import { splitCountries } from '../mockData';
+import { parseSubmittedAt } from '../dateTime';
 
 interface CounselorClientsPageProps {
   clients: CounselorStudent[];
@@ -21,16 +23,28 @@ const STATUS_STYLES: Record<ConsultationStatus, string> = {
   'Consultation Complete': 'bg-green-50 text-green-700 border-green-200',
 };
 
+type SortOption = 'newest' | 'oldest' | 'name-asc' | 'name-desc';
+
+const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  { value: 'newest', label: 'Sort: Newest First' },
+  { value: 'oldest', label: 'Sort: Oldest First' },
+  { value: 'name-asc', label: 'Sort: Name (A–Z)' },
+  { value: 'name-desc', label: 'Sort: Name (Z–A)' },
+];
+
 export default function CounselorClientsPage({ clients, onUpdateClient }: CounselorClientsPageProps) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<ConsultationStatus[]>([]);
   const [country, setCountry] = useState('all');
   const [caseType, setCaseType] = useState('all');
+  const [sortOption, setSortOption] = useState<SortOption>('newest');
   const [selectedClient, setSelectedClient] = useState<CounselorStudent | null>(null);
 
   // Dropdown options come from the data itself, so new countries/case types appear automatically.
+  // A client's `country` can hold more than one country of interest, comma-separated, so this
+  // splits each one out to offer individual countries in the filter.
   const countries = useMemo(
-    () => Array.from(new Set(clients.map((c) => c.country).filter(Boolean))).sort(),
+    () => Array.from(new Set(clients.flatMap((c) => splitCountries(c.country)))).sort(),
     [clients]
   );
   const caseTypes = useMemo(
@@ -48,16 +62,24 @@ export default function CounselorClientsPage({ clients, onUpdateClient }: Counse
 
   const filteredClients = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return clients.filter((client) => {
-      const matchesSearch = !query
-        || client.name.toLowerCase().includes(query)
-        || client.phone.toLowerCase().includes(query);
-      const matchesStatus = statusFilter.length === 0 || statusFilter.includes(client.consultationStatus);
-      const matchesCountry = country === 'all' || client.country === country;
-      const matchesCase = caseType === 'all' || client.purpose === caseType;
-      return matchesSearch && matchesStatus && matchesCountry && matchesCase;
-    });
-  }, [clients, search, statusFilter, country, caseType]);
+    return clients
+      .filter((client) => {
+        const matchesSearch = !query
+          || client.name.toLowerCase().includes(query)
+          || client.phone.toLowerCase().includes(query);
+        const matchesStatus = statusFilter.length === 0 || statusFilter.includes(client.consultationStatus);
+        const matchesCountry = country === 'all' || splitCountries(client.country).includes(country);
+        const matchesCase = caseType === 'all' || client.purpose === caseType;
+        return matchesSearch && matchesStatus && matchesCountry && matchesCase;
+      })
+      .sort((a, b) => {
+        if (sortOption === 'name-asc') return a.name.localeCompare(b.name);
+        if (sortOption === 'name-desc') return b.name.localeCompare(a.name);
+        const aTime = parseSubmittedAt(a.submittedAt)?.getTime() ?? 0;
+        const bTime = parseSubmittedAt(b.submittedAt)?.getTime() ?? 0;
+        return sortOption === 'oldest' ? aTime - bTime : bTime - aTime;
+      });
+  }, [clients, search, statusFilter, country, caseType, sortOption]);
 
   const filtersActive = !!search || statusFilter.length > 0 || country !== 'all' || caseType !== 'all';
 
@@ -85,7 +107,7 @@ export default function CounselorClientsPage({ clients, onUpdateClient }: Counse
     <div className="space-y-5">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-end">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="relative w-full sm:w-72">
+          <div className="relative w-full sm:w-96">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input
               type="search"
@@ -118,7 +140,7 @@ export default function CounselorClientsPage({ clients, onUpdateClient }: Counse
 
       {/* Advanced filters */}
       <div className="rounded-lg border border-grey-border bg-white p-4 space-y-4">
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <div>
             <label className="mb-1.5 block text-xs font-semibold text-gray-500" htmlFor="country-filter">Country of Interest</label>
             <select id="country-filter" value={country} onChange={(e) => setCountry(e.target.value)} className={selectClass}>
@@ -131,6 +153,12 @@ export default function CounselorClientsPage({ clients, onUpdateClient }: Counse
             <select id="case-filter" value={caseType} onChange={(e) => setCaseType(e.target.value)} className={selectClass}>
               <option value="all">All case types</option>
               {caseTypes.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-gray-500" htmlFor="sort-filter">Sort by</label>
+            <select id="sort-filter" value={sortOption} onChange={(e) => setSortOption(e.target.value as SortOption)} className={selectClass}>
+              {SORT_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
             </select>
           </div>
         </div>

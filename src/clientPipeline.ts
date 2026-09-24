@@ -1,4 +1,4 @@
-import { ApplicationRecord, OfferApplication, OfferStatus, VisaApplication, VisaChecklist, VisaStageStatus, Role } from './types';
+import { AcademicEntry, ApplicationRecord, OfferApplication, OfferStatus, VisaApplication, VisaChecklist, VisaStageStatus, Role } from './types';
 
 export type ClientStage = 'Offer' | 'Visa';
 
@@ -6,6 +6,19 @@ export type StatusTone = 'progress' | 'positive' | 'negative' | 'early' | 'withd
 
 export function today(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+/** Combines one Academic entry's 4 fields into one display string, e.g. "Bachelor's in Computer Science, GPA 3.6 (2024)". */
+function formatAcademicEntry(entry: AcademicEntry): string {
+  const levelAndStream = [entry.level, entry.stream].filter(Boolean).join(' in ');
+  const gpa = entry.gpa ? `GPA ${entry.gpa}` : '';
+  const year = entry.completionYear ? `(${entry.completionYear})` : '';
+  return [levelAndStream, gpa, year].filter(Boolean).join(', ').replace(/, \(/, ' (');
+}
+
+/** Joins every academic qualification into one display string, semicolon-separated. */
+export function formatAcademic(record: { academics?: AcademicEntry[] }): string {
+  return (record.academics ?? []).map(formatAcademicEntry).filter(Boolean).join('; ');
 }
 
 export function daysBetween(from: Date, to: Date): number {

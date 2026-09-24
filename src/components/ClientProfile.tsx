@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import {
   ArrowLeft, Check, X, ChevronDown,
   AlertTriangle, Building2, FileText, UserX,
-  Phone, Mail, Globe, Target, User, Cake, IdCard,
+  Phone, Mail, MapPin, Globe, Target, User, Cake, IdCard,
   Users, Heart, GraduationCap, BookOpen, Briefcase,
   ListChecks, MessageSquare, Banknote, Plus, type LucideIcon,
 } from 'lucide-react';
@@ -13,10 +13,11 @@ import {
   getActiveOfferApplication, getFeePaidOffer, isChecklistComplete, checklistCompleteCount, checklistTotalCount,
   getClientStatusLabel, getStatusTone, STATUS_TONE_STYLES, OFFER_STATUS_STYLES,
   pipelineStepsFor, getPipelineStep, getOfferPipelineStep, canEditClientProfile, canWithdrawClient, today, isStudyCase,
-  emptyVisaChecklist, type PipelineStepKey,
+  emptyVisaChecklist, formatAcademic, type PipelineStepKey,
 } from '../clientPipeline';
 import { clientIdFor } from '../clientId';
-import { ROLE_LABELS, ROLE_BADGE_STYLES } from '../mockData';
+import { ROLE_LABELS, ROLE_BADGE_STYLES, COUNTRIES } from '../mockData';
+import { formatSubmittedAt } from '../dateTime';
 
 interface ClientProfileProps {
   application: ApplicationRecord;
@@ -128,6 +129,18 @@ function TextField({
   );
 }
 
+// Read-only display for details already locked in earlier (Enrolment Details / Add
+// Institution) — shown so staff can double-check what they're confirming the fee against
+// without being able to edit it here.
+function ReadOnlyField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-gray-500 mb-1.5">{label}</label>
+      <p className="w-full border border-grey-border rounded-lg px-3 py-2.5 text-sm text-navy bg-grey-bg">{value || '—'}</p>
+    </div>
+  );
+}
+
 // ─── Apply / Re-apply to Institution modal ─────────────────────────────────────
 // Institution, program and intake are all free text — no fixed institution list, so any
 // college or university can be entered.
@@ -136,15 +149,19 @@ function ApplyToInstitutionModal({
   onAdd, onClose,
 }: { onAdd: (o: OfferApplication) => void; onClose: () => void }) {
   const [institution, setInstitution] = useState('');
+  const [country, setCountry] = useState('');
   const [course, setCourse] = useState('');
   const [intake, setIntake] = useState('');
   const [notes, setNotes] = useState('');
 
+  const complete = !!institution.trim() && !!country.trim();
+
   const handleSubmit = () => {
-    if (!institution.trim()) return;
+    if (!complete) return;
     onAdd({
       id: `o${Date.now()}`,
       institution: institution.trim(),
+      country,
       course: course.trim() || undefined,
       intake: intake.trim() || undefined,
       status: 'Enrolled',
@@ -161,13 +178,26 @@ function ApplyToInstitutionModal({
       footer={
         <>
           <button onClick={onClose} className="flex-1 py-2.5 border border-grey-border rounded-lg text-sm font-medium text-navy hover:bg-grey-bg transition-colors">Cancel</button>
-          <button onClick={handleSubmit} disabled={!institution.trim()} className="flex-1 py-2.5 bg-navy text-white rounded-lg text-sm font-semibold hover:bg-navy-light disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          <button onClick={handleSubmit} disabled={!complete} className="flex-1 py-2.5 bg-navy text-white rounded-lg text-sm font-semibold hover:bg-navy-light disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
             Submit
           </button>
         </>
       }
     >
       <TextField label="Institution Name" value={institution} onChange={setInstitution} placeholder="e.g. Holmes Institute" required />
+      <div>
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">Country<span className="text-red-600"> *</span></label>
+        <select
+          value={country}
+          onChange={(e) => setCountry(e.target.value)}
+          className="w-full appearance-none border border-grey-border rounded-lg px-3 py-2.5 text-sm text-navy bg-white focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light"
+        >
+          <option value="" disabled>Select a country</option>
+          {COUNTRIES.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+      </div>
       <TextField label="Program" value={course} onChange={setCourse} placeholder="e.g. Master of Business Information Systems" />
       <TextField label="Intake" value={intake} onChange={setIntake} placeholder="e.g. Feb 2027" />
       <div>
@@ -184,35 +214,27 @@ function ApplyToInstitutionModal({
 export interface FeePaidDetails {
   offerId: string;
   studentId: string;
-  institution: string;
-  course: string;
-  intake: string;
 }
 
 // The client may hold offers from several institutions — the fee is paid to exactly one of
-// them, and that institution issues the Student ID shown on the visa queue.
+// them, and that institution issues the Student ID shown on the visa queue. Institution,
+// country, course and intake were already locked in earlier (Enrolment Details / Add
+// Institution), so they're shown read-only here rather than re-editable — only the Student ID
+// is actually being captured at this step.
 function FeePaidModal({
   offers, onConfirm, onClose,
 }: { offers: OfferApplication[]; onConfirm: (d: FeePaidDetails) => void; onClose: () => void }) {
   const [offerId, setOfferId] = useState(offers[0]?.id ?? '');
   const selected = offers.find((o) => o.id === offerId) ?? offers[0];
   const [studentId, setStudentId] = useState(selected?.studentId ?? '');
-  const [institution, setInstitution] = useState(selected?.institution ?? '');
-  const [course, setCourse] = useState(selected?.course ?? '');
-  const [intake, setIntake] = useState(selected?.intake ?? '');
 
   const pickOffer = (id: string) => {
     const o = offers.find((x) => x.id === id);
     setOfferId(id);
-    if (o) {
-      setInstitution(o.institution ?? '');
-      setCourse(o.course ?? '');
-      setIntake(o.intake ?? '');
-      setStudentId(o.studentId ?? '');
-    }
+    setStudentId(o?.studentId ?? '');
   };
 
-  const complete = [offerId, studentId, institution, course, intake].every((v) => v.trim().length > 0);
+  const complete = !!offerId.trim() && !!studentId.trim();
 
   return (
     <ModalShell
@@ -222,7 +244,7 @@ function FeePaidModal({
         <>
           <button onClick={onClose} className="flex-1 py-2.5 border border-grey-border rounded-lg text-sm font-medium text-navy hover:bg-grey-bg transition-colors">Cancel</button>
           <button
-            onClick={() => complete && onConfirm({ offerId, studentId: studentId.trim(), institution: institution.trim(), course: course.trim(), intake: intake.trim() })}
+            onClick={() => complete && onConfirm({ offerId, studentId: studentId.trim() })}
             disabled={!complete}
             className="flex-1 py-2.5 bg-navy text-white rounded-lg text-sm font-semibold hover:bg-navy-light disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
@@ -231,7 +253,7 @@ function FeePaidModal({
         </>
       }
     >
-      <p className="text-xs text-gray-500">All fields are required before this client moves into the visa stage.</p>
+      <p className="text-xs text-gray-500">Confirm the details below and enter the Student ID before this client moves into the visa stage.</p>
       {offers.length > 1 && (
         <label className="block">
           <span className="text-xs font-medium text-gray-500">Fee paid to <span className="text-red-500">*</span></span>
@@ -246,9 +268,10 @@ function FeePaidModal({
           </select>
         </label>
       )}
-      <TextField label="Institution (College/University)" value={institution} onChange={setInstitution} required />
-      <TextField label="Course" value={course} onChange={setCourse} placeholder="e.g. Bachelor of Nursing" required />
-      <TextField label="Intake" value={intake} onChange={setIntake} placeholder="e.g. Feb 2027" required />
+      <ReadOnlyField label="Institution (College/University)" value={selected?.institution ?? ''} />
+      <ReadOnlyField label="Country" value={selected?.country ?? ''} />
+      <ReadOnlyField label="Course" value={selected?.course ?? ''} />
+      <ReadOnlyField label="Intake" value={selected?.intake ?? ''} />
       <TextField label="Student ID (issued by institution)" value={studentId} onChange={setStudentId} placeholder="e.g. 100482991" required />
     </ModalShell>
   );
@@ -414,21 +437,21 @@ function StatusTracker({
     const date = today();
     switch (value) {
       case 'applied':
-        if (selectedOffer) updateOffer(selectedOffer.id, { status: 'Applied to Institution', statusUpdatedAt: date, appliedDate: date });
+        if (selectedOffer) updateOffer(selectedOffer.id, { status: 'Applied to Institution', statusUpdatedAt: date, appliedDate: date, appliedBy: currentUser.name });
         break;
       case 'further-info':
         if (selectedOffer) updateOffer(selectedOffer.id, { status: 'Further Information Required', statusUpdatedAt: date, furtherInfoRequired: true });
         break;
       case 'offer-received':
-        if (selectedOffer) updateOffer(selectedOffer.id, { status: 'Offer Received', statusUpdatedAt: date, outcomeDate: date });
+        if (selectedOffer) updateOffer(selectedOffer.id, { status: 'Offer Received', statusUpdatedAt: date, outcomeDate: date, outcomeBy: currentUser.name });
         break;
       case 'offer-rejected':
-        if (selectedOffer) updateOffer(selectedOffer.id, { status: 'Rejected', statusUpdatedAt: date, outcomeDate: date });
+        if (selectedOffer) updateOffer(selectedOffer.id, { status: 'Rejected', statusUpdatedAt: date, outcomeDate: date, outcomeBy: currentUser.name });
         break;
       case 'fee-paid':
         if (selectedOffer) {
           onUpdate({
-            offerApplications: attempts.map((o) => (o.id === selectedOffer.id ? { ...o, status: 'Fee Paid', statusUpdatedAt: date, feePaidDate: date } : o)),
+            offerApplications: attempts.map((o) => (o.id === selectedOffer.id ? { ...o, status: 'Fee Paid', statusUpdatedAt: date, feePaidDate: date, feePaidBy: currentUser.name } : o)),
             visaApplication: newVisaAttempt(date, visaHistory),
           });
         }
@@ -472,7 +495,7 @@ function StatusTracker({
       ? [...(application.visaApplication.history ?? []), archiveVisaAttempt(application.visaApplication)]
       : visaHistory;
     onUpdate({
-      offerApplications: [...attempts, o],
+      offerApplications: [...attempts, { ...o, enrolledBy: currentUser.name }],
       ...(resetVisa ? { visaApplication: newVisaAttempt(date, history) } : {}),
     });
     setShowApplyModal(false);
@@ -492,7 +515,7 @@ function StatusTracker({
     const date = today();
     onUpdate({
       offerApplications: attempts.map((o) => (o.id === details.offerId
-        ? { ...o, status: 'Fee Paid' as const, statusUpdatedAt: date, feePaidDate: date, studentId: details.studentId, institution: details.institution, course: details.course, intake: details.intake }
+        ? { ...o, status: 'Fee Paid' as const, statusUpdatedAt: date, feePaidDate: date, feePaidBy: currentUser.name, studentId: details.studentId }
         : o)),
       visaApplication: newVisaAttempt(date, visaHistory),
     });
@@ -546,6 +569,9 @@ function StatusTracker({
                 <Badge className={OFFER_STATUS_STYLES[o.status]}>{o.status}</Badge>
               </div>
               <div className="pl-6 space-y-1">
+                {/* Who did what and when now lives on the Status Tracker timeline below,
+                    next to each step's own date, instead of stacking as generic lines here. */}
+                {o.country && <p className="text-xs text-gray-500">Country: <span className="text-gray-700">{o.country}</span></p>}
                 {o.studentId && <p className="text-xs text-gray-500">Student ID: <span className="text-gray-700">{o.studentId}</span></p>}
                 {o.clientRefId && <p className="text-xs text-gray-500">Reference: <span className="text-gray-700">{o.clientRefId}</span></p>}
                 {o.course && <p className="text-xs text-gray-500">Course: <span className="text-gray-700">{o.course}</span></p>}
@@ -609,6 +635,17 @@ function StatusTracker({
               default: return undefined;
             }
           };
+          // Staff member who reached each step — shown next to that step's date.
+          const offerStepBy = (key: PipelineStepKey, offer: typeof active) => {
+            if (!offer) return undefined;
+            switch (key) {
+              case 'enrolled': return offer.enrolledBy;
+              case 'applied': return offer.appliedBy;
+              case 'offer_outcome': return offer.outcomeBy;
+              case 'fee_paid': return offer.feePaidBy;
+              default: return undefined;
+            }
+          };
           const visaStepDate = (i: number, attempt: VisaApplication) => {
             switch (i) {
               case 0: return attempt.preparingDocsDate ?? (attempt.status === 'Preparing Documents' ? attempt.statusUpdatedAt : undefined);
@@ -631,6 +668,7 @@ function StatusTracker({
               key: step.key,
               label: step.key === 'offer_outcome' && curNegative && i === curIdx ? 'Offer Rejected' : step.label,
               date: offerStepDate(step.key, selectedOffer),
+              by: offerStepBy(step.key, selectedOffer),
               isDone: i < curIdx,
               isCurrent: i === curIdx,
               isCurrentNegative: i === curIdx && curNegative,
@@ -648,10 +686,16 @@ function StatusTracker({
                 : step.key === 'visa_outcome' && negative && i === stepIndex ? 'Visa Refused'
                   : step.label,
               date: visaStepKeys.includes(step.key) && visa ? visaStepDate(visaStepKeys.indexOf(step.key), visa) : offerStepDate(step.key, primaryOffer),
-              // The final "Visa Approved" step stays on `stepIndex` forever once reached (there's
-              // no later step to advance to), so it needs its own check to ever show dark-filled —
-              // completing enrollment is what confirms the client's journey is actually finished.
-              isDone: i < stepIndex || (i === stepIndex && step.key === 'visa_outcome' && !negative && !!visa?.enrollmentCompleted),
+              by: visaStepKeys.includes(step.key) ? undefined : offerStepBy(step.key, primaryOffer),
+              // Reaching a step's named status is itself that step's "done" event — the only
+              // ones that stay ring/current instead of dark-filled while current are steps with
+              // their own extra completion requirement beyond just being reached: Preparing
+              // Documents (checklist may still be incomplete) and, since it's also the final step
+              // and stays on `stepIndex` forever once reached, Visa Approved (needs enrollment
+              // completed to actually be done).
+              isDone: i < stepIndex
+                || (i === stepIndex && step.key === 'visa_outcome' && !negative && !!visa?.enrollmentCompleted)
+                || (i === stepIndex && !negative && step.key !== 'preparing_docs' && step.key !== 'visa_outcome'),
               isCurrent: i === stepIndex,
               isCurrentNegative: i === stepIndex && negative,
               isChecklistStep: i === stepIndex && step.key === 'preparing_docs',
@@ -667,6 +711,7 @@ function StatusTracker({
               key: step.key,
               label: step.label,
               date: offerStepDate(step.key, primaryOffer),
+              by: offerStepBy(step.key, primaryOffer),
               isDone: true,
               isCurrent: false,
               isCurrentNegative: false,
@@ -685,11 +730,15 @@ function StatusTracker({
                 // last step sits at `currentIndex` forever once "Visa Approved" is reached, so it
                 // needs its own check to show dark-filled once enrollment is actually completed.
                 const isFinalStepDone = activeAttempt && i === currentIndex && i === 3 && attempt.status === 'Visa Approved' && !!attempt.enrollmentCompleted;
+                // Reaching a step is itself "done" — Preparing Documents (i === 0, checklist may
+                // still be incomplete) and Visa Approved (i === 3, handled above) are the only
+                // ones that stay ring/current instead of dark-filled while current.
+                const isCurrentStepDone = activeAttempt && i === currentIndex && !terminalRefused && i !== 0 && i !== 3;
                 return {
                   key: `visa-${attemptIndex}-${i}`,
                   label: `${prefix}${terminalRefused ? 'Visa Refused' : baseLabel}`,
                   date: visaStepDate(i, attempt),
-                  isDone: !activeAttempt || i < currentIndex || isFinalStepDone,
+                  isDone: !activeAttempt || i < currentIndex || isFinalStepDone || isCurrentStepDone,
                   isCurrent: activeAttempt && i === currentIndex,
                   isCurrentNegative: terminalRefused,
                   isChecklistStep: activeAttempt && i === currentIndex && i === 0,
@@ -727,6 +776,7 @@ function StatusTracker({
                     <span className={`text-xs flex-shrink-0 ${isCurrentNegative ? 'text-red-500' : isDone || isCurrent ? 'text-gray-500' : 'text-gray-300'}`}>{step.date}</span>
                   )}
                 </div>
+                {step.by && <p className="text-[11px] text-gray-400 mt-0.5">Updated by: {step.by}</p>}
                 {step.isChecklistStep && visa && (
                   <div className="mt-2.5 space-y-2">
                     <div className="flex items-center justify-between">
@@ -893,7 +943,7 @@ function BranchNotes({
       text,
       authorName: currentUser.name,
       authorRole: currentUser.role,
-      createdAt: today(),
+      createdAt: formatSubmittedAt(new Date()),
     };
     onUpdate({ notes: [...notes, newNote] });
     setDraft('');
@@ -949,12 +999,13 @@ function ClientDetails({ application }: { application: ApplicationRecord }) {
     { icon: IdCard,        label: 'Client ID',              value: clientIdFor(application) },
     { icon: Phone,         label: 'Phone',                  value: application.phone },
     { icon: Mail,          label: 'Email',                  value: application.email },
+    { icon: MapPin,        label: 'Address',                value: application.address },
     { icon: Globe,         label: 'Country of Interest',    value: application.country },
     { icon: Target,        label: 'Purpose',                value: application.purpose },
     { icon: Cake,          label: 'Date of Birth',          value: application.dob },
     { icon: Users,         label: 'Gender',                 value: application.gender },
     { icon: Heart,         label: 'Marital Status',         value: application.maritalStatus },
-    { icon: GraduationCap, label: 'Academic Qualification', value: application.academicQualification },
+    { icon: GraduationCap, label: 'Academic',               value: formatAcademic(application) },
     { icon: BookOpen,      label: 'IELTS / PTE',            value: application.ieltsPte },
     { icon: Briefcase,     label: 'Work Experience',        value: application.workExperience },
   ];

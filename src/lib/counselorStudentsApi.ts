@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import { CounselorStudent } from '../types';
+import { normalizeAcademics } from './academics';
 
 export interface CounselorStudentRow {
   id: string;
@@ -8,12 +9,13 @@ export interface CounselorStudentRow {
   name: string;
   phone: string;
   email: string;
+  address: string;
   country: string;
   purpose: string;
   dob: string;
   gender: string;
   marital_status: string;
-  academic_qualification: string;
+  academics: unknown;
   ielts_pte: string;
   work_experience: string;
   submitted_at: string;
@@ -38,6 +40,7 @@ function normalizeEnrolments(raw: unknown): CounselorStudent['enrolments'] {
   if (!Array.isArray(raw)) return undefined;
   return raw.map((e: Record<string, unknown>) => ({
     institution: typeof e.institution === 'string' ? e.institution : '',
+    country: typeof e.country === 'string' ? e.country : '',
     program: typeof e.program === 'string' ? e.program : '',
     intake: typeof e.intake === 'string' ? e.intake : '',
   }));
@@ -51,12 +54,13 @@ export function fromRow(row: CounselorStudentRow): CounselorStudent {
     name: row.name,
     phone: row.phone,
     email: row.email,
+    address: row.address,
     country: row.country,
     purpose: row.purpose,
     dob: row.dob,
     gender: row.gender,
     maritalStatus: row.marital_status,
-    academicQualification: row.academic_qualification,
+    academics: normalizeAcademics(row.academics),
     ieltsPte: row.ielts_pte,
     workExperience: row.work_experience,
     submittedAt: row.submitted_at,
@@ -85,12 +89,13 @@ function toRowUpdates(updates: Partial<CounselorStudent>): Record<string, unknow
   if (updates.name !== undefined) row.name = updates.name;
   if (updates.phone !== undefined) row.phone = updates.phone;
   if (updates.email !== undefined) row.email = updates.email;
+  if (updates.address !== undefined) row.address = updates.address;
   if (updates.country !== undefined) row.country = updates.country;
   if (updates.purpose !== undefined) row.purpose = updates.purpose;
   if (updates.dob !== undefined) row.dob = updates.dob;
   if (updates.gender !== undefined) row.gender = updates.gender;
   if (updates.maritalStatus !== undefined) row.marital_status = updates.maritalStatus;
-  if (updates.academicQualification !== undefined) row.academic_qualification = updates.academicQualification;
+  if (updates.academics !== undefined) row.academics = updates.academics;
   if (updates.ieltsPte !== undefined) row.ielts_pte = updates.ieltsPte;
   if (updates.workExperience !== undefined) row.work_experience = updates.workExperience;
   if (updates.submittedAt !== undefined) row.submitted_at = updates.submittedAt;
@@ -120,12 +125,13 @@ function toRow(cs: CounselorStudent): CounselorStudentRow {
     name: cs.name,
     phone: cs.phone,
     email: cs.email,
+    address: cs.address,
     country: cs.country,
     purpose: cs.purpose,
     dob: cs.dob,
     gender: cs.gender,
     marital_status: cs.maritalStatus,
-    academic_qualification: cs.academicQualification,
+    academics: cs.academics,
     ielts_pte: cs.ieltsPte,
     work_experience: cs.workExperience,
     submitted_at: cs.submittedAt,

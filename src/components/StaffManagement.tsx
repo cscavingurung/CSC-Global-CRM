@@ -411,7 +411,15 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
                 <div className="relative">
                   <select
                     value={newStaff.role}
-                    onChange={(e) => setNewStaff({ ...newStaff, role: e.target.value as StaffRole })}
+                    onChange={(e) => {
+                      const role = e.target.value as StaffRole;
+                      const isCompanyWide = role === 'Marketing' || role === 'Finance';
+                      setNewStaff({
+                        ...newStaff,
+                        role,
+                        branch: isCompanyWide ? currentUser?.branch || '' : defaultNewStaffBranch(),
+                      });
+                    }}
                     className="w-full px-4 py-2.5 border border-grey-border rounded-lg text-sm focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light transition-colors appearance-none bg-white"
                   >
                     <option value="Front Desk Officer">Front Desk Officer</option>
@@ -468,7 +476,7 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
                   <p className="text-xs text-gray-400 mt-1.5">Comma-separate any countries not listed above, e.g. European destinations.</p>
                 </div>
               )}
-              {showBranchFilter && branches && (
+              {showBranchFilter && branches && newStaff.role !== 'Marketing' && newStaff.role !== 'Finance' && (
                 <div>
                   <label className="block text-sm font-medium text-navy mb-1.5">Branch</label>
                   <div className="relative">

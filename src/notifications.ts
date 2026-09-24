@@ -71,13 +71,13 @@ export function createLeadBroadcastNotification(leadId: string, country: string,
 
 // A client's status tracker (offer stage or visa stage) advanced — branch manager only, since
 // no other role needs a push for their own case work.
-export function createStatusUpdateNotification(studentName: string, statusLabel: string, branch: string): AppNotification {
+export function createStatusUpdateNotification(studentName: string, statusLabel: string, branch: string, updatedBy?: string): AppNotification {
   return {
     id: nextId(),
     trigger: 'status-update',
     studentName,
     messageBefore: '',
-    messageAfter: ` status updated to ${statusLabel}`,
+    messageAfter: ` status updated to ${statusLabel}${updatedBy ? ` by ${updatedBy}` : ''}`,
     createdAt: new Date(),
     read: false,
     role: 'branch_manager',

@@ -40,6 +40,15 @@ const VISA_FILTER_OPTIONS: { value: VisaFilter; label: string }[] = [
   { value: 'Visa Refused', label: 'Visa Refused' },
 ];
 
+type SortOption = 'enrolled-desc' | 'enrolled-asc' | 'name-asc' | 'name-desc';
+
+const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  { value: 'enrolled-desc', label: 'Sort: Newest Enrolled' },
+  { value: 'enrolled-asc', label: 'Sort: Oldest Enrolled' },
+  { value: 'name-asc', label: 'Sort: Name (A–Z)' },
+  { value: 'name-desc', label: 'Sort: Name (Z–A)' },
+];
+
 function getOfferStatus(app: ApplicationRecord | undefined): 'none' | OfferStatus {
   const active = app ? getActiveOfferApplication(app) : null;
   return active ? active.status : 'none';
@@ -54,6 +63,7 @@ export default function ConsultationsPage({ students, applications, partners, cu
   const [enrolledMonth, setEnrolledMonth] = useState('all');
   const [offerFilter, setOfferFilter] = useState<OfferFilter>('all');
   const [visaFilter, setVisaFilter] = useState<VisaFilter>('all');
+  const [sortOption, setSortOption] = useState<SortOption>('enrolled-desc');
   const [viewMode, setViewMode] = useState<'simple' | 'sheet'>('simple');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -102,8 +112,15 @@ export default function ConsultationsPage({ students, applications, partners, cu
       // Manual range works alongside the month dropdown, both on the enrolled date.
       .filter((s) => matchesDateRange(s.completedDate, dateFrom, dateTo))
       .filter((s) => offerFilter === 'all' || getOfferStatus(applicationByClientId.get(clientIdFor(s))) === offerFilter)
-      .filter((s) => visaFilter === 'all' || getVisaStatus(applicationByClientId.get(clientIdFor(s))) === visaFilter);
-  }, [students, search, enrolledMonth, offerFilter, visaFilter, applicationByClientId, dateFrom, dateTo]);
+      .filter((s) => visaFilter === 'all' || getVisaStatus(applicationByClientId.get(clientIdFor(s))) === visaFilter)
+      .sort((a, b) => {
+        if (sortOption === 'name-asc') return a.name.localeCompare(b.name);
+        if (sortOption === 'name-desc') return b.name.localeCompare(a.name);
+        const aTime = a.completedDate ? new Date(a.completedDate).getTime() : 0;
+        const bTime = b.completedDate ? new Date(b.completedDate).getTime() : 0;
+        return sortOption === 'enrolled-asc' ? aTime - bTime : bTime - aTime;
+      });
+  }, [students, search, enrolledMonth, offerFilter, visaFilter, applicationByClientId, dateFrom, dateTo, sortOption]);
 
   const selectedApplication = viewStudent ? applicationByClientId.get(clientIdFor(viewStudent)) : undefined;
 
@@ -162,6 +179,18 @@ export default function ConsultationsPage({ students, applications, partners, cu
             className="w-full sm:w-auto appearance-none bg-white border border-grey-border rounded-lg pl-3 pr-9 py-2.5 text-sm font-medium text-navy focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light transition-colors"
           >
             {VISA_FILTER_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+        </div>
+        <div className="relative">
+          <select
+            value={sortOption}
+            onChange={(e) => setSortOption(e.target.value as SortOption)}
+            className="w-full sm:w-auto appearance-none bg-white border border-grey-border rounded-lg pl-3 pr-9 py-2.5 text-sm font-medium text-navy focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light transition-colors"
+          >
+            {SORT_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>

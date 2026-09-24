@@ -50,7 +50,7 @@ const STALE_STUDENT_HOURS = 24;
 
 type ActivityFilter = 'all' | ActivityEntry['type'];
 
-// Today's Activity is derived live from the branch-scoped notifications created alongside
+// Activity is derived live from the branch-scoped notifications created alongside
 // New Intake / Assign Counselor / Consultation Ready / Status Tracker updates (see
 // createBranchManagerNotification and createStatusUpdateNotification in src/notifications.ts)
 // rather than the static, never-written-to activity_feed table.
@@ -61,10 +61,6 @@ const TRIGGER_TO_ACTIVITY_TYPE: Record<AppNotification['trigger'], ActivityEntry
   'lead-broadcast': 'intake',
   'status-update': 'status',
 };
-
-function isSameDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
 
 interface NeedsAttentionRow {
   id: string;
@@ -130,7 +126,7 @@ export default function BranchManagerOverview({ branch, students, counselorStude
   const needsAttention = useMemo<NeedsAttentionRow[]>(() => {
     const rows: NeedsAttentionRow[] = [];
 
-    students
+    periodStudents
       .filter((s) => s.status === 'New')
       .forEach((s) => {
         const submitted = parseSubmittedAt(s.submittedAt);
@@ -149,7 +145,7 @@ export default function BranchManagerOverview({ branch, students, counselorStude
         });
       });
 
-    branchApplications
+    periodApplications
       .filter(isClientInProgress)
       .forEach((a) => {
         const days = daysInCurrentStatus(a, now);
@@ -181,12 +177,13 @@ export default function BranchManagerOverview({ branch, students, counselorStude
       });
 
     return rows.sort((a, b) => b.severity - a.severity);
-  }, [students, branchApplications, counselors, now]);
+  }, [periodStudents, periodApplications, counselors, now]);
 
-  const todaysActivity = useMemo<ActivityEntry[]>(() => {
-    const today = new Date();
+  // Same report-period window as the stat cards above, so switching the period filter updates
+  // this feed too instead of only the cards.
+  const periodActivity = useMemo<ActivityEntry[]>(() => {
     return notifications
-      .filter((n) => n.role === 'branch_manager' && n.branch === branch && isSameDay(n.createdAt, today))
+      .filter((n) => n.role === 'branch_manager' && n.branch === branch && (!start || n.createdAt >= start))
       .filter((n) => activityFilter === 'all' || TRIGGER_TO_ACTIVITY_TYPE[n.trigger] === activityFilter)
       .map((n) => ({
         id: n.id,
@@ -194,18 +191,18 @@ export default function BranchManagerOverview({ branch, students, counselorStude
         timestamp: formatRelativeTime(n.createdAt),
         type: TRIGGER_TO_ACTIVITY_TYPE[n.trigger],
       }));
-  }, [notifications, branch, activityFilter]);
+  }, [notifications, branch, activityFilter, start]);
 
-  const activityTotalPages = Math.max(1, Math.ceil(todaysActivity.length / ACTIVITY_PAGE_SIZE));
+  const activityTotalPages = Math.max(1, Math.ceil(periodActivity.length / ACTIVITY_PAGE_SIZE));
 
   useEffect(() => {
     setActivityPage(1);
   }, [activityFilter]);
 
   const pagedActivity = useMemo(() => {
-    const start = (activityPage - 1) * ACTIVITY_PAGE_SIZE;
-    return todaysActivity.slice(start, start + ACTIVITY_PAGE_SIZE);
-  }, [todaysActivity, activityPage]);
+    const pageStart = (activityPage - 1) * ACTIVITY_PAGE_SIZE;
+    return periodActivity.slice(pageStart, pageStart + ACTIVITY_PAGE_SIZE);
+  }, [periodActivity, activityPage]);
 
   return (
     <div className="space-y-6">
@@ -288,7 +285,7 @@ export default function BranchManagerOverview({ branch, students, counselorStude
 
         <div className="stat-card">
           <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-            <h3 className="text-base font-semibold text-navy">Today's Activity</h3>
+            <h3 className="text-base font-semibold text-navy">Activity · {suffix}</h3>
             <div className="flex items-center gap-1 flex-wrap">
               {ACTIVITY_FILTERS.map((f) => (
                 <button
@@ -305,7 +302,7 @@ export default function BranchManagerOverview({ branch, students, counselorStude
               ))}
             </div>
           </div>
-          {todaysActivity.length > 0 ? (
+          {periodActivity.length > 0 ? (
             <>
               <div className="space-y-1">
                 {pagedActivity.map((entry, idx) => {
@@ -357,7 +354,7 @@ export default function BranchManagerOverview({ branch, students, counselorStude
               )}
             </>
           ) : (
-            <p className="text-sm text-gray-400 text-center py-6">No activity yet today.</p>
+            <p className="text-sm text-gray-400 text-center py-6">No activity in this period.</p>
           )}
         </div>
       </div>

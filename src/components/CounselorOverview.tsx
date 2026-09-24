@@ -22,6 +22,7 @@ interface StatCardDef {
   value: string;
   label: string;
   trend: string;
+  emphasized?: boolean;
 }
 
 function monthKey(dateStr: string): string {
@@ -111,6 +112,7 @@ export default function CounselorOverview({ counselorName, counselorStudents, ap
         value: String(awaiting.length),
         label: 'Awaiting Consultation',
         trend: awaitingOver24h === 0 ? 'None waiting over 24 hrs' : `${awaitingOver24h} waiting over 24 hrs`,
+        emphasized: awaiting.length > 0,
       },
       {
         key: 'completed',
@@ -129,18 +131,20 @@ export default function CounselorOverview({ counselorName, counselorStudents, ap
     ];
   }, [myStudents, myApplications, now, suffix]);
 
-  // Follow-ups this counselor scheduled — soonest first, overdue ones kept visible.
+  // Follow-ups this counselor scheduled — soonest first, overdue ones kept visible. Scoped to
+  // the same report-period window as the stat cards, so switching the period filter updates
+  // this list too instead of only the cards above it.
   const upcomingFollowUps = useMemo(
     () =>
-      allMyStudents
+      myStudents
         .filter((s) => s.consultationStatus === 'Follow Up' && !!s.followUpDate)
         .sort((a, b) => ((a.followUpDate as string) < (b.followUpDate as string) ? -1 : 1))
         .slice(0, 6),
-    [allMyStudents]
+    [myStudents]
   );
 
-  // Activity feed on this counselor's clients.
-  const updates = useMemo(() => recentActivity(allMyApplications, 6), [allMyApplications]);
+  // Activity feed on this counselor's clients, scoped to the same report-period window.
+  const updates = useMemo(() => recentActivity(myApplications, 6), [myApplications]);
   const newUpdateCount = useMemo(
     () => (lastLoginAt ? recentActivity(allMyApplications, 200).filter((e) => e.date > lastLoginAt).length : 0),
     [allMyApplications, lastLoginAt]
@@ -168,15 +172,18 @@ export default function CounselorOverview({ counselorName, counselorStudents, ap
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <div key={stat.key} className="stat-card">
+            <div
+              key={stat.key}
+              className={`stat-card ${stat.emphasized ? 'border-2 border-amber-300 bg-amber-50' : ''}`}
+            >
               <div className="flex items-start justify-between mb-4">
-                <div className="w-11 h-11 rounded-lg bg-navy/5 flex items-center justify-center">
-                  <Icon className="text-navy" size={22} />
+                <div className={`w-11 h-11 rounded-lg flex items-center justify-center ${stat.emphasized ? 'bg-amber-100' : 'bg-navy/5'}`}>
+                  <Icon className={stat.emphasized ? 'text-amber-600' : 'text-navy'} size={22} />
                 </div>
               </div>
-              <p className="text-3xl font-bold text-navy">{stat.value}</p>
+              <p className={`font-bold ${stat.emphasized ? 'text-4xl text-amber-700' : 'text-3xl text-navy'}`}>{stat.value}</p>
               <p className="text-sm text-gray-500 mt-1">{stat.label}</p>
-              <p className="text-xs mt-2 text-gray-400">{stat.trend}</p>
+              <p className={`text-xs mt-2 ${stat.emphasized ? 'text-amber-600 font-medium' : 'text-gray-400'}`}>{stat.trend}</p>
             </div>
           );
         })}

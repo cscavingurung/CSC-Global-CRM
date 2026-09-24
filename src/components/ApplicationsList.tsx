@@ -7,9 +7,12 @@ import CompactDateRangeFilter from './CompactDateRangeFilter';
 import { matchesDateRange } from '../dateFilter';
 import {
   getClientStage, getClientStatusLabel, getStatusTone, STATUS_TONE_STYLES, ClientStage,
-  OFFER_STATUS_STYLES, getFeePaidOffer, isStudyCase,
+  OFFER_STATUS_STYLES, getFeePaidOffer, getActiveOfferApplication, isStudyCase,
 } from '../clientPipeline';
 import { clientIdFor } from '../clientId';
+import { INTAKE_MONTHS, generateIntakeYears } from '../mockData';
+
+const INTAKE_YEARS = generateIntakeYears(5, 2);
 
 interface ApplicationsListProps {
   applications: ApplicationRecord[];
@@ -37,14 +40,15 @@ const STAGE_FILTER_OPTIONS: { value: StageFilter; label: string }[] = [
 ];
 
 // Offer queue filter — grouped by where the offer letter itself stands.
-type OfferFilter = 'all' | 'pending' | 'further-info' | 'received' | 'decided';
+type OfferFilter = 'all' | 'pending' | 'further-info' | 'received' | 'refused' | 'fee-paid';
 
 const OFFER_FILTER_OPTIONS: { value: OfferFilter; label: string }[] = [
   { value: 'all', label: 'All Offer Statuses' },
   { value: 'pending', label: 'Offer Letter Pending' },
   { value: 'further-info', label: 'Further Information Required' },
   { value: 'received', label: 'Offer Letter Received' },
-  { value: 'decided', label: 'Other/Decided' },
+  { value: 'refused', label: 'Offer Refused' },
+  { value: 'fee-paid', label: 'Fee Paid' },
 ];
 
 function matchesOfferFilter(offer: OfferApplication | null, filter: OfferFilter): boolean {
@@ -53,7 +57,8 @@ function matchesOfferFilter(offer: OfferApplication | null, filter: OfferFilter)
   if (filter === 'pending') return offer.status === 'Enrolled' || offer.status === 'Applied to Institution';
   if (filter === 'further-info') return offer.status === 'Further Information Required';
   if (filter === 'received') return offer.status === 'Offer Received';
-  return offer.status === 'Fee Paid' || offer.status === 'Rejected';
+  if (filter === 'refused') return offer.status === 'Rejected';
+  return offer.status === 'Fee Paid';
 }
 
 // Soft-tinted case type pill — Study / SOWP / Visit and anything else the branch records.
@@ -71,6 +76,14 @@ function CaseTypeBadge({ purpose }: { purpose: string }) {
 type SortKey = 'date' | 'name' | 'institution' | 'country';
 type VisaStatusFilter = 'Pending' | 'Applied' | 'Approved' | 'Refused';
 type ViewMode = 'simple' | 'sheet' | 'kanban';
+type SortOption = 'date-desc' | 'date-asc' | 'name-asc' | 'name-desc';
+
+const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  { value: 'date-desc', label: 'Sort: Newest Submission' },
+  { value: 'date-asc', label: 'Sort: Oldest Submission' },
+  { value: 'name-asc', label: 'Sort: Name (A–Z)' },
+  { value: 'name-desc', label: 'Sort: Name (Z–A)' },
+];
 
 const VISA_STATUS_FILTER_OPTIONS: VisaStatusFilter[] = ['Pending', 'Applied', 'Approved', 'Refused'];
 
@@ -97,6 +110,8 @@ export default function ApplicationsList({ applications, onUpdateApplication, br
   const [dateTo, setDateTo] = useState('');
   const [visaStatusFilter, setVisaStatusFilter] = useState<VisaStatusFilter[]>([]);
   const [visaStatusOpen, setVisaStatusOpen] = useState(false);
+  const [intakeMonth, setIntakeMonth] = useState('');
+  const [intakeYear, setIntakeYear] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('date');
   const [sortAsc, setSortAsc] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('simple');
@@ -137,8 +152,23 @@ export default function ApplicationsList({ applications, onUpdateApplication, br
       }
     });
 
+    // Intake filter (Offer/Visa queues only) — the Offer queue matches the specific
+    // institution attempt each row represents; the Visa queue has no per-row offer, so it
+    // matches whichever offer actually got the client into the visa stage (fee-paid, or
+    // still-active if not yet paid).
+    const matchesIntake = (row: Row) => {
+      if (!intakeMonth && !intakeYear) return true;
+      const intake = isOfferQueue
+        ? row.offer?.intake
+        : (getFeePaidOffer(row.app)?.intake ?? getActiveOfferApplication(row.app)?.intake);
+      if (!intake) return false;
+      const [im, iy] = intake.split(' ');
+      return (!intakeMonth || im === intakeMonth) && (!intakeYear || iy === intakeYear);
+    };
+    const filtered = (isOfferQueue || isVisaQueue) ? built.filter(matchesIntake) : built;
+
     const dir = sortAsc ? 1 : -1;
-    return built.sort((x, y) => {
+    return filtered.sort((x, y) => {
       const left = sortKey === 'name' ? x.app.name
         : sortKey === 'country' ? x.app.country
           : sortKey === 'institution' ? (x.offer?.institution ?? '')
@@ -149,11 +179,22 @@ export default function ApplicationsList({ applications, onUpdateApplication, br
             : y.app.consultationDate;
       return left.localeCompare(right) * dir;
     });
-  }, [applications, search, stageScope, stageFilter, offerFilter, branchFilter, showBranchFilter, dateFrom, dateTo, isOfferQueue, isVisaQueue, excludePendingOffers, visaStatusFilter, sortKey, sortAsc]);
+  }, [applications, search, stageScope, stageFilter, offerFilter, branchFilter, showBranchFilter, dateFrom, dateTo, isOfferQueue, isVisaQueue, excludePendingOffers, visaStatusFilter, intakeMonth, intakeYear, sortKey, sortAsc]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc((v) => !v);
     else { setSortKey(key); setSortAsc(key !== 'date'); }
+  };
+
+  // Dropdown alternative to clicking the table's sortable column headers — same underlying
+  // sortKey/sortAsc state, just collapsed to the 4 combinations the other client-list pages
+  // also offer, for a consistent "Sort by" control across the app.
+  const sortOption: SortOption = sortKey === 'name' ? (sortAsc ? 'name-asc' : 'name-desc') : (sortAsc ? 'date-asc' : 'date-desc');
+  const setSortOption = (value: SortOption) => {
+    if (value === 'date-desc') { setSortKey('date'); setSortAsc(false); }
+    else if (value === 'date-asc') { setSortKey('date'); setSortAsc(true); }
+    else if (value === 'name-asc') { setSortKey('name'); setSortAsc(true); }
+    else { setSortKey('name'); setSortAsc(false); }
   };
 
   const toggleVisaStatus = (status: VisaStatusFilter) => {
@@ -266,6 +307,36 @@ export default function ApplicationsList({ applications, onUpdateApplication, br
             )}
           </div>
         )}
+        {(isOfferQueue || isVisaQueue) && (
+          <div className="flex gap-2">
+            <div className="relative">
+              <select
+                value={intakeMonth}
+                onChange={(e) => setIntakeMonth(e.target.value)}
+                className="w-full sm:w-auto appearance-none bg-white border border-grey-border rounded-lg pl-3 pr-9 py-2.5 text-sm font-medium text-navy focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light transition-colors"
+              >
+                <option value="">Intake: Any Month</option>
+                {INTAKE_MONTHS.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+            </div>
+            <div className="relative">
+              <select
+                value={intakeYear}
+                onChange={(e) => setIntakeYear(e.target.value)}
+                className="w-full sm:w-auto appearance-none bg-white border border-grey-border rounded-lg pl-3 pr-9 py-2.5 text-sm font-medium text-navy focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light transition-colors"
+              >
+                <option value="">Any Year</option>
+                {INTAKE_YEARS.map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+            </div>
+          </div>
+        )}
         {showBranchFilter && branches && (
           <div className="relative">
             <select
@@ -282,6 +353,20 @@ export default function ApplicationsList({ applications, onUpdateApplication, br
           </div>
         )}
         <CompactDateRangeFilter from={dateFrom} to={dateTo} onFromChange={setDateFrom} onToChange={setDateTo} />
+        {(isOfferQueue || isVisaQueue) && (
+          <div className="relative">
+            <select
+              value={sortOption}
+              onChange={(e) => setSortOption(e.target.value as SortOption)}
+              className="w-full sm:w-auto appearance-none bg-white border border-grey-border rounded-lg pl-3 pr-9 py-2.5 text-sm font-medium text-navy focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light transition-colors"
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+          </div>
+        )}
       </div>
       )}
 

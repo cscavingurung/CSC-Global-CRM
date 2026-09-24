@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Search, X, UserCheck, ChevronDown, LayoutGrid, Sheet } from 'lucide-react';
 import { Counselor, CounselorStudent, IntakeStudent } from '../types';
 import { dateKey } from '../dateTime';
+import { formatAcademic } from '../clientPipeline';
 import AssignCounselorModal from './AssignCounselorModal';
 import CompactDateRangeFilter from './CompactDateRangeFilter';
 import { matchesDateRange } from '../dateFilter';
@@ -166,7 +167,7 @@ export default function StudentList({ students, counselors, counselorStudents = 
             <table className="border-collapse text-xs whitespace-nowrap">
               <thead>
                 <tr className="bg-grey-bg">
-                  {['#', 'Name', 'Email', 'Phone', 'Visit Date and Time', 'Date of Birth', 'Gender', 'Marital Status', 'Qualification', 'IELTS / PTE', 'Work Experience', 'Country', 'Purpose', 'Submitted', 'Branch', 'Status', 'Counselor'].map((h) => (
+                  {['#', 'Name', 'Email', 'Phone', 'Address', 'Visit Date and Time', 'Date of Birth', 'Gender', 'Marital Status', 'Academic', 'IELTS / PTE', 'Work Experience', 'Country', 'Purpose', 'Submitted', 'Branch', 'Status', 'Counselor'].map((h) => (
                     <th key={h} className="sticky top-0 text-left font-semibold text-gray-500 px-3 py-2 border border-grey-border">{h}</th>
                   ))}
                 </tr>
@@ -181,11 +182,12 @@ export default function StudentList({ students, counselors, counselorStudents = 
                       <td className="px-3 py-2 border border-grey-border font-medium text-navy">{s.name}</td>
                       <td className="px-3 py-2 border border-grey-border text-gray-600">{s.email}</td>
                       <td className="px-3 py-2 border border-grey-border text-gray-600">{s.phone}</td>
+                      <td className="px-3 py-2 border border-grey-border text-gray-600">{s.address}</td>
                       <td className="px-3 py-2 border border-grey-border text-gray-600">{cs?.visitDateTime ?? s.visitDateTime ?? s.submittedAt}</td>
                       <td className="px-3 py-2 border border-grey-border text-gray-600">{s.dob}</td>
                       <td className="px-3 py-2 border border-grey-border text-gray-600">{s.gender}</td>
                       <td className="px-3 py-2 border border-grey-border text-gray-600">{s.maritalStatus}</td>
-                      <td className="px-3 py-2 border border-grey-border text-gray-600">{s.academicQualification}</td>
+                      <td className="px-3 py-2 border border-grey-border text-gray-600">{formatAcademic(s)}</td>
                       <td className="px-3 py-2 border border-grey-border text-gray-600">{s.ieltsPte}</td>
                       <td className="px-3 py-2 border border-grey-border text-gray-600">{s.workExperience}</td>
                       <td className="px-3 py-2 border border-grey-border text-gray-600">{s.country}</td>

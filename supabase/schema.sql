@@ -4,12 +4,13 @@ create table if not exists students (
   name text not null,
   phone text not null,
   email text not null,
+  address text not null default '',
   country text not null,
   purpose text not null,
   dob text not null,
   gender text not null,
   marital_status text not null,
-  academic_qualification text not null,
+  academics jsonb not null default '[]',
   ielts_pte text not null,
   work_experience text not null,
   submitted_at text not null,
@@ -38,6 +39,15 @@ alter table students add column if not exists claimed_by text;
 alter table students add column if not exists claimed_at text;
 alter table students add column if not exists revisited_at text;
 alter table students add column if not exists visit_history text[];
+alter table students add column if not exists address text not null default '';
+alter table students add column if not exists academics jsonb not null default '[]';
+
+-- Legacy column, no longer written by the app — relaxed so old rows aren't required to carry it.
+do $$ begin
+  if exists (select 1 from information_schema.columns where table_name = 'students' and column_name = 'academic_qualification') then
+    alter table students alter column academic_qualification drop not null;
+  end if;
+end $$;
 
 alter table students enable row level security;
 drop policy if exists "anon full access" on students;
@@ -79,12 +89,13 @@ create table if not exists counselor_students (
   name text not null,
   phone text not null,
   email text not null,
+  address text not null default '',
   country text not null,
   purpose text not null,
   dob text not null,
   gender text not null,
   marital_status text not null,
-  academic_qualification text not null,
+  academics jsonb not null default '[]',
   ielts_pte text not null,
   work_experience text not null,
   submitted_at text not null,
@@ -115,6 +126,15 @@ alter table counselor_students add column if not exists revisited_at text;
 alter table counselor_students add column if not exists visit_history text[];
 alter table counselor_students add column if not exists lead_temperature text;
 alter table counselor_students add column if not exists follow_up_note text;
+alter table counselor_students add column if not exists address text not null default '';
+alter table counselor_students add column if not exists academics jsonb not null default '[]';
+
+-- Legacy column, no longer written by the app — relaxed so old rows aren't required to carry it.
+do $$ begin
+  if exists (select 1 from information_schema.columns where table_name = 'counselor_students' and column_name = 'academic_qualification') then
+    alter table counselor_students alter column academic_qualification drop not null;
+  end if;
+end $$;
 
 alter table counselor_students enable row level security;
 drop policy if exists "anon full access" on counselor_students;
@@ -132,12 +152,13 @@ create table if not exists applications (
   name text not null,
   phone text not null,
   email text not null,
+  address text,
   country text not null,
   purpose text not null,
   dob text,
   gender text,
   marital_status text,
-  academic_qualification text,
+  academics jsonb not null default '[]',
   ielts_pte text,
   work_experience text,
   counselor text not null,
@@ -159,6 +180,8 @@ alter table applications add column if not exists added_by text;
 alter table applications add column if not exists platform_source text;
 alter table applications add column if not exists visit_date_time text;
 alter table applications add column if not exists notes jsonb not null default '[]';
+alter table applications add column if not exists address text;
+alter table applications add column if not exists academics jsonb not null default '[]';
 
 alter table applications enable row level security;
 drop policy if exists "anon full access" on applications;

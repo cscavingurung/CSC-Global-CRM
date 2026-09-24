@@ -1,10 +1,12 @@
 import { useMemo, useState, useEffect } from 'react';
 import {
-  X, User, Phone, Mail, Globe, Target, Check, UserCheck,
+  X, User, Phone, Mail, MapPin, Globe, Target, Check, UserCheck,
   Users, Heart, GraduationCap, Languages, Briefcase, Cake,
 } from 'lucide-react';
 import { IntakeStudent, Counselor } from '../types';
 import { AVAILABILITY_STYLES, sortByAvailability } from '../counselorStatus';
+import { formatAcademic } from '../clientPipeline';
+import { splitCountries } from '../mockData';
 
 interface AssignCounselorModalProps {
   student: IntakeStudent;
@@ -26,14 +28,16 @@ export default function AssignCounselorModal({
 
   // Country-of-interest match is a fit signal, not a restriction — matching counselors are
   // just sorted first and badged, never disabled or de-emphasized. Within each group,
-  // available counselors sort before in-session/away ones.
+  // available counselors sort before in-session/away ones. A client can list more than one
+  // country of interest, so "match" means any overlap with the counselor's specializations.
+  const studentCountries = useMemo(() => splitCountries(student.country), [student.country]);
   const { matching, others } = useMemo(() => {
-    const isMatch = (c: Counselor) => c.countries.includes(student.country);
+    const isMatch = (c: Counselor) => c.countries.some((sc) => studentCountries.includes(sc));
     return {
       matching: sortByAvailability(counselors.filter(isMatch)),
       others: sortByAvailability(counselors.filter((c) => !isMatch(c))),
     };
-  }, [counselors, student.country]);
+  }, [counselors, studentCountries]);
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -47,12 +51,13 @@ export default function AssignCounselorModal({
     { icon: User, label: 'Name', value: student.name },
     { icon: Phone, label: 'Phone', value: student.phone },
     { icon: Mail, label: 'Email', value: student.email },
+    { icon: MapPin, label: 'Address', value: student.address },
     { icon: Globe, label: 'Country', value: student.country },
     { icon: Target, label: 'Purpose', value: student.purpose },
     { icon: Cake, label: 'Date of Birth', value: student.dob },
     { icon: Users, label: 'Gender', value: student.gender },
     { icon: Heart, label: 'Marital Status', value: student.maritalStatus },
-    { icon: GraduationCap, label: 'Academic Qualification', value: student.academicQualification },
+    { icon: GraduationCap, label: 'Academic', value: formatAcademic(student) },
     { icon: Languages, label: 'IELTS/PTE', value: student.ieltsPte },
     { icon: Briefcase, label: 'Work Experience', value: student.workExperience },
   ];
@@ -109,56 +114,55 @@ export default function AssignCounselorModal({
           {/* Counselor selection */}
           <div className="px-5 pb-5">
             <label className="block text-sm font-medium text-navy mb-1.5">Select Counselor</label>
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="w-full flex items-center justify-between pl-4 pr-3 py-2.5 border border-grey-border rounded-lg text-sm focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light transition-colors bg-white"
-              >
-                <span className={selectedCounselor ? 'text-navy font-medium' : 'text-gray-400'}>
-                  {selectedCounselor || 'Choose a counselor'}
-                </span>
-                <ChevronDownIcon open={dropdownOpen} />
-              </button>
-              {dropdownOpen && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setDropdownOpen(false)} />
-                  <div className="absolute z-20 mt-1 w-full bg-white border border-grey-border rounded-lg overflow-hidden max-h-80 overflow-y-auto">
-                    {matching.map((c) => (
-                      <CounselorOption
-                        key={c.id}
-                        counselor={c}
-                        selected={c.name === selectedCounselor}
-                        isSpecialist
-                        studentCountry={student.country}
-                        onSelect={() => {
-                          setSelectedCounselor(c.name);
-                          setDropdownOpen(false);
-                        }}
-                      />
-                    ))}
-                    {matching.length > 0 && others.length > 0 && (
-                      <p className="px-4 py-1.5 text-[11px] font-medium text-gray-400 uppercase tracking-wide bg-grey-bg">
-                        Other counselors
-                      </p>
-                    )}
-                    {others.map((c) => (
-                      <CounselorOption
-                        key={c.id}
-                        counselor={c}
-                        selected={c.name === selectedCounselor}
-                        isSpecialist={false}
-                        studentCountry={student.country}
-                        onSelect={() => {
-                          setSelectedCounselor(c.name);
-                          setDropdownOpen(false);
-                        }}
-                      />
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
+            <button
+              type="button"
+              onClick={() => setDropdownOpen(!dropdownOpen)}
+              className="w-full flex items-center justify-between pl-4 pr-3 py-2.5 border border-grey-border rounded-lg text-sm focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light transition-colors bg-white"
+            >
+              <span className={selectedCounselor ? 'text-navy font-medium' : 'text-gray-400'}>
+                {selectedCounselor || 'Choose a counselor'}
+              </span>
+              <ChevronDownIcon open={dropdownOpen} />
+            </button>
+            {/* In-flow (not absolutely positioned) so a long list scrolls with the rest of the
+                drawer's own overflow-y-auto instead of needing its own nested scroll region —
+                an absolute overlay here would get clipped by that ancestor on short screens,
+                making the list scrollable only while the pointer sits directly over it. */}
+            {dropdownOpen && (
+              <div className="mt-1 w-full bg-white border border-grey-border rounded-lg overflow-hidden">
+                {matching.map((c) => (
+                  <CounselorOption
+                    key={c.id}
+                    counselor={c}
+                    selected={c.name === selectedCounselor}
+                    isSpecialist
+                    matchedCountries={c.countries.filter((sc) => studentCountries.includes(sc))}
+                    onSelect={() => {
+                      setSelectedCounselor(c.name);
+                      setDropdownOpen(false);
+                    }}
+                  />
+                ))}
+                {matching.length > 0 && others.length > 0 && (
+                  <p className="px-4 py-1.5 text-[11px] font-medium text-gray-400 uppercase tracking-wide bg-grey-bg">
+                    Other counselors
+                  </p>
+                )}
+                {others.map((c) => (
+                  <CounselorOption
+                    key={c.id}
+                    counselor={c}
+                    selected={c.name === selectedCounselor}
+                    isSpecialist={false}
+                    matchedCountries={[]}
+                    onSelect={() => {
+                      setSelectedCounselor(c.name);
+                      setDropdownOpen(false);
+                    }}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -189,7 +193,7 @@ interface CounselorOptionProps {
   counselor: Counselor;
   selected: boolean;
   isSpecialist: boolean;
-  studentCountry: string;
+  matchedCountries: string[];
   onSelect: () => void;
 }
 
@@ -198,7 +202,7 @@ interface CounselorOptionProps {
 // white-on-navy overlay treatment when selected rather than keeping their normal colors
 // (a navy "In Session" badge, for instance, would otherwise disappear against the selected
 // row's own navy background).
-function CounselorOption({ counselor: c, selected, isSpecialist, studentCountry, onSelect }: CounselorOptionProps) {
+function CounselorOption({ counselor: c, selected, isSpecialist, matchedCountries, onSelect }: CounselorOptionProps) {
   const overlayBadge = 'bg-white/20 text-white';
 
   return (
@@ -214,7 +218,7 @@ function CounselorOption({ counselor: c, selected, isSpecialist, studentCountry,
           <p className="font-medium truncate">{c.name}</p>
           {isSpecialist && (
             <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${selected ? overlayBadge : 'bg-navy text-white'}`}>
-              {studentCountry} specialist
+              {matchedCountries.join(', ')} specialist
             </span>
           )}
         </div>

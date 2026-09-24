@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
 import {
-  ArrowLeft, User, Phone, Mail, Globe, Target, CalendarDays,
+  ArrowLeft, User, Phone, Mail, MapPin, Globe, Target, CalendarDays,
   Send, CheckCircle, XCircle, Lock, Calendar,
   Cake, Users, Heart, GraduationCap, Languages, Briefcase,
 } from 'lucide-react';
 import { CounselorStudent, ConsultationStatus, ConsultationOutcome, EnrolmentChoice, LeadTemperature } from '../types';
 import { LEAD_TEMPERATURES, LEAD_TEMPERATURE_HINTS, LEAD_TEMPERATURE_STYLES } from '../leadTemperature';
-import { isStudyCase } from '../clientPipeline';
+import { isStudyCase, formatAcademic } from '../clientPipeline';
 import { clientIdFor } from '../clientId';
+import { COUNTRIES, INTAKE_MONTHS, generateIntakeYears } from '../mockData';
+
+const INTAKE_YEARS = generateIntakeYears();
 
 interface StudentDetailDrawerProps {
   student: CounselorStudent;
@@ -25,16 +28,20 @@ const STATUS_STYLES: Record<ConsultationStatus, string> = {
 };
 
 // Study clients need their target institutions captured as they move to Enrolled — a client
-// can apply to several at once, and each one becomes its own offer application.
-function EnrolmentModal({
+// can apply to several at once, and each one becomes its own offer application. Exported so
+// the Follow Up / Archive profile (StudentProfile) can reuse it for the same outcome flow.
+export function EnrolmentModal({
   onConfirm, onClose,
 }: { onConfirm: (rows: EnrolmentChoice[]) => void; onClose: () => void }) {
-  const [rows, setRows] = useState<EnrolmentChoice[]>([{ institution: '', program: '', intake: '' }]);
+  const [rows, setRows] = useState<EnrolmentChoice[]>([{ institution: '', country: '', program: '', intake: '' }]);
 
   const update = (i: number, field: keyof EnrolmentChoice, value: string) =>
     setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, [field]: value } : r)));
 
-  const complete = rows.every((r) => r.institution.trim() && r.program.trim() && r.intake.trim());
+  const complete = rows.every((r) => {
+    const [intakeMonth, intakeYear] = r.intake.split(' ');
+    return r.institution.trim() && r.country.trim() && r.program.trim() && !!intakeMonth && !!intakeYear;
+  });
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4">
@@ -55,21 +62,54 @@ function EnrolmentModal({
                 placeholder="University / College"
                 className="w-full rounded-lg border border-grey-border px-3 py-2 text-sm text-navy focus:border-navy-light focus:outline-none"
               />
+              <select
+                value={row.country} onChange={(e) => update(i, 'country', e.target.value)}
+                className="w-full appearance-none rounded-lg border border-grey-border bg-white px-3 py-2 text-sm text-navy focus:border-navy-light focus:outline-none"
+              >
+                <option value="" disabled>Select a country</option>
+                {COUNTRIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
               <input
                 type="text" value={row.program} onChange={(e) => update(i, 'program', e.target.value)}
                 placeholder="Program"
                 className="w-full rounded-lg border border-grey-border px-3 py-2 text-sm text-navy focus:border-navy-light focus:outline-none"
               />
-              <input
-                type="text" value={row.intake} onChange={(e) => update(i, 'intake', e.target.value)}
-                placeholder="Intake, e.g. Sep 2026"
-                className="w-full rounded-lg border border-grey-border px-3 py-2 text-sm text-navy focus:border-navy-light focus:outline-none"
-              />
+              <div className="grid grid-cols-2 gap-2">
+                {(() => {
+                  const [intakeMonth = '', intakeYear = ''] = row.intake.split(' ');
+                  return (
+                    <>
+                      <select
+                        value={intakeMonth}
+                        onChange={(e) => update(i, 'intake', `${e.target.value} ${intakeYear}`.trim())}
+                        className="w-full appearance-none rounded-lg border border-grey-border bg-white px-3 py-2 text-sm text-navy focus:border-navy-light focus:outline-none"
+                      >
+                        <option value="" disabled>Month</option>
+                        {INTAKE_MONTHS.map((m) => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={intakeYear}
+                        onChange={(e) => update(i, 'intake', `${intakeMonth} ${e.target.value}`.trim())}
+                        className="w-full appearance-none rounded-lg border border-grey-border bg-white px-3 py-2 text-sm text-navy focus:border-navy-light focus:outline-none"
+                      >
+                        <option value="" disabled>Year</option>
+                        {INTAKE_YEARS.map((y) => (
+                          <option key={y} value={y}>{y}</option>
+                        ))}
+                      </select>
+                    </>
+                  );
+                })()}
+              </div>
             </div>
           ))}
         </div>
         <button
-          onClick={() => setRows((prev) => [...prev, { institution: '', program: '', intake: '' }])}
+          onClick={() => setRows((prev) => [...prev, { institution: '', country: '', program: '', intake: '' }])}
           className="mt-3 text-xs font-semibold text-navy hover:text-navy-light"
         >
           + Add another university
@@ -77,7 +117,7 @@ function EnrolmentModal({
         <div className="mt-5 flex gap-3">
           <button onClick={onClose} className="flex-1 rounded-lg border border-grey-border py-2.5 text-sm font-medium text-navy hover:bg-grey-bg">Cancel</button>
           <button
-            onClick={() => complete && onConfirm(rows.map((r) => ({ institution: r.institution.trim(), program: r.program.trim(), intake: r.intake.trim() })))}
+            onClick={() => complete && onConfirm(rows.map((r) => ({ institution: r.institution.trim(), country: r.country, program: r.program.trim(), intake: r.intake.trim() })))}
             disabled={!complete}
             className="flex-1 rounded-lg bg-navy py-2.5 text-sm font-semibold text-white hover:bg-navy-light disabled:cursor-not-allowed disabled:opacity-40"
           >
@@ -160,7 +200,11 @@ export default function StudentDetailDrawer({ student, onClose, onUpdate }: Stud
   };
 
   const handleOutcomeChange = (newOutcome: ConsultationOutcome) => {
-    if (outcome !== 'Pending') return;
+    // Proceeding is final — the client is already downstream in the application pipeline.
+    // Not Proceeding (archived) can still be reopened later if the client comes back, but
+    // only forward into Proceeding, never back-and-forth.
+    if (outcome === 'Proceeding') return;
+    if (outcome === 'Not Proceeding' && newOutcome !== 'Proceeding') return;
     // Study cases collect their university/program/intake choices first.
     if (newOutcome === 'Proceeding' && isStudyCase(student.purpose)) {
       setShowEnrolmentModal(true);
@@ -187,12 +231,13 @@ export default function StudentDetailDrawer({ student, onClose, onUpdate }: Stud
   const detailRows = [
     { icon: Phone, label: 'Phone', value: student.phone },
     { icon: Mail, label: 'Email', value: student.email },
+    { icon: MapPin, label: 'Address', value: student.address },
     { icon: Globe, label: 'Country of Interest', value: student.country },
     { icon: Target, label: 'Purpose', value: student.purpose },
     { icon: Cake, label: 'Date of Birth', value: student.dob },
     { icon: Users, label: 'Gender', value: student.gender },
     { icon: Heart, label: 'Marital Status', value: student.maritalStatus },
-    { icon: GraduationCap, label: 'Academic Qualification', value: student.academicQualification },
+    { icon: GraduationCap, label: 'Academic', value: formatAcademic(student) },
     { icon: Languages, label: 'IELTS/PTE', value: student.ieltsPte },
     { icon: Briefcase, label: 'Work Experience', value: student.workExperience },
     { icon: CalendarDays, label: 'Submitted', value: student.submittedAt },
@@ -325,6 +370,7 @@ export default function StudentDetailDrawer({ student, onClose, onUpdate }: Stud
                   value={inputDate}
                   min={new Date().toISOString().split('T')[0]}
                   onChange={(e) => setInputDate(e.target.value)}
+                  onClick={(e) => e.currentTarget.showPicker?.()}
                   className="w-full pl-10 pr-4 py-2.5 border border-grey-border rounded-lg text-sm focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light transition-colors"
                 />
               </div>
@@ -421,20 +467,33 @@ export default function StudentDetailDrawer({ student, onClose, onUpdate }: Stud
                   </button>
                 </div>
               ) : (
-                <div className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg border text-sm font-medium ${
-                  outcome === 'Proceeding'
-                    ? 'bg-green-100 text-green-700 border-green-200'
-                    : 'bg-red-100 text-red-700 border-red-200'
-                }`}>
-                  {outcome === 'Proceeding' ? <Send size={15} /> : <XCircle size={15} />}
-                  {outcome}
-                  <Lock size={13} className="ml-auto opacity-60" />
-                </div>
+                <>
+                  <div className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg border text-sm font-medium ${
+                    outcome === 'Proceeding'
+                      ? 'bg-green-100 text-green-700 border-green-200'
+                      : 'bg-red-100 text-red-700 border-red-200'
+                  }`}>
+                    {outcome === 'Proceeding' ? <Send size={15} /> : <XCircle size={15} />}
+                    {outcome}
+                    <Lock size={13} className="ml-auto opacity-60" />
+                  </div>
+                  {/* Not Proceeding is the only reversible outcome — a client can come back later */}
+                  {outcome === 'Not Proceeding' && (
+                    <button
+                      type="button"
+                      onClick={() => handleOutcomeChange('Proceeding')}
+                      className="mt-3 w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg border border-grey-border text-sm font-medium text-gray-500 transition-colors hover:bg-green-50 hover:text-green-700 hover:border-green-200"
+                    >
+                      <Send size={15} />
+                      Reopen — Mark as Proceeding
+                    </button>
+                  )}
+                </>
               )}
               <p className="text-xs text-gray-400 mt-2">
                 {outcome === 'Pending' && 'No decision made yet.'}
                 {outcome === 'Proceeding' && 'Sent to V/A Officer. This decision is final and can\'t be changed.'}
-                {outcome === 'Not Proceeding' && 'Client will not be moving forward. This decision is final and can\'t be changed.'}
+                {outcome === 'Not Proceeding' && 'Client will not be moving forward — but can still be reopened if they come back.'}
               </p>
             </div>
           )}

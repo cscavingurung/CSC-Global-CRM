@@ -1,22 +1,25 @@
 import { useState, useRef, useLayoutEffect } from 'react';
 import {
-  Mountain, CheckCircle, User, Phone, Mail, Globe, Target, Calendar,
-  Users, Heart, GraduationCap, Languages, Briefcase, Share2, Megaphone,
+  Mountain, CheckCircle, User, Phone, Mail, MapPin, Target, Calendar,
+  Users, Heart, GraduationCap, Languages, Briefcase, Share2, Megaphone, Plus, X,
 } from 'lucide-react';
 import { COUNTRIES, PURPOSES } from '../mockData';
 import { PLATFORM_SOURCES } from '../marketing';
 import { today } from '../clientPipeline';
+import { AcademicEntry } from '../types';
 
 export interface IntakeFormData {
   name: string;
   phone: string;
   email: string;
+  address: string;
   country: string;
   purpose: string;
   dob: string;
   gender: string;
   maritalStatus: string;
-  academicQualification: string;
+  /** One or more qualifications — a client can list several (SEE, +2, Bachelor's, …). */
+  academics: AcademicEntry[];
   ieltsPte: string;
   workExperience: string;
   /** How the client found the consultancy. */
@@ -27,7 +30,9 @@ export interface IntakeFormData {
 
 const GENDERS = ['Male', 'Female', 'Other'];
 const MARITAL_STATUSES = ['Single', 'Married', 'Divorced', 'Widowed'];
-export const REFERRAL_SOURCES = ['Walk Ins', 'Marketing', 'Others'];
+const ACADEMIC_LEVELS = ['SEE', '+2/A Level', "Bachelor's", "Master's", 'PhD', 'Others'];
+const EMPTY_ACADEMIC_ENTRY: AcademicEntry = { level: '', stream: '', gpa: '', completionYear: '' };
+export const REFERRAL_SOURCES = ['Walk Ins', 'Marketing', 'Referred By', 'Others'];
 
 // +1 (Canada/US, 10-digit NANP number) or +977 (Nepal, 10-digit mobile starting with 9).
 const PHONE_REGEX = /^(?:\+1[\s-]?\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{4}|\+977[\s-]?9\d{9})$/;
@@ -101,12 +106,13 @@ const EMPTY_FORM: IntakeFormData = {
   name: '',
   phone: '',
   email: '',
+  address: '',
   country: '',
   purpose: '',
   dob: '',
   gender: '',
   maritalStatus: '',
-  academicQualification: '',
+  academics: [EMPTY_ACADEMIC_ENTRY],
   ieltsPte: '',
   workExperience: '',
   referredThrough: '',
@@ -119,7 +125,11 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
     marketing ? { ...EMPTY_FORM, referredThrough: 'Marketing' } : EMPTY_FORM
   );
   const [platformOther, setPlatformOther] = useState('');
+  // One "Others" specify-text slot per academic entry, kept in step with form.academics by index.
+  const [academicLevelOthers, setAcademicLevelOthers] = useState<string[]>(['']);
+  const [referredByName, setReferredByName] = useState('');
   const [phoneError, setPhoneError] = useState('');
+  const [countryError, setCountryError] = useState('');
   const phoneInputRef = useRef<HTMLInputElement>(null);
   const phoneCaretRef = useRef<number | null>(null);
 
@@ -137,10 +147,21 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
       return;
     }
 
-    // "Others" keeps the typed platform name so reporting shows the real source.
+    if (!form.country) {
+      setCountryError('Select at least one country');
+      return;
+    }
+
+    // "Others"/"Referred By" keep the typed name so reporting shows the real source.
     const platformSource =
       form.platformSource === 'Others' ? platformOther.trim() || 'Others' : form.platformSource;
-    onSubmit?.(marketing ? { ...form, platformSource } : form);
+    const academics = form.academics.map((entry, i) => ({
+      ...entry,
+      level: entry.level === 'Others' ? academicLevelOthers[i]?.trim() || 'Others' : entry.level,
+    }));
+    const referredThrough =
+      form.referredThrough === 'Referred By' ? `Referred By: ${referredByName.trim()}` : form.referredThrough;
+    onSubmit?.(marketing ? { ...form, platformSource, academics } : { ...form, academics, referredThrough });
     setSubmitted(true);
     onSubmitted?.();
   };
@@ -148,8 +169,38 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
   const handleReset = () => {
     setForm(marketing ? { ...EMPTY_FORM, referredThrough: 'Marketing' } : EMPTY_FORM);
     setPlatformOther('');
+    setAcademicLevelOthers(['']);
+    setReferredByName('');
     setPhoneError('');
+    setCountryError('');
     setSubmitted(false);
+  };
+
+  const selectedCountries = form.country ? form.country.split(',').map((c) => c.trim()).filter(Boolean) : [];
+
+  const toggleCountry = (c: string) => {
+    const next = selectedCountries.includes(c)
+      ? selectedCountries.filter((v) => v !== c)
+      : [...selectedCountries, c];
+    setForm({ ...form, country: next.join(', ') });
+    if (countryError) setCountryError('');
+  };
+
+  const updateAcademicEntry = (index: number, updates: Partial<AcademicEntry>) => {
+    setForm({
+      ...form,
+      academics: form.academics.map((entry, i) => (i === index ? { ...entry, ...updates } : entry)),
+    });
+  };
+
+  const addAcademicEntry = () => {
+    setForm({ ...form, academics: [...form.academics, EMPTY_ACADEMIC_ENTRY] });
+    setAcademicLevelOthers((prev) => [...prev, '']);
+  };
+
+  const removeAcademicEntry = (index: number) => {
+    setForm({ ...form, academics: form.academics.filter((_, i) => i !== index) });
+    setAcademicLevelOthers((prev) => prev.filter((_, i) => i !== index));
   };
 
   if (submitted) {
@@ -283,6 +334,22 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
             </div>
           </div>
 
+          {/* Address */}
+          <div>
+            <label className="block text-sm font-medium text-navy mb-1.5">Address</label>
+            <div className="relative">
+              <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+              <input
+                type="text"
+                required
+                value={form.address}
+                onChange={(e) => setForm({ ...form, address: e.target.value })}
+                placeholder="e.g. Kathmandu, Nepal"
+                className={fieldClass}
+              />
+            </div>
+          </div>
+
           {/* Date of birth */}
           <div>
             <label className="block text-sm font-medium text-navy mb-1.5">Date of birth</label>
@@ -314,22 +381,23 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
           </div>
 
           {/* Country of interest */}
-          <div>
+          <div className={embedded ? 'col-span-2' : ''}>
             <label className="block text-sm font-medium text-navy mb-1.5">Country of interest</label>
-            <div className="relative">
-              <Globe className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
-              <select
-                required
-                value={form.country}
-                onChange={(e) => setForm({ ...form, country: e.target.value })}
-                className={selectClass}
-              >
-                <option value="" disabled>Select a country</option>
-                {COUNTRIES.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
+            <p className="text-xs text-gray-400 mb-2">A client can be interested in more than one country — select all that apply.</p>
+            <div className={`grid grid-cols-2 sm:grid-cols-3 gap-x-3 gap-y-2 p-3 border rounded-lg ${countryError ? 'border-red-400' : 'border-grey-border'}`}>
+              {COUNTRIES.map((c) => (
+                <label key={c} className="flex items-center gap-2 text-sm text-navy cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedCountries.includes(c)}
+                    onChange={() => toggleCountry(c)}
+                    className="rounded border-grey-border text-navy focus:ring-navy-light"
+                  />
+                  {c}
+                </label>
+              ))}
             </div>
+            {countryError && <p className="mt-1 text-xs text-red-500">{countryError}</p>}
           </div>
 
           {/* Purpose */}
@@ -390,24 +458,43 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
               )}
             </>
           ) : (
-            /* Referred Through */
-            <div>
-              <label className="block text-sm font-medium text-navy mb-1.5">Referred Through</label>
-              <div className="relative">
-                <Share2 className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
-                <select
-                  required
-                  value={form.referredThrough}
-                  onChange={(e) => setForm({ ...form, referredThrough: e.target.value })}
-                  className={selectClass}
-                >
-                  <option value="" disabled>Select a source</option>
-                  {REFERRAL_SOURCES.map((r) => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
-                </select>
+            <>
+              {/* Referred Through */}
+              <div className={embedded ? 'col-span-2' : ''}>
+                <label className="block text-sm font-medium text-navy mb-1.5">Referred Through</label>
+                <div className="relative">
+                  <Share2 className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                  <select
+                    required
+                    value={form.referredThrough}
+                    onChange={(e) => setForm({ ...form, referredThrough: e.target.value })}
+                    className={selectClass}
+                  >
+                    <option value="" disabled>Select a source</option>
+                    {REFERRAL_SOURCES.map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
-            </div>
+
+              {form.referredThrough === 'Referred By' && (
+                <div className={embedded ? 'col-span-2' : ''}>
+                  <label className="block text-sm font-medium text-navy mb-1.5">Referrer's Name</label>
+                  <div className="relative">
+                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                    <input
+                      type="text"
+                      required
+                      value={referredByName}
+                      onChange={(e) => setReferredByName(e.target.value)}
+                      placeholder="e.g. Sita Sharma"
+                      className={fieldClass}
+                    />
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {/* Gender */}
@@ -448,20 +535,99 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
             </div>
           </div>
 
-          {/* Academic qualification */}
-          <div>
-            <label className="block text-sm font-medium text-navy mb-1.5">Academic qualification</label>
-            <div className="relative">
-              <GraduationCap className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-              <input
-                type="text"
-                required
-                value={form.academicQualification}
-                onChange={(e) => setForm({ ...form, academicQualification: e.target.value })}
-                placeholder="e.g. Bachelor's in Computer Science"
-                className={fieldClass}
-              />
+          {/* Academic */}
+          <div className={embedded ? 'col-span-2' : ''}>
+            <label className="block text-sm font-medium text-navy mb-1.5">Academic</label>
+            <div className="space-y-3">
+              {form.academics.map((entry, i) => (
+                <div key={i} className="space-y-3">
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-3">
+                      <div className="relative">
+                        <GraduationCap className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                        <select
+                          required
+                          value={entry.level}
+                          onChange={(e) => updateAcademicEntry(i, { level: e.target.value })}
+                          className={selectClass}
+                        >
+                          <option value="" disabled>Select level</option>
+                          {ACADEMIC_LEVELS.map((l) => (
+                            <option key={l} value={l}>{l}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="relative">
+                        <GraduationCap className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                        <input
+                          type="text"
+                          required
+                          value={entry.stream}
+                          onChange={(e) => updateAcademicEntry(i, { stream: e.target.value })}
+                          placeholder="Stream, e.g. Computer Science"
+                          className={fieldClass}
+                        />
+                      </div>
+                      <div className="relative">
+                        <GraduationCap className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                        <input
+                          type="text"
+                          required
+                          value={entry.gpa}
+                          onChange={(e) => updateAcademicEntry(i, { gpa: e.target.value })}
+                          placeholder="GPA, e.g. 3.6"
+                          className={fieldClass}
+                        />
+                      </div>
+                      <div className="relative">
+                        <GraduationCap className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                        <input
+                          type="text"
+                          required
+                          value={entry.completionYear}
+                          onChange={(e) => updateAcademicEntry(i, { completionYear: e.target.value })}
+                          placeholder="Completion year, e.g. 2024"
+                          className={fieldClass}
+                        />
+                      </div>
+                    </div>
+                    {form.academics.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeAcademicEntry(i)}
+                        className="mt-1 p-2 text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
+                        aria-label="Remove qualification"
+                      >
+                        <X size={16} />
+                      </button>
+                    )}
+                  </div>
+
+                  {entry.level === 'Others' && (
+                    <div className="relative">
+                      <GraduationCap className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                      <input
+                        type="text"
+                        required
+                        value={academicLevelOthers[i] ?? ''}
+                        onChange={(e) =>
+                          setAcademicLevelOthers((prev) => prev.map((v, vi) => (vi === i ? e.target.value : v)))
+                        }
+                        placeholder="Specify level, e.g. Diploma"
+                        className={fieldClass}
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
+            <button
+              type="button"
+              onClick={addAcademicEntry}
+              className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-navy hover:text-navy-light transition-colors"
+            >
+              <Plus size={15} /> Add another qualification
+            </button>
           </div>
 
           {/* IELTS/PTE */}
@@ -481,7 +647,7 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
           </div>
 
           {/* Work experience */}
-          <div className={embedded ? 'col-span-2' : ''}>
+          <div>
             <label className="block text-sm font-medium text-navy mb-1.5">Work experience</label>
             <div className="relative">
               <Briefcase className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />

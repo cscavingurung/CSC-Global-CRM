@@ -70,9 +70,12 @@ export default function ReceptionistOverview({ students, upcomingConsultations, 
           waitMinutes: assignedAt ? Math.max(0, (now.getTime() - assignedAt.getTime()) / 60000) : 0,
         };
       })
+      // Same report-period window as the stat cards, so switching the period filter updates
+      // this list too instead of only the cards above it.
+      .filter((entry) => !start || (entry.assignedAt && entry.assignedAt >= start))
       .sort((a, b) => (a.assignedAt?.getTime() ?? 0) - (b.assignedAt?.getTime() ?? 0))
       .slice(0, 5);
-  }, [upcomingConsultations, now]);
+  }, [upcomingConsultations, now, start]);
 
   const stats = useMemo<StatCardDef[]>(() => {
     const submissions = students
@@ -121,7 +124,7 @@ export default function ReceptionistOverview({ students, upcomingConsultations, 
         key: 'today',
         icon: UserPlus,
         value: String(periodIntakes),
-        label: `Intakes · ${suffix}`,
+        label: `Leads · ${suffix}`,
         trend: `${todaysIntakes} today · ${intakeTrend}`,
       },
       {

@@ -76,8 +76,8 @@ export const NAV_CONFIG: NavConfig = {
   ],
   counselor: [
     { key: 'overview', label: 'Dashboard', icon: 'LayoutDashboard' },
-    { key: 'my-students', label: 'Clients', icon: 'GraduationCap' },
     { key: 'new-intake', label: 'Add Client', icon: 'UserPlus' },
+    { key: 'my-students', label: 'Clients', icon: 'GraduationCap' },
     { key: 'consultations', label: 'Enrolled', icon: 'CalendarDays' },
     { key: 'follow-ups', label: 'Follow Ups', icon: 'PhoneCall' },
     { key: 'offer-applications', label: 'Offer Applications', icon: 'Building2' },
@@ -93,5 +93,23 @@ export const NAV_CONFIG: NavConfig = {
 };
 
 export const COUNTRIES = ['Australia', 'Canada', 'United Kingdom', 'USA', 'New Zealand'];
+
+// A client's `country` field can hold more than one country of interest, comma-separated
+// (e.g. "Canada, Australia") — this splits it back out for matching/filtering.
+export function splitCountries(country: string): string[] {
+  return country.split(',').map((c) => c.trim()).filter(Boolean);
+}
+
+// Intake period is picked as separate Month + Year selects (joined as "Jan 2027") rather
+// than one combined dropdown — every month is offered since intake timing varies by
+// institution and country, so nothing is hardcoded to fixed seasons.
+export const INTAKE_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// `yearsBack` lets filters (which need to match intakes already recorded in the past) reach
+// further back than the picker in the Enrolment Details modal, which only offers the future.
+export function generateIntakeYears(yearsAhead = 5, yearsBack = 0, from = new Date()): string[] {
+  const startYear = from.getFullYear() - yearsBack;
+  return Array.from({ length: yearsAhead + yearsBack }, (_, i) => String(startYear + i));
+}
 
 export const PURPOSES = ['Study', 'SOWP', 'Tourist', 'PR'];

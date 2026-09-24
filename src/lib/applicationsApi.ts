@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import { ApplicationRecord, ClientNote, OfferApplication, OfferStatus, Role, VisaApplication, VisaStageStatus } from '../types';
+import { normalizeAcademics } from './academics';
 
 export interface ApplicationRow {
   id: string;
@@ -7,12 +8,13 @@ export interface ApplicationRow {
   name: string;
   phone: string;
   email: string;
+  address: string | null;
   country: string;
   purpose: string;
   dob: string | null;
   gender: string | null;
   marital_status: string | null;
-  academic_qualification: string | null;
+  academics: unknown;
   ielts_pte: string | null;
   work_experience: string | null;
   counselor: string;
@@ -54,15 +56,20 @@ function normalizeOfferApplications(raw: unknown): OfferApplication[] {
     return {
       id: typeof o.id === 'string' ? o.id : `o${Date.now()}${i}`,
       institution: typeof o.institution === 'string' ? o.institution : 'Unknown institution',
+      country: typeof o.country === 'string' ? o.country : undefined,
       status,
       course: typeof o.course === 'string' ? o.course : undefined,
       intake: typeof o.intake === 'string' ? o.intake : undefined,
       clientRefId: typeof o.clientRefId === 'string' ? o.clientRefId : undefined,
       studentId: typeof o.studentId === 'string' ? o.studentId : undefined,
       enrolledDate: typeof o.enrolledDate === 'string' ? o.enrolledDate : undefined,
+      enrolledBy: typeof o.enrolledBy === 'string' ? o.enrolledBy : undefined,
       appliedDate: typeof o.appliedDate === 'string' ? o.appliedDate : undefined,
+      appliedBy: typeof o.appliedBy === 'string' ? o.appliedBy : undefined,
       outcomeDate: typeof o.outcomeDate === 'string' ? o.outcomeDate : undefined,
+      outcomeBy: typeof o.outcomeBy === 'string' ? o.outcomeBy : undefined,
       feePaidDate: typeof o.feePaidDate === 'string' ? o.feePaidDate : undefined,
+      feePaidBy: typeof o.feePaidBy === 'string' ? o.feePaidBy : undefined,
       statusUpdatedAt: typeof o.statusUpdatedAt === 'string' ? o.statusUpdatedAt
         : (o.feePaidDate as string) ?? (o.outcomeDate as string) ?? (o.appliedDate as string) ?? new Date().toISOString().slice(0, 10),
       notes: typeof o.notes === 'string' ? o.notes : undefined,
@@ -115,12 +122,13 @@ export function fromRow(row: ApplicationRow): ApplicationRecord {
     name: row.name,
     phone: row.phone,
     email: row.email,
+    address: row.address ?? undefined,
     country: row.country,
     purpose: row.purpose,
     dob: row.dob ?? undefined,
     gender: row.gender ?? undefined,
     maritalStatus: row.marital_status ?? undefined,
-    academicQualification: row.academic_qualification ?? undefined,
+    academics: normalizeAcademics(row.academics),
     ieltsPte: row.ielts_pte ?? undefined,
     workExperience: row.work_experience ?? undefined,
     counselor: row.counselor,
@@ -145,12 +153,13 @@ function toRow(a: ApplicationRecord): ApplicationRow {
     name: a.name,
     phone: a.phone,
     email: a.email,
+    address: a.address ?? null,
     country: a.country,
     purpose: a.purpose,
     dob: a.dob ?? null,
     gender: a.gender ?? null,
     marital_status: a.maritalStatus ?? null,
-    academic_qualification: a.academicQualification ?? null,
+    academics: a.academics ?? null,
     ielts_pte: a.ieltsPte ?? null,
     work_experience: a.workExperience ?? null,
     counselor: a.counselor,
@@ -174,12 +183,13 @@ function toRowUpdates(updates: Partial<ApplicationRecord>): Record<string, unkno
   if (updates.name !== undefined) row.name = updates.name;
   if (updates.phone !== undefined) row.phone = updates.phone;
   if (updates.email !== undefined) row.email = updates.email;
+  if (updates.address !== undefined) row.address = updates.address;
   if (updates.country !== undefined) row.country = updates.country;
   if (updates.purpose !== undefined) row.purpose = updates.purpose;
   if (updates.dob !== undefined) row.dob = updates.dob;
   if (updates.gender !== undefined) row.gender = updates.gender;
   if (updates.maritalStatus !== undefined) row.marital_status = updates.maritalStatus;
-  if (updates.academicQualification !== undefined) row.academic_qualification = updates.academicQualification;
+  if (updates.academics !== undefined) row.academics = updates.academics;
   if (updates.ieltsPte !== undefined) row.ielts_pte = updates.ieltsPte;
   if (updates.workExperience !== undefined) row.work_experience = updates.workExperience;
   if (updates.counselor !== undefined) row.counselor = updates.counselor;

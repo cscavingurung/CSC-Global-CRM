@@ -1,17 +1,19 @@
 import { supabase } from './supabaseClient';
 import { IntakeStudent } from '../types';
+import { normalizeAcademics } from './academics';
 
 export interface StudentRow {
   id: string;
   name: string;
   phone: string;
   email: string;
+  address: string;
   country: string;
   purpose: string;
   dob: string;
   gender: string;
   marital_status: string;
-  academic_qualification: string;
+  academics: unknown;
   ielts_pte: string;
   work_experience: string;
   submitted_at: string;
@@ -36,12 +38,13 @@ export function fromRow(row: StudentRow): IntakeStudent {
     name: row.name,
     phone: row.phone,
     email: row.email,
+    address: row.address,
     country: row.country,
     purpose: row.purpose,
     dob: row.dob,
     gender: row.gender,
     maritalStatus: row.marital_status,
-    academicQualification: row.academic_qualification,
+    academics: normalizeAcademics(row.academics),
     ieltsPte: row.ielts_pte,
     workExperience: row.work_experience,
     submittedAt: row.submitted_at,
@@ -67,12 +70,13 @@ function toRow(student: IntakeStudent): StudentRow {
     name: student.name,
     phone: student.phone,
     email: student.email,
+    address: student.address,
     country: student.country,
     purpose: student.purpose,
     dob: student.dob,
     gender: student.gender,
     marital_status: student.maritalStatus,
-    academic_qualification: student.academicQualification,
+    academics: student.academics,
     ielts_pte: student.ieltsPte,
     work_experience: student.workExperience,
     submitted_at: student.submittedAt,
@@ -97,12 +101,13 @@ function toRowUpdates(updates: Partial<IntakeStudent>): Record<string, unknown> 
   if (updates.name !== undefined) row.name = updates.name;
   if (updates.phone !== undefined) row.phone = updates.phone;
   if (updates.email !== undefined) row.email = updates.email;
+  if (updates.address !== undefined) row.address = updates.address;
   if (updates.country !== undefined) row.country = updates.country;
   if (updates.purpose !== undefined) row.purpose = updates.purpose;
   if (updates.dob !== undefined) row.dob = updates.dob;
   if (updates.gender !== undefined) row.gender = updates.gender;
   if (updates.maritalStatus !== undefined) row.marital_status = updates.maritalStatus;
-  if (updates.academicQualification !== undefined) row.academic_qualification = updates.academicQualification;
+  if (updates.academics !== undefined) row.academics = updates.academics;
   if (updates.ieltsPte !== undefined) row.ielts_pte = updates.ieltsPte;
   if (updates.workExperience !== undefined) row.work_experience = updates.workExperience;
   if (updates.submittedAt !== undefined) row.submitted_at = updates.submittedAt;

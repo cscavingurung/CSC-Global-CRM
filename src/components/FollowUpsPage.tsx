@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, X, ChevronRight, PhoneCall, Calendar, LayoutGrid, Sheet } from 'lucide-react';
+import { Search, X, ChevronRight, ChevronDown, PhoneCall, Calendar, LayoutGrid, Sheet } from 'lucide-react';
 import { CounselorStudent, LeadTemperature } from '../types';
 import StudentProfile from './StudentProfile';
 import { LEAD_TEMPERATURES, LEAD_TEMPERATURE_STYLES } from '../leadTemperature';
@@ -12,6 +12,14 @@ interface FollowUpsPageProps {
 
 type TempFilter = 'all' | LeadTemperature;
 type ViewMode = 'simple' | 'sheet';
+type SortOption = 'visit-asc' | 'visit-desc' | 'name-asc' | 'name-desc';
+
+const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  { value: 'visit-asc', label: 'Sort: Soonest Next Visit' },
+  { value: 'visit-desc', label: 'Sort: Latest Next Visit' },
+  { value: 'name-asc', label: 'Sort: Name (A–Z)' },
+  { value: 'name-desc', label: 'Sort: Name (Z–A)' },
+];
 
 function formatDate(value: string): string {
   return new Date(value + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -20,6 +28,7 @@ function formatDate(value: string): string {
 export default function FollowUpsPage({ students, onUpdateStudent }: FollowUpsPageProps) {
   const [search, setSearch] = useState('');
   const [tempFilter, setTempFilter] = useState<TempFilter>('all');
+  const [sortOption, setSortOption] = useState<SortOption>('visit-asc');
   const [viewMode, setViewMode] = useState<ViewMode>('simple');
   const [selectedStudent, setSelectedStudent] = useState<CounselorStudent | null>(null);
 
@@ -27,8 +36,14 @@ export default function FollowUpsPage({ students, onUpdateStudent }: FollowUpsPa
     return students
       .filter((s) => s.consultationStatus === 'Follow Up' && !!s.followUpDate)
       .filter((s) => s.name.toLowerCase().includes(search.toLowerCase()) || s.phone.toLowerCase().includes(search.toLowerCase()))
-      .filter((s) => tempFilter === 'all' || s.leadTemperature === tempFilter);
-  }, [students, search, tempFilter]);
+      .filter((s) => tempFilter === 'all' || s.leadTemperature === tempFilter)
+      .sort((a, b) => {
+        if (sortOption === 'name-asc') return a.name.localeCompare(b.name);
+        if (sortOption === 'name-desc') return b.name.localeCompare(a.name);
+        const cmp = (a.followUpDate as string).localeCompare(b.followUpDate as string);
+        return sortOption === 'visit-desc' ? -cmp : cmp;
+      });
+  }, [students, search, tempFilter, sortOption]);
 
   return (
     <div className="space-y-5">
@@ -51,6 +66,18 @@ export default function FollowUpsPage({ students, onUpdateStudent }: FollowUpsPa
               <X size={16} />
             </button>
           )}
+        </div>
+        <div className="relative">
+          <select
+            value={sortOption}
+            onChange={(e) => setSortOption(e.target.value as SortOption)}
+            className="w-full sm:w-auto appearance-none bg-white border border-grey-border rounded-lg pl-3 pr-9 py-2.5 text-sm font-medium text-navy focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light transition-colors"
+          >
+            {SORT_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
         </div>
       </div>
 

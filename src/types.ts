@@ -23,17 +23,28 @@ export interface NavItem {
 
 export type NavConfig = Record<Role, NavItem[]>;
 
+/** One academic qualification. A client can list several (SEE, +2, Bachelor's, …). */
+export interface AcademicEntry {
+  /** Highest completed level of education, e.g. Bachelor's, Master's. */
+  level: string;
+  /** Field of study, e.g. Computer Science. */
+  stream: string;
+  gpa: string;
+  completionYear: string;
+}
+
 export interface IntakeStudent {
   id: string;
   name: string;
   phone: string;
   email: string;
+  address: string;
   country: string;
   purpose: string;
   dob: string;
   gender: string;
   maritalStatus: string;
-  academicQualification: string;
+  academics: AcademicEntry[];
   ieltsPte: string;
   workExperience: string;
   submittedAt: string;
@@ -82,6 +93,7 @@ export type LeadTemperature = 'Hot' | 'Mild' | 'Cold';
 /** One target institution chosen by the counselor when a client starts enrolment. */
 export interface EnrolmentChoice {
   institution: string;
+  country: string;
   program: string;
   intake: string;
 }
@@ -95,12 +107,13 @@ export interface CounselorStudent {
   name: string;
   phone: string;
   email: string;
+  address: string;
   country: string;
   purpose: string;
   dob: string;
   gender: string;
   maritalStatus: string;
-  academicQualification: string;
+  academics: AcademicEntry[];
   ieltsPte: string;
   workExperience: string;
   submittedAt: string;
@@ -144,6 +157,8 @@ export type OfferStatus =
 export interface OfferApplication {
   id: string;
   institution: string;
+  /** Country this institution is in — a client can apply to different countries per institution. */
+  country?: string;
   status: OfferStatus;
   /** Free-text program/course name. */
   course?: string;
@@ -155,12 +170,20 @@ export interface OfferApplication {
   studentId?: string;
   /** Set when the offer attempt is first added — the Status Tracker's "Enrolled" date. */
   enrolledDate?: string;
+  /** Staff member who added/marked this institution attempt as Enrolled. */
+  enrolledBy?: string;
   /** Set when status moves to 'Applied to Institution'. */
   appliedDate?: string;
+  /** Staff member who marked this offer Applied to Institution. */
+  appliedBy?: string;
   /** Set when status reaches 'Offer Received' or 'Rejected'. */
   outcomeDate?: string;
+  /** Staff member who marked the offer Received or Rejected. */
+  outcomeBy?: string;
   /** Set when status reaches 'Fee Paid'. */
   feePaidDate?: string;
+  /** Staff member who marked the fee Paid. */
+  feePaidBy?: string;
   /** Date the current status was entered — powers "days in current status" staleness checks. */
   statusUpdatedAt: string;
   /** Flagged when the institution asks for more information — set by Counselor, Branch Manager or V/A Officer. */
@@ -236,12 +259,13 @@ export interface ApplicationRecord {
   name: string;
   phone: string;
   email: string;
+  address?: string;
   country: string;
   purpose: string;
   dob?: string;
   gender?: string;
   maritalStatus?: string;
-  academicQualification?: string;
+  academics?: AcademicEntry[];
   ieltsPte?: string;
   workExperience?: string;
   counselor: string;

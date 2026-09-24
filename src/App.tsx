@@ -211,12 +211,13 @@ export default function App() {
         name: newStudent.name,
         phone: newStudent.phone,
         email: newStudent.email,
+        address: newStudent.address,
         country: newStudent.country,
         purpose: newStudent.purpose,
         dob: newStudent.dob,
         gender: newStudent.gender,
         maritalStatus: newStudent.maritalStatus,
-        academicQualification: newStudent.academicQualification,
+        academics: newStudent.academics,
         ieltsPte: newStudent.ieltsPte,
         workExperience: newStudent.workExperience,
         submittedAt: newStudent.submittedAt,
@@ -327,12 +328,13 @@ export default function App() {
             name: student.name,
             phone: student.phone,
             email: student.email,
+            address: student.address,
             country: student.country,
             purpose: student.purpose,
             dob: student.dob,
             gender: student.gender,
             maritalStatus: student.maritalStatus,
-            academicQualification: student.academicQualification,
+            academics: student.academics,
             ieltsPte: student.ieltsPte,
             workExperience: student.workExperience,
             submittedAt: student.submittedAt,
@@ -410,11 +412,13 @@ export default function App() {
           ? enrolments.map((e, i) => ({
               id: `o${Date.now()}${i}`,
               institution: e.institution,
+              country: e.country,
               course: e.program,
               intake: e.intake,
               status: 'Enrolled' as const,
               statusUpdatedAt: date,
               enrolledDate: date,
+              enrolledBy: student.assignedCounselor,
             }))
           : [];
         const newApplication: ApplicationRecord = {
@@ -423,12 +427,13 @@ export default function App() {
           name: student.name,
           phone: student.phone,
           email: student.email,
+          address: student.address,
           country: student.country,
           purpose: student.purpose,
           dob: student.dob,
           gender: student.gender,
           maritalStatus: student.maritalStatus,
-          academicQualification: student.academicQualification,
+          academics: student.academics,
           ieltsPte: student.ieltsPte,
           workExperience: student.workExperience,
           counselor: student.assignedCounselor,
@@ -474,7 +479,7 @@ export default function App() {
       const prevLabel = getClientStatusLabel(prevApp);
       const nextLabel = getClientStatusLabel({ ...prevApp, ...updates });
       if (nextLabel !== prevLabel) {
-        const notification = createStatusUpdateNotification(prevApp.name, nextLabel, prevApp.branch);
+        const notification = createStatusUpdateNotification(prevApp.name, nextLabel, prevApp.branch, user?.name);
         setNotifications((prev) => [notification, ...prev]);
         insertNotification(notification).catch((err) => console.error('Failed to insert notification in Supabase', err));
       }
