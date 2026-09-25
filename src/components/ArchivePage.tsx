@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Search, X, Eye, Archive as ArchiveIcon, ChevronDown } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { Search, X, Eye, Archive as ArchiveIcon, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { CounselorStudent } from '../types';
 import StudentProfile from './StudentProfile';
 import DateRangeFilter from './DateRangeFilter';
@@ -11,6 +11,8 @@ interface ArchivePageProps {
 }
 
 type SortOption = 'newest' | 'oldest' | 'name-asc' | 'name-desc';
+
+const PAGE_SIZE = 15;
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: 'newest', label: 'Sort: Newest First' },
@@ -39,6 +41,18 @@ export default function ArchivePage({ students, onUpdateStudent }: ArchivePagePr
         return sortOption === 'oldest' ? aTime - bTime : bTime - aTime;
       });
   }, [students, search, dateFrom, dateTo, sortOption]);
+
+  const [page, setPage] = useState(1);
+  useEffect(() => {
+    setPage(1);
+  }, [search, dateFrom, dateTo, sortOption]);
+
+  const totalPages = Math.max(1, Math.ceil(archived.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paginated = useMemo(
+    () => archived.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [archived, currentPage]
+  );
 
   return (
     <div className="space-y-5">
@@ -86,7 +100,7 @@ export default function ArchivePage({ students, onUpdateStudent }: ArchivePagePr
       {/* List */}
       {archived.length > 0 ? (
         <div className="space-y-3">
-          {archived.map((s) => (
+          {paginated.map((s) => (
             <div
               key={s.id}
               className="bg-white rounded-xl border border-grey-border p-4 flex items-center gap-4"
@@ -119,7 +133,33 @@ export default function ArchivePage({ students, onUpdateStudent }: ArchivePagePr
         </div>
       ) : search || dateFrom || dateTo ? (
         <div className="py-12 text-center text-sm text-gray-400">No archived clients found.</div>
-      ) : (
+      ) : null}
+
+      {archived.length > 0 && totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-gray-400">Page {currentPage} of {totalPages}</p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="inline-flex items-center gap-1 rounded-lg border border-grey-border bg-white px-3 py-1.5 text-sm font-medium text-navy hover:bg-navy/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft size={15} /> Prev
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="inline-flex items-center gap-1 rounded-lg border border-grey-border bg-white px-3 py-1.5 text-sm font-medium text-navy hover:bg-navy/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Next <ChevronRight size={15} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {archived.length === 0 && !(search || dateFrom || dateTo) && (
         <div className="py-16 text-center">
           <div className="w-14 h-14 rounded-2xl bg-navy/5 flex items-center justify-center mx-auto mb-4">
             <ArchiveIcon className="text-navy/40" size={28} />

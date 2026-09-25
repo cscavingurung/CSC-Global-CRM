@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Check, Search, X, ChevronDown, ChevronUp, ExternalLink, LayoutGrid, Sheet } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { Check, Search, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ExternalLink, LayoutGrid, Sheet } from 'lucide-react';
 import { ApplicationRecord, MockUser, OfferApplication, Partner, VisaStageStatus } from '../types';
 import ClientProfile from './ClientProfile';
 import StatusUpdatesKanban from './StatusUpdatesKanban';
@@ -94,6 +94,8 @@ function visaStatusBucket(status: VisaStageStatus | undefined): VisaStatusFilter
   return 'Pending';
 }
 
+const PAGE_SIZE = 15;
+
 interface Row {
   key: string;
   app: ApplicationRecord;
@@ -116,6 +118,7 @@ export default function ApplicationsList({ applications, onUpdateApplication, br
   const [sortAsc, setSortAsc] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('simple');
   const [selectedApp, setSelectedApp] = useState<ApplicationRecord | null>(null);
+  const [page, setPage] = useState(1);
 
   const isOfferQueue = stageScope === 'Offer';
   const isVisaQueue = stageScope === 'Visa';
@@ -180,6 +183,17 @@ export default function ApplicationsList({ applications, onUpdateApplication, br
       return left.localeCompare(right) * dir;
     });
   }, [applications, search, stageScope, stageFilter, offerFilter, branchFilter, showBranchFilter, dateFrom, dateTo, isOfferQueue, isVisaQueue, excludePendingOffers, visaStatusFilter, intakeMonth, intakeYear, sortKey, sortAsc]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, stageFilter, offerFilter, branchFilter, dateFrom, dateTo, visaStatusFilter, intakeMonth, intakeYear, sortKey, sortAsc]);
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedRows = useMemo(
+    () => rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [rows, currentPage]
+  );
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc((v) => !v);
@@ -418,11 +432,11 @@ export default function ApplicationsList({ applications, onUpdateApplication, br
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ key, app: a, offer }, index) => {
+              {paginatedRows.map(({ key, app: a, offer }, index) => {
                 const feePaid = getFeePaidOffer(a);
                 return (
                   <tr key={key} onClick={() => setSelectedApp(a)} className="cursor-pointer odd:bg-white even:bg-grey-bg/40 hover:bg-blue-50">
-                    <td className="border border-grey-border px-3 py-2 text-xs text-gray-400">{index + 1}</td>
+                    <td className="border border-grey-border px-3 py-2 text-xs text-gray-400">{(currentPage - 1) * PAGE_SIZE + index + 1}</td>
                     <td className="border border-grey-border px-3 py-2 text-sm text-gray-600">{clientIdFor(a)}</td>
                     <td className="border border-grey-border px-3 py-2 text-sm font-medium text-navy">{a.name}</td>
                     <td className="border border-grey-border px-3 py-2 text-sm text-gray-600">{a.email}</td>
@@ -473,7 +487,7 @@ export default function ApplicationsList({ applications, onUpdateApplication, br
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ key, app: a, offer }) => {
+            {paginatedRows.map(({ key, app: a, offer }) => {
               const feePaid = getFeePaidOffer(a);
               return (
                 <tr
@@ -531,7 +545,7 @@ export default function ApplicationsList({ applications, onUpdateApplication, br
       {/* Card list — mobile */}
       {viewMode !== 'kanban' && (
       <div className="lg:hidden space-y-3">
-        {rows.map(({ key, app: a, offer }) => (
+        {paginatedRows.map(({ key, app: a, offer }) => (
           <div key={key} className="bg-white rounded-xl border border-grey-border p-4">
             <div className="flex items-start justify-between mb-2">
               <div className="min-w-0">
@@ -570,6 +584,33 @@ export default function ApplicationsList({ applications, onUpdateApplication, br
           <div className="py-12 text-center text-sm text-gray-400">No applications found.</div>
         )}
       </div>
+      )}
+
+      {/* Pagination */}
+      {viewMode !== 'kanban' && totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-gray-400">
+            Page {currentPage} of {totalPages}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="inline-flex items-center gap-1 rounded-lg border border-grey-border bg-white px-3 py-1.5 text-sm font-medium text-navy hover:bg-navy/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft size={15} /> Prev
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="inline-flex items-center gap-1 rounded-lg border border-grey-border bg-white px-3 py-1.5 text-sm font-medium text-navy hover:bg-navy/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Next <ChevronRight size={15} />
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Status Updates — embedded kanban, replaces the list entirely while active */}

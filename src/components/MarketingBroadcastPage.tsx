@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react';
-import { Radar, Search, CheckCircle } from 'lucide-react';
+import { useMemo, useState, useEffect } from 'react';
+import { Radar, Search, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { IntakeStudent } from '../types';
 import { platformBadgeStyle, isMarketingLead } from '../marketing';
+
+const PAGE_SIZE = 15;
 
 interface MarketingBroadcastPageProps {
   students: IntakeStudent[];
@@ -23,6 +25,46 @@ export default function MarketingBroadcastPage({ students, branches, onBroadcast
 
   const pool = leads.filter((lead) => !lead.broadcastBranch);
   const broadcast = leads.filter((lead) => lead.broadcastBranch);
+
+  const [poolPage, setPoolPage] = useState(1);
+  const [broadcastPage, setBroadcastPage] = useState(1);
+  useEffect(() => {
+    setPoolPage(1);
+    setBroadcastPage(1);
+  }, [search]);
+
+  const poolTotalPages = Math.max(1, Math.ceil(pool.length / PAGE_SIZE));
+  const poolCurrentPage = Math.min(poolPage, poolTotalPages);
+  const paginatedPool = pool.slice((poolCurrentPage - 1) * PAGE_SIZE, poolCurrentPage * PAGE_SIZE);
+
+  const broadcastTotalPages = Math.max(1, Math.ceil(broadcast.length / PAGE_SIZE));
+  const broadcastCurrentPage = Math.min(broadcastPage, broadcastTotalPages);
+  const paginatedBroadcast = broadcast.slice((broadcastCurrentPage - 1) * PAGE_SIZE, broadcastCurrentPage * PAGE_SIZE);
+
+  const pagination = (currentPage: number, totalPages: number, setPage: (fn: (p: number) => number) => void) =>
+    totalPages > 1 && (
+      <div className="flex items-center justify-between px-1 pt-3">
+        <p className="text-xs text-gray-400">Page {currentPage} of {totalPages}</p>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="inline-flex items-center gap-1 rounded-lg border border-grey-border bg-white px-3 py-1.5 text-sm font-medium text-navy hover:bg-navy/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronLeft size={15} /> Prev
+          </button>
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="inline-flex items-center gap-1 rounded-lg border border-grey-border bg-white px-3 py-1.5 text-sm font-medium text-navy hover:bg-navy/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            Next <ChevronRight size={15} />
+          </button>
+        </div>
+      </div>
+    );
 
   const renderRow = (lead: IntakeStudent) => {
     const branch = selectedBranch[lead.id] ?? '';
@@ -117,7 +159,8 @@ export default function MarketingBroadcastPage({ students, branches, onBroadcast
 
       <div>
         <h3 className="mb-3 text-sm font-semibold text-navy">Unassigned Leads ({pool.length})</h3>
-        {table(pool, 'No unassigned marketing leads.')}
+        {table(paginatedPool, 'No unassigned marketing leads.')}
+        {pagination(poolCurrentPage, poolTotalPages, setPoolPage)}
       </div>
 
       <div>
@@ -125,7 +168,8 @@ export default function MarketingBroadcastPage({ students, branches, onBroadcast
           <CheckCircle size={15} className="text-gray-400" />
           Broadcast — Awaiting Claim ({broadcast.length})
         </h3>
-        {table(broadcast, 'Nothing waiting in a branch pool.')}
+        {table(paginatedBroadcast, 'Nothing waiting in a branch pool.')}
+        {pagination(broadcastCurrentPage, broadcastTotalPages, setBroadcastPage)}
       </div>
     </div>
   );

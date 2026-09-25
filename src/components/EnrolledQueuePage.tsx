@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react';
-import { Search, X, ExternalLink, Send, GraduationCap } from 'lucide-react';
+import { useMemo, useState, useEffect } from 'react';
+import { Search, X, ExternalLink, Send, GraduationCap, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ApplicationRecord, MockUser, OfferApplication, Partner } from '../types';
 import ClientProfile from './ClientProfile';
 import { clientIdFor } from '../clientId';
 import { today } from '../clientPipeline';
+
+const PAGE_SIZE = 15;
 
 interface EnrolledQueuePageProps {
   applications: ApplicationRecord[];
@@ -39,6 +41,18 @@ export default function EnrolledQueuePage({ applications, partners, currentUser,
       });
     return built.sort((x, y) => y.app.consultationDate.localeCompare(x.app.consultationDate));
   }, [applications, search]);
+
+  const [page, setPage] = useState(1);
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedRows = useMemo(
+    () => rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [rows, currentPage]
+  );
 
   const submitApplication = (row: QueueRow) => {
     const date = today();
@@ -85,7 +99,7 @@ export default function EnrolledQueuePage({ applications, partners, currentUser,
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
+            {paginatedRows.map((row) => (
               <tr key={row.key} className="border-b border-grey-border transition-colors last:border-0 hover:bg-grey-bg/50">
                 <td className="px-5 py-3.5">
                   <p className="text-sm font-medium text-navy">{row.app.name}</p>
@@ -130,7 +144,7 @@ export default function EnrolledQueuePage({ applications, partners, currentUser,
 
       {/* Cards — mobile */}
       <div className="space-y-3 lg:hidden">
-        {rows.map((row) => (
+        {paginatedRows.map((row) => (
           <div key={row.key} className="rounded-xl border border-grey-border bg-white p-4">
             <p className="text-sm font-semibold text-navy">{row.app.name}</p>
             <p className="text-xs text-gray-400">{clientIdFor(row.app)}</p>
@@ -154,6 +168,30 @@ export default function EnrolledQueuePage({ applications, partners, currentUser,
           <div className="py-12 text-center text-sm text-gray-400">No enrolled clients waiting for an offer application.</div>
         )}
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-gray-400">Page {currentPage} of {totalPages}</p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="inline-flex items-center gap-1 rounded-lg border border-grey-border bg-white px-3 py-1.5 text-sm font-medium text-navy hover:bg-navy/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft size={15} /> Prev
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="inline-flex items-center gap-1 rounded-lg border border-grey-border bg-white px-3 py-1.5 text-sm font-medium text-navy hover:bg-navy/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Next <ChevronRight size={15} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {selectedApp && (
         <ClientProfile

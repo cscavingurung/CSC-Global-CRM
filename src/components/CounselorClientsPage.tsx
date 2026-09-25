@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { ChevronRight, Download, Mail, Phone, Search, UserCheck, Users, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, Download, Mail, Phone, Search, UserCheck, Users, X } from 'lucide-react';
 import { ConsultationStatus, CounselorStudent } from '../types';
 import StudentDetailDrawer from './StudentDetailDrawer';
 import { LEAD_TEMPERATURE_STYLES } from '../leadTemperature';
@@ -24,6 +24,8 @@ const STATUS_STYLES: Record<ConsultationStatus, string> = {
 };
 
 type SortOption = 'newest' | 'oldest' | 'name-asc' | 'name-desc';
+
+const PAGE_SIZE = 15;
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: 'newest', label: 'Sort: Newest First' },
@@ -80,6 +82,18 @@ export default function CounselorClientsPage({ clients, onUpdateClient }: Counse
         return sortOption === 'oldest' ? aTime - bTime : bTime - aTime;
       });
   }, [clients, search, statusFilter, country, caseType, sortOption]);
+
+  const [page, setPage] = useState(1);
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter, country, caseType, sortOption]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredClients.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedClients = useMemo(
+    () => filteredClients.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [filteredClients, currentPage]
+  );
 
   const filtersActive = !!search || statusFilter.length > 0 || country !== 'all' || caseType !== 'all';
 
@@ -212,7 +226,7 @@ export default function CounselorClientsPage({ clients, onUpdateClient }: Counse
                 </tr>
               </thead>
               <tbody>
-                {filteredClients.map((client) => (
+                {paginatedClients.map((client) => (
                   <tr
                     key={client.id}
                     onClick={() => setSelectedClient(client)}
@@ -257,7 +271,7 @@ export default function CounselorClientsPage({ clients, onUpdateClient }: Counse
           </div>
 
           <div className="space-y-3 lg:hidden">
-            {filteredClients.map((client) => (
+            {paginatedClients.map((client) => (
               <button
                 key={client.id}
                 type="button"
@@ -289,6 +303,30 @@ export default function CounselorClientsPage({ clients, onUpdateClient }: Counse
               </button>
             ))}
           </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-gray-400">Page {currentPage} of {totalPages}</p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="inline-flex items-center gap-1 rounded-lg border border-grey-border bg-white px-3 py-1.5 text-sm font-medium text-navy hover:bg-navy/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft size={15} /> Prev
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="inline-flex items-center gap-1 rounded-lg border border-grey-border bg-white px-3 py-1.5 text-sm font-medium text-navy hover:bg-navy/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next <ChevronRight size={15} />
+                </button>
+              </div>
+            </div>
+          )}
         </>
       ) : (
         <div className="rounded-lg border border-grey-border bg-white py-14 text-center">

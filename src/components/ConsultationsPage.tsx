@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Search, X, Eye, CalendarDays, FileText, ChevronDown, LayoutGrid, Sheet } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { Search, X, Eye, CalendarDays, FileText, ChevronDown, ChevronLeft, ChevronRight, LayoutGrid, Sheet } from 'lucide-react';
 import { CounselorStudent, ApplicationRecord, MockUser, OfferStatus, Partner, VisaStageStatus } from '../types';
 import StudentProfile from './StudentProfile';
 import ClientProfile from './ClientProfile';
@@ -48,6 +48,8 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: 'name-asc', label: 'Sort: Name (A–Z)' },
   { value: 'name-desc', label: 'Sort: Name (Z–A)' },
 ];
+
+const PAGE_SIZE = 15;
 
 function getOfferStatus(app: ApplicationRecord | undefined): 'none' | OfferStatus {
   const active = app ? getActiveOfferApplication(app) : null;
@@ -121,6 +123,18 @@ export default function ConsultationsPage({ students, applications, partners, cu
         return sortOption === 'enrolled-asc' ? aTime - bTime : bTime - aTime;
       });
   }, [students, search, enrolledMonth, offerFilter, visaFilter, applicationByClientId, dateFrom, dateTo, sortOption]);
+
+  const [page, setPage] = useState(1);
+  useEffect(() => {
+    setPage(1);
+  }, [search, enrolledMonth, offerFilter, visaFilter, dateFrom, dateTo, sortOption]);
+
+  const totalPages = Math.max(1, Math.ceil(completed.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paginated = useMemo(
+    () => completed.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [completed, currentPage]
+  );
 
   const selectedApplication = viewStudent ? applicationByClientId.get(clientIdFor(viewStudent)) : undefined;
 
@@ -240,14 +254,14 @@ export default function ConsultationsPage({ students, applications, partners, cu
                   </tr>
                 </thead>
                 <tbody>
-                  {completed.map((s, i) => {
+                  {paginated.map((s, i) => {
                     const app = applicationByClientId.get(clientIdFor(s));
                     const offer = app ? getActiveOfferApplication(app) : null;
                     const offerStatus = getOfferStatus(app);
                     const visaStatus = getVisaStatus(app);
                     return (
                       <tr key={s.id} className="odd:bg-white even:bg-grey-bg/40 hover:bg-blue-50 transition-colors">
-                        <td className="border border-grey-border px-3 py-2 text-gray-400">{i + 1}</td>
+                        <td className="border border-grey-border px-3 py-2 text-gray-400">{(currentPage - 1) * PAGE_SIZE + i + 1}</td>
                         <td className="border border-grey-border px-3 py-2 text-gray-600">{clientIdFor(app ?? s)}</td>
                         <td className="border border-grey-border px-3 py-2 font-medium text-navy">{s.name}</td>
                         <td className="border border-grey-border px-3 py-2 text-gray-600">{s.email}</td>
@@ -285,7 +299,7 @@ export default function ConsultationsPage({ students, applications, partners, cu
           </div>
         ) : (
           <div className="space-y-3">
-            {completed.map((s) => {
+            {paginated.map((s) => {
               const app = applicationByClientId.get(clientIdFor(s));
               const offer = app ? getActiveOfferApplication(app) : null;
               const offerStatus = getOfferStatus(app);
@@ -349,6 +363,30 @@ export default function ConsultationsPage({ students, applications, partners, cu
             <CalendarDays className="text-navy/40" size={28} />
           </div>
           <p className="text-sm text-gray-400">No enrolled clients yet.</p>
+        </div>
+      )}
+
+      {completed.length > 0 && totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-gray-400">Page {currentPage} of {totalPages}</p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="inline-flex items-center gap-1 rounded-lg border border-grey-border bg-white px-3 py-1.5 text-sm font-medium text-navy hover:bg-navy/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft size={15} /> Prev
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="inline-flex items-center gap-1 rounded-lg border border-grey-border bg-white px-3 py-1.5 text-sm font-medium text-navy hover:bg-navy/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Next <ChevronRight size={15} />
+            </button>
+          </div>
         </div>
       )}
 

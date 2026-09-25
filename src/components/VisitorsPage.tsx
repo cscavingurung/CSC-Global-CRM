@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react';
-import { Search, Footprints, RotateCcw, UserPlus, X, Check } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Search, Footprints, RotateCcw, UserPlus, X, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { CounselorStudent, IntakeStudent } from '../types';
 import { dateKey } from '../dateTime';
 import CompactDateRangeFilter from './CompactDateRangeFilter';
 import { matchesDateRange } from '../dateFilter';
+
+const PAGE_SIZE = 15;
 
 interface VisitorsPageProps {
   students: IntakeStudent[];
@@ -101,6 +103,18 @@ export default function VisitorsPage({ students, counselorStudents, onLogRevisit
   });
 
   const todayCount = rows.filter((r) => r.visit.slice(0, 10) === today).length;
+
+  const [page, setPage] = useState(1);
+  useEffect(() => {
+    setPage(1);
+  }, [search, kindFilter, dateFrom, dateTo]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paginated = useMemo(
+    () => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [filtered, currentPage]
+  );
 
   // Everyone already on file, so the desk can log a repeat visit without re-typing details.
   const knownClients = useMemo(() => {
@@ -217,7 +231,7 @@ export default function VisitorsPage({ students, counselorStudents, onLogRevisit
               </tr>
             </thead>
             <tbody>
-              {filtered.map((r) => (
+              {paginated.map((r) => (
                 <tr key={r.id} className="border-b border-grey-border last:border-0 hover:bg-grey-bg">
                   <td className="px-4 py-3 font-medium text-navy">{r.name}</td>
                   <td className="px-4 py-3 text-gray-500">
@@ -245,6 +259,30 @@ export default function VisitorsPage({ students, counselorStudents, onLogRevisit
             </tbody>
           </table>
         </div>
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-grey-border px-4 py-3">
+            <p className="text-xs text-gray-400">Page {currentPage} of {totalPages}</p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="inline-flex items-center gap-1 rounded-lg border border-grey-border bg-white px-3 py-1.5 text-sm font-medium text-navy transition-colors hover:bg-navy/5 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronLeft size={15} /> Prev
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="inline-flex items-center gap-1 rounded-lg border border-grey-border bg-white px-3 py-1.5 text-sm font-medium text-navy transition-colors hover:bg-navy/5 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next <ChevronRight size={15} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Add Revisited Client */}

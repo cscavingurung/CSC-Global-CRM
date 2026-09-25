@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Activity, ChevronDown, CalendarCheck, UserPlus, GraduationCap, Send, BadgeCheck } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Activity, ChevronDown, ChevronLeft, ChevronRight, CalendarCheck, UserPlus, GraduationCap, Send, BadgeCheck } from 'lucide-react';
 import { ApplicationRecord, CounselorStudent, MockUser, Partner, StaffMember, StaffRole } from '../types';
 import CompactDateRangeFilter from './CompactDateRangeFilter';
 import ClientProfile from './ClientProfile';
@@ -41,6 +41,8 @@ const ROLE_BADGE_STYLES: Record<StaffRole, string> = {
   Finance: 'bg-teal-50 text-teal-700',
 };
 
+const PAGE_SIZE = 15;
+
 const PRESETS: { key: RangePreset; label: string }[] = [
   { key: 'today', label: 'Today' },
   { key: 'week', label: 'This Week' },
@@ -74,6 +76,7 @@ export default function StaffActivityPanel({
   const [manualFrom, setManualFrom] = useState('');
   const [manualTo, setManualTo] = useState('');
   const [selectedApp, setSelectedApp] = useState<ApplicationRecord | null>(null);
+  const [page, setPage] = useState(1);
 
   const [from, to] = useMemo<[string, string]>(() => {
     if (preset === 'manual') return [manualFrom, manualTo];
@@ -176,6 +179,17 @@ export default function StaffActivityPanel({
       .sort((x, y) => `${y.date} ${y.time ?? ''}`.localeCompare(`${x.date} ${x.time ?? ''}`));
   }, [counselorStudents, applications, staffFilter, from, to]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [staffFilter, from, to]);
+
+  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedItems = useMemo(
+    () => items.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [items, currentPage]
+  );
+
   const openClient = (id?: string) => {
     if (!id || !currentUser) return;
     const app = applications.find((a) => a.id === id);
@@ -250,7 +264,7 @@ export default function StaffActivityPanel({
           )}
         </div>
 
-        <div className="max-h-[520px] overflow-y-auto">
+        <div>
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-grey-border text-xs uppercase tracking-wide text-gray-400">
@@ -261,7 +275,7 @@ export default function StaffActivityPanel({
               </tr>
             </thead>
             <tbody>
-              {items.map((i) => {
+              {paginatedItems.map((i) => {
                 const role = roleOf(i.staffName);
                 return (
                   <tr key={i.id} className="border-b border-grey-border last:border-0 hover:bg-grey-bg/50">
@@ -302,6 +316,32 @@ export default function StaffActivityPanel({
             <div className="py-12 text-center text-sm text-gray-400">No staff activity in this period.</div>
           )}
         </div>
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-grey-border px-4 py-3">
+            <p className="text-xs text-gray-400">
+              Page {currentPage} of {totalPages}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="inline-flex items-center gap-1 rounded-lg border border-grey-border bg-white px-3 py-1.5 text-sm font-medium text-navy transition-colors hover:bg-navy/5 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronLeft size={15} /> Prev
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="inline-flex items-center gap-1 rounded-lg border border-grey-border bg-white px-3 py-1.5 text-sm font-medium text-navy transition-colors hover:bg-navy/5 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next <ChevronRight size={15} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {selectedApp && currentUser && (

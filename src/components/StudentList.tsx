@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Search, X, UserCheck, ChevronDown, LayoutGrid, Sheet } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { Search, X, UserCheck, ChevronDown, ChevronLeft, ChevronRight, LayoutGrid, Sheet } from 'lucide-react';
 import { Counselor, CounselorStudent, IntakeStudent } from '../types';
 import { dateKey } from '../dateTime';
 import { formatAcademic } from '../clientPipeline';
@@ -18,6 +18,8 @@ interface StudentListProps {
 
 type StatusFilter = 'all' | 'New' | 'Assigned' | 'Enrolled' | 'Followup' | 'Archive';
 
+const PAGE_SIZE = 15;
+
 const CONSULTATION_STATUS_STYLES: Record<string, string> = {
   'Awaiting Consultation': 'bg-orange-100 text-orange-700',
   'In Progress': 'bg-blue-100 text-blue-700',
@@ -34,6 +36,7 @@ export default function StudentList({ students, counselors, counselorStudents = 
   const [viewMode, setViewMode] = useState<'table' | 'sheet'>('table');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [page, setPage] = useState(1);
   const today = dateKey(new Date());
 
   // Beyond the intake's own New/Assigned state, the later stages come from the client's
@@ -61,6 +64,17 @@ export default function StudentList({ students, counselors, counselorStudents = 
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [students, search, statusFilter, branchFilter, showBranchFilter, dateFrom, dateTo, csMap]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter, branchFilter, dateFrom, dateTo]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paginated = useMemo(
+    () => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [filtered, currentPage]
+  );
 
   const statusOptions: { value: StatusFilter; label: string }[] = [
     { value: 'all', label: 'All Statuses' },
@@ -173,12 +187,12 @@ export default function StudentList({ students, counselors, counselorStudents = 
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((s, i) => {
+                {paginated.map((s, i) => {
                   const cs = csMap.get(s.id);
                   const statusLabel = cs?.consultationStatus || s.status;
                   return (
                     <tr key={s.id} className="odd:bg-white even:bg-grey-bg/40 hover:bg-blue-50 transition-colors">
-                      <td className="px-3 py-2 border border-grey-border text-gray-400">{i + 1}</td>
+                      <td className="px-3 py-2 border border-grey-border text-gray-400">{(currentPage - 1) * PAGE_SIZE + i + 1}</td>
                       <td className="px-3 py-2 border border-grey-border font-medium text-navy">{s.name}</td>
                       <td className="px-3 py-2 border border-grey-border text-gray-600">{s.email}</td>
                       <td className="px-3 py-2 border border-grey-border text-gray-600">{s.phone}</td>
@@ -231,7 +245,7 @@ export default function StudentList({ students, counselors, counselorStudents = 
             </tr>
           </thead>
           <tbody>
-            {filtered.map((s) => {
+            {paginated.map((s) => {
               const cs = csMap.get(s.id);
               const consultationStatus = cs?.consultationStatus;
               const canReassign = !consultationStatus || consultationStatus === 'Awaiting Consultation';
@@ -296,7 +310,7 @@ export default function StudentList({ students, counselors, counselorStudents = 
 
       {/* Card list — mobile */}
       <div className="lg:hidden space-y-3">
-        {filtered.map((s) => {
+        {paginated.map((s) => {
           const cs = csMap.get(s.id);
           const consultationStatus = cs?.consultationStatus;
           const canReassign = !consultationStatus || consultationStatus === 'Awaiting Consultation';
@@ -347,6 +361,31 @@ export default function StudentList({ students, counselors, counselorStudents = 
           <div className="py-12 text-center text-sm text-gray-400">No clients found.</div>
         )}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-gray-400">
+            Page {currentPage} of {totalPages}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="inline-flex items-center gap-1 rounded-lg border border-grey-border bg-white px-3 py-1.5 text-sm font-medium text-navy hover:bg-navy/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft size={15} /> Prev
+            </button>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="inline-flex items-center gap-1 rounded-lg border border-grey-border bg-white px-3 py-1.5 text-sm font-medium text-navy hover:bg-navy/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Next <ChevronRight size={15} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Assign modal */}
       {assignStudent && (

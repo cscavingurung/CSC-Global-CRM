@@ -1,8 +1,10 @@
-import { useState, useMemo } from 'react';
-import { UserCheck, Users } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { UserCheck, Users, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Counselor, IntakeStudent } from '../types';
 import AssignCounselorModal from './AssignCounselorModal';
 import { AVAILABILITY_STYLES, sortByAvailability } from '../counselorStatus';
+
+const PAGE_SIZE = 15;
 
 interface AssignCounselorPageProps {
   students: IntakeStudent[];
@@ -18,6 +20,18 @@ export default function AssignCounselorPage({ students, counselors, onAssign }: 
   const unassigned = useMemo(
     () => students.filter((s) => s.status === 'New' && !(s.broadcastBranch && !s.claimedBy)),
     [students]
+  );
+
+  const [page, setPage] = useState(1);
+  useEffect(() => {
+    setPage(1);
+  }, [students]);
+
+  const totalPages = Math.max(1, Math.ceil(unassigned.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paginated = useMemo(
+    () => unassigned.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [unassigned, currentPage]
   );
 
   return (
@@ -72,7 +86,7 @@ export default function AssignCounselorPage({ students, counselors, onAssign }: 
                   </tr>
                 </thead>
                 <tbody>
-                  {unassigned.map((s) => (
+                  {paginated.map((s) => (
                     <tr key={s.id} className="border-b border-grey-border last:border-0 hover:bg-grey-bg/50 transition-colors">
                       <td className="px-5 py-3.5">
                         <p className="text-sm font-medium text-navy">{s.name}</p>
@@ -98,7 +112,7 @@ export default function AssignCounselorPage({ students, counselors, onAssign }: 
 
             {/* Card list — mobile */}
             <div className="lg:hidden space-y-3">
-              {unassigned.map((s) => (
+              {paginated.map((s) => (
                 <div key={s.id} className="bg-white rounded-xl border border-grey-border p-4">
                   <div className="flex items-start justify-between mb-2">
                     <div className="min-w-0">
@@ -123,6 +137,30 @@ export default function AssignCounselorPage({ students, counselors, onAssign }: 
                 </div>
               ))}
             </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-3">
+                <p className="text-xs text-gray-400">Page {currentPage} of {totalPages}</p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="inline-flex items-center gap-1 rounded-lg border border-grey-border bg-white px-3 py-1.5 text-sm font-medium text-navy hover:bg-navy/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronLeft size={15} /> Prev
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="inline-flex items-center gap-1 rounded-lg border border-grey-border bg-white px-3 py-1.5 text-sm font-medium text-navy hover:bg-navy/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next <ChevronRight size={15} />
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>

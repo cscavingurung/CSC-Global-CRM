@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Search, Lock, Share2 } from 'lucide-react';
+import { useMemo, useState, useEffect } from 'react';
+import { Search, Lock, Share2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ApplicationRecord, CounselorStudent, IntakeStudent } from '../types';
 import { getClientStatusLabel, getStatusTone, STATUS_TONE_STYLES } from '../clientPipeline';
 import {
@@ -14,6 +14,7 @@ interface MarketingClientsPageProps {
 }
 
 const ALL_PLATFORMS = 'All Platforms';
+const PAGE_SIZE = 15;
 
 const CONSULT_STATUS_STYLES: Record<CounselorStudent['consultationStatus'], string> = {
   'Awaiting Consultation': 'bg-gray-100 text-gray-600',
@@ -56,6 +57,18 @@ export default function MarketingClientsPage({ students, counselorStudents, appl
         return { lead, counselor, statusLabel, statusStyle };
       });
   }, [students, counselorStudents, applications, search, platform]);
+
+  const [page, setPage] = useState(1);
+  useEffect(() => {
+    setPage(1);
+  }, [search, platform]);
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedRows = useMemo(
+    () => rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [rows, currentPage]
+  );
 
   return (
     <div className="space-y-5">
@@ -112,7 +125,7 @@ export default function MarketingClientsPage({ students, counselorStudents, appl
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ lead, counselor, statusLabel, statusStyle }) => (
+              {paginatedRows.map(({ lead, counselor, statusLabel, statusStyle }) => (
                 <tr key={lead.id} className="border-b border-grey-border last:border-0 hover:bg-grey-bg/50 transition-colors">
                   <td className="px-5 py-3.5">
                     <p className="text-sm font-medium text-navy">{lead.name}</p>
@@ -134,6 +147,30 @@ export default function MarketingClientsPage({ students, counselorStudents, appl
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-gray-400">Page {currentPage} of {totalPages}</p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="inline-flex items-center gap-1 rounded-lg border border-grey-border bg-white px-3 py-1.5 text-sm font-medium text-navy hover:bg-navy/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft size={15} /> Prev
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="inline-flex items-center gap-1 rounded-lg border border-grey-border bg-white px-3 py-1.5 text-sm font-medium text-navy hover:bg-navy/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Next <ChevronRight size={15} />
+            </button>
+          </div>
         </div>
       )}
     </div>

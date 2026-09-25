@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Search, X, ChevronRight, ChevronDown, PhoneCall, Calendar, LayoutGrid, Sheet } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { Search, X, ChevronRight, ChevronDown, ChevronLeft, PhoneCall, Calendar, LayoutGrid, Sheet } from 'lucide-react';
 import { CounselorStudent, LeadTemperature } from '../types';
 import StudentProfile from './StudentProfile';
 import { LEAD_TEMPERATURES, LEAD_TEMPERATURE_STYLES } from '../leadTemperature';
@@ -20,6 +20,8 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: 'name-asc', label: 'Sort: Name (A–Z)' },
   { value: 'name-desc', label: 'Sort: Name (Z–A)' },
 ];
+
+const PAGE_SIZE = 15;
 
 function formatDate(value: string): string {
   return new Date(value + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -44,6 +46,18 @@ export default function FollowUpsPage({ students, onUpdateStudent }: FollowUpsPa
         return sortOption === 'visit-desc' ? -cmp : cmp;
       });
   }, [students, search, tempFilter, sortOption]);
+
+  const [page, setPage] = useState(1);
+  useEffect(() => {
+    setPage(1);
+  }, [search, tempFilter, sortOption]);
+
+  const totalPages = Math.max(1, Math.ceil(followUps.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paginated = useMemo(
+    () => followUps.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [followUps, currentPage]
+  );
 
   return (
     <div className="space-y-5">
@@ -141,9 +155,9 @@ export default function FollowUpsPage({ students, onUpdateStudent }: FollowUpsPa
               </tr>
             </thead>
             <tbody>
-              {followUps.map((s, index) => (
+              {paginated.map((s, index) => (
                 <tr key={s.id} onClick={() => setSelectedStudent(s)} className="cursor-pointer hover:bg-grey-bg/50">
-                  <td className="border border-grey-border px-3 py-2 text-xs text-gray-500">{index + 1}</td>
+                  <td className="border border-grey-border px-3 py-2 text-xs text-gray-500">{(currentPage - 1) * PAGE_SIZE + index + 1}</td>
                   <td className="border border-grey-border px-3 py-2 text-sm text-gray-600 whitespace-nowrap">{clientIdFor(s)}</td>
                   <td className="border border-grey-border px-3 py-2 text-sm font-medium text-navy">{s.name}</td>
                   <td className="border border-grey-border px-3 py-2 text-sm text-gray-600 whitespace-nowrap">{s.phone}</td>
@@ -181,7 +195,7 @@ export default function FollowUpsPage({ students, onUpdateStudent }: FollowUpsPa
             </tr>
           </thead>
           <tbody>
-            {followUps.map((s) => (
+            {paginated.map((s) => (
               <tr
                 key={s.id}
                 onClick={() => setSelectedStudent(s)}
@@ -234,7 +248,7 @@ export default function FollowUpsPage({ students, onUpdateStudent }: FollowUpsPa
 
       {/* Card list — mobile */}
       <div className="lg:hidden space-y-3">
-        {followUps.map((s) => (
+        {paginated.map((s) => (
           <button
             key={s.id}
             onClick={() => setSelectedStudent(s)}
@@ -287,6 +301,30 @@ export default function FollowUpsPage({ students, onUpdateStudent }: FollowUpsPa
       </div>
 
         </>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-gray-400">Page {currentPage} of {totalPages}</p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="inline-flex items-center gap-1 rounded-lg border border-grey-border bg-white px-3 py-1.5 text-sm font-medium text-navy hover:bg-navy/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft size={15} /> Prev
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="inline-flex items-center gap-1 rounded-lg border border-grey-border bg-white px-3 py-1.5 text-sm font-medium text-navy hover:bg-navy/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Next <ChevronRight size={15} />
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Detail drawer */}

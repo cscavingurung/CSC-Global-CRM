@@ -1,8 +1,10 @@
-import { useState, useMemo } from 'react';
-import { Search, X, UserCheck, Users } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { Search, X, UserCheck, Users, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ConsultationStatus, CounselorStudent } from '../types';
 import DateRangeFilter from './DateRangeFilter';
 import { matchesDateRange } from '../dateFilter';
+
+const PAGE_SIZE = 15;
 
 interface AssignedClientsPageProps {
   counselorStudents: CounselorStudent[];
@@ -30,6 +32,18 @@ export default function AssignedClientsPage({ counselorStudents }: AssignedClien
         return matchesSearch && matchesDateRange(s.assignedDate, dateFrom, dateTo);
       }),
     [counselorStudents, search, dateFrom, dateTo]
+  );
+
+  const [page, setPage] = useState(1);
+  useEffect(() => {
+    setPage(1);
+  }, [search, dateFrom, dateTo]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paginated = useMemo(
+    () => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [filtered, currentPage]
   );
 
   return (
@@ -79,7 +93,7 @@ export default function AssignedClientsPage({ counselorStudents }: AssignedClien
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((s) => (
+                {paginated.map((s) => (
                   <tr key={s.id} className="border-b border-grey-border last:border-0 hover:bg-grey-bg/50 transition-colors">
                     <td className="px-5 py-3.5">
                       <p className="text-sm font-medium text-navy">{s.name}</p>
@@ -107,7 +121,7 @@ export default function AssignedClientsPage({ counselorStudents }: AssignedClien
 
           {/* Card list — mobile */}
           <div className="lg:hidden space-y-3">
-            {filtered.map((s) => (
+            {paginated.map((s) => (
               <div key={s.id} className="bg-white rounded-xl border border-grey-border p-4">
                 <div className="flex items-start justify-between mb-2">
                   <div className="min-w-0">
@@ -130,6 +144,30 @@ export default function AssignedClientsPage({ counselorStudents }: AssignedClien
               </div>
             ))}
           </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-gray-400">Page {currentPage} of {totalPages}</p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="inline-flex items-center gap-1 rounded-lg border border-grey-border bg-white px-3 py-1.5 text-sm font-medium text-navy hover:bg-navy/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft size={15} /> Prev
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="inline-flex items-center gap-1 rounded-lg border border-grey-border bg-white px-3 py-1.5 text-sm font-medium text-navy hover:bg-navy/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next <ChevronRight size={15} />
+                </button>
+              </div>
+            </div>
+          )}
         </>
       ) : search || dateFrom || dateTo ? (
         <div className="py-12 text-center text-sm text-gray-400">No assigned clients found.</div>
