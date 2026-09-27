@@ -72,7 +72,7 @@ import ScaffoldPage from './components/ScaffoldPage';
 import SmartClientMatching from './components/SmartClientMatching';
 import VisaApprovedPage from './components/VisaApprovedPage';
 import { BM_SCAFFOLDS } from './branchManagerPages';
-import { MockUser, NavIntent, DailyTask, BranchNotice, BranchIssue, AttendanceRecord, AttendanceCorrection, BranchDayLog, OnboardingCase, OffboardingCase, LeaveRecord, AttendanceExplanation, Holiday, PerformanceReview, PayProfile, PayrollRun, FinTransaction, ExpenseRequest, CommunicationEntry, IntakeStudent, CounselorStudent, ApplicationRecord, OfferApplication, StaffMember, Branch, CommissionRecord, Partner, AppNotification, Counselor, MarketingStore, MarketingLead, ContentRequest, BranchPing, DeliveredFile, ClientAuditEntry, ManagerWorkspaceStore, BranchTransfer, AuditOverrideEntry, ServicePrice } from './types';
+import { MockUser, NavIntent, DailyTask, BranchNotice, BranchIssue, AttendanceRecord, AttendanceCorrection, BranchDayLog, OnboardingCase, OffboardingCase, LeaveRecord, AttendanceExplanation, Holiday, PerformanceReview, PayProfile, PayrollRun, FinTransaction, ExpenseRequest, CommunicationEntry, IntakeStudent, CounselorStudent, ApplicationRecord, OfferApplication, StaffMember, Branch, CommissionRecord, Partner, AppNotification, Counselor, MarketingStore, MarketingLead, ContentRequest, BranchPing, DeliveredFile, ClientAuditEntry, ManagerWorkspaceStore, BranchTransfer, AuditOverrideEntry, ServicePrice, BranchContentRequest, MarketingSupportRequest, ItTicket } from './types';
 import { isStudyCase, getClientStatusLabel } from './clientPipeline';
 import { clientIdFor, generateClientId } from './clientId';
 import { STAFF_ROLE_TO_ROLE, NAV_CONFIG, LEADS_SPECIALIST_NAV, CONTENT_PLANNER_NAV, DESIGNER_NAV, findNavEntry } from './mockData';
@@ -84,26 +84,96 @@ import { fetchStudents, insertStudent, updateStudent, fromRow as studentFromRow,
 import { fetchCounselors, insertCounselor, deleteCounselor, fromRow as counselorFromRow, CounselorRow } from './lib/counselorsApi';
 import { fetchApplications, updateApplication, insertApplication, fromRow as applicationFromRow, ApplicationRow } from './lib/applicationsApi';
 import { fetchStaff, insertStaff, updateStaff, deleteStaff, fromRow as staffFromRow, StaffRow } from './lib/staffApi';
+import { supabase } from './lib/supabaseClient';
+import { createStaffAccount, resetStaffPassword, updateStaffEmail, deleteStaffAccount } from './lib/adminStaffFunction';
 import { fetchBranches, insertBranch, updateBranch, deleteBranch, fromRow as branchFromRow, BranchRow } from './lib/branchesApi';
 import { fetchCommissions, updateCommission, fromRow as commissionFromRow, CommissionRow } from './lib/commissionsApi';
 import { fetchPartners, insertPartner, updatePartner, deletePartner, fromRow as partnerFromRow, PartnerRow } from './lib/partnersApi';
 import { subscribeToTable, applyRealtimeChange } from './lib/realtimeSubscribe';
 import { fetchServicePrices, insertServicePrice, fromRow as servicePriceFromRow, ServicePriceRow } from './lib/servicePricesApi';
-import { fetchCommunications, insertCommunication, fromRow as communicationFromRow, CommunicationRow } from './lib/communicationsApi';
+import { fetchCommunications, insertCommunication, fromRow as communicationFromRow, CommunicationRow } from './lib/ops/communicationsApi';
+import { fetchTasks, insertTask, updateTask, deleteTask, fromRow as taskFromRow, TaskRow } from './lib/ops/tasksApi';
+import { fetchBranchNotices, insertBranchNotice, updateBranchNotice, fromRow as branchNoticeFromRow, BranchNoticeRow } from './lib/ops/branchNoticesApi';
+import { fetchBranchIssues, insertBranchIssue, updateBranchIssue, fromRow as branchIssueFromRow, BranchIssueRow } from './lib/ops/branchIssuesApi';
+import { fetchAttendance, upsertAttendance, fromRow as attendanceFromRow, AttendanceRow } from './lib/hr/attendanceApi';
+import { fetchAttendanceCorrections, insertAttendanceCorrection, updateAttendanceCorrection, fromRow as attendanceCorrectionFromRow, AttendanceCorrectionRow } from './lib/hr/attendanceCorrectionsApi';
+import { fetchAttendanceExplanations, upsertAttendanceExplanation, fromRow as attendanceExplanationFromRow, AttendanceExplanationRow } from './lib/hr/attendanceExplanationsApi';
+import { fetchBranchDayLogs, upsertBranchDayLog, fromRow as branchDayLogFromRow, BranchDayLogRow } from './lib/ops/branchDayLogsApi';
+import { fetchLeave, insertLeave, updateLeave, fromRow as leaveFromRow, LeaveRecordRow } from './lib/hr/leaveApi';
+import { fetchHolidays, upsertHoliday, deleteHoliday, fromRow as holidayFromRow, HolidayRow } from './lib/hr/holidaysApi';
+import { fetchPerformanceReviews, upsertPerformanceReview, fromRow as performanceReviewFromRow, PerformanceReviewRow } from './lib/hr/performanceReviewsApi';
+import { fetchPayProfiles, upsertPayProfile, fromRow as payProfileFromRow, PayProfileRow } from './lib/hr/payProfilesApi';
+import { fetchPayrollRuns, upsertPayrollRun, fromRow as payrollRunFromRow, PayrollRunRow } from './lib/hr/payrollRunsApi';
+import { fetchOnboardingCases, insertOnboardingCase, updateOnboardingCase, fromRow as onboardingCaseFromRow, OnboardingCaseRow } from './lib/hr/onboardingApi';
+import { fetchOffboardingCases, insertOffboardingCase, updateOffboardingCase, fromRow as offboardingCaseFromRow, OffboardingCaseRow } from './lib/hr/offboardingApi';
+import { fetchAuditLog, insertAuditLogEntry, fromRow as auditLogFromRow, AuditLogRow } from './lib/auditLogApi';
+import { fetchFinTransactions, upsertFinTransaction, fromRow as finTransactionFromRow, FinTransactionRow } from './lib/finance/finTransactionsApi';
+import { fetchExpenseRequests, updateExpenseRequest, fromRow as expenseRequestFromRow, ExpenseRequestRow } from './lib/finance/expenseRequestsApi';
+import { fetchMarketingLeads, upsertMarketingLead, deleteMarketingLead, fromRow as marketingLeadFromRow, MarketingLeadRow } from './lib/marketing/marketingLeadsApi';
+import { fetchMarketingCampaigns, upsertMarketingCampaign, deleteMarketingCampaign, fromRow as marketingCampaignFromRow, CampaignRow as MarketingCampaignRow } from './lib/marketing/marketingCampaignsApi';
+import { fetchMarketingAdSpend, upsertMarketingAdSpend, deleteMarketingAdSpend, fromRow as marketingAdSpendFromRow, AdSpendRow as MarketingAdSpendRow } from './lib/marketing/marketingAdSpendApi';
+import { fetchMarketingContentRequests, upsertMarketingContentRequest, deleteMarketingContentRequest, fromRow as marketingContentRequestFromRow, ContentRequestRow as MarketingContentRequestRow } from './lib/marketing/marketingContentRequestsApi';
+import { fetchMarketingContentItems, upsertMarketingContentItem, deleteMarketingContentItem, fromRow as marketingContentItemFromRow, ContentItemRow as MarketingContentItemRow } from './lib/marketing/marketingContentItemsApi';
+import { fetchMarketingDesignTasks, upsertMarketingDesignTask, deleteMarketingDesignTask, fromRow as marketingDesignTaskFromRow, DesignTaskRow as MarketingDesignTaskRow } from './lib/marketing/marketingDesignTasksApi';
+import { fetchMarketingVideoTasks, upsertMarketingVideoTask, deleteMarketingVideoTask, fromRow as marketingVideoTaskFromRow, VideoTaskRow as MarketingVideoTaskRow } from './lib/marketing/marketingVideoTasksApi';
+import { fetchMarketingPosts, upsertMarketingPost, deleteMarketingPost, fromRow as marketingPostFromRow, SocialPostRow as MarketingPostRow } from './lib/marketing/marketingPostsApi';
+import { fetchMarketingSeoTasks, upsertMarketingSeoTask, deleteMarketingSeoTask, fromRow as marketingSeoTaskFromRow, SeoTaskRow as MarketingSeoTaskRow } from './lib/marketing/marketingSeoTasksApi';
+import { fetchMarketingSeoKeywords, upsertMarketingSeoKeyword, deleteMarketingSeoKeyword, fromRow as marketingSeoKeywordFromRow } from './lib/marketing/marketingSeoKeywordsApi';
+import { fetchMarketingPings, upsertMarketingPing, deleteMarketingPing, fromRow as marketingPingFromRow, BranchPingRow as MarketingPingRow } from './lib/marketing/marketingPingsApi';
+import { fetchBranchContentRequests, insertBranchContentRequest, updateBranchContentRequest, deleteBranchContentRequest, fromRow as branchContentRequestFromRow, BranchContentRequestRow } from './lib/ops/branchContentRequestsApi';
+import { fetchMarketingSupportRequests, insertMarketingSupportRequest, updateMarketingSupportRequest, fromRow as marketingSupportRequestFromRow, MarketingSupportRequestRow } from './lib/marketing/marketingSupportRequestsApi';
+import { fetchItTickets, insertItTicket, updateItTicket, fromRow as itTicketFromRow, ItTicketRow } from './lib/ops/itTicketsApi';
+import { fetchBranchTransfers, insertBranchTransfer, updateBranchTransfer, fromRow as branchTransferFromRow, BranchTransferRow } from './lib/ops/branchTransfersApi';
 import { CommunicationsContext } from './communications';
 import { FinanceLedgerContext } from './financeLedger';
-import {
-  SEED_APPLICATIONS, SEED_BRANCHES, SEED_COMMISSIONS, SEED_COUNSELORS, SEED_COUNSELOR_STUDENTS,
-  SEED_NOTIFICATIONS, SEED_PARTNERS, SEED_STAFF, SEED_STUDENTS, SEED_TASKS, SEED_NOTICES, SEED_ISSUES, SEED_ATTENDANCE, SEED_CORRECTIONS, SEED_DAY_LOGS, SEED_ONBOARDING, SEED_OFFBOARDING, SEED_LEAVE, SEED_EXPLANATIONS, SEED_HOLIDAYS, SEED_REVIEWS, SEED_PAY_PROFILES, SEED_PAYROLL_RUNS, SEED_JOIN_DATES, SEED_FIN_TRANSACTIONS, SEED_EXPENSES, SEED_COMMUNICATIONS, SEED_MARKETING, SEED_WORKSPACE, SEED_AUDIT, SEED_SERVICE_PRICES,
-} from './devSeed';
 
-// Demo mode only (appMode.ts): an empty table (or no Supabase at all) falls back to the sample
-// data in devSeed.ts, and the stores that aren't in the database yet start from it. Outside demo
-// mode every store starts empty and shows only real records.
-const withSeed = <T,>(rows: T[], seed: T[]): T[] => (rows.length > 0 || !DEMO_MODE ? rows : seed);
-const demo = <T,>(seed: T, empty: T): T => (DEMO_MODE ? seed : empty);
+// Every store reflects real Supabase state only — no demo/seed fallback. Composite stores
+// (Marketing, Manager Workspace) start from these empty shapes until their tables load.
 const EMPTY_MARKETING: MarketingStore = { pings: [], leads: [], campaigns: [], adSpend: [], contentRequests: [], contentItems: [], designTasks: [], videoTasks: [], posts: [], seoTasks: [], keywords: [] };
 const EMPTY_WORKSPACE: ManagerWorkspaceStore = { contentRequests: [], supportRequests: [], itTickets: [], transfers: [] };
+
+// The Marketing store is mutated in dozens of places (named handlers here, and deep inside
+// MarketingModule's own subtree via its `setStore` prop) — too many call sites to hand-wire
+// individually. Instead, every one of its 11 arrays gets diffed against its previous value
+// whenever `setMarketing` runs, and whatever changed is pushed to the matching Supabase table.
+// This makes every existing/future `setMarketing(...)` call persist automatically.
+function syncMarketingArray<T>(
+  prevArr: T[],
+  nextArr: T[],
+  getKey: (item: T) => string,
+  upsert: (item: T) => Promise<void>,
+  del: (key: string) => Promise<void>,
+  label: string
+) {
+  if (prevArr === nextArr) return;
+  const prevByKey = new Map(prevArr.map((item) => [getKey(item), item] as const));
+  const nextByKey = new Map(nextArr.map((item) => [getKey(item), item] as const));
+  nextByKey.forEach((item, key) => {
+    const prevItem = prevByKey.get(key);
+    if (!prevItem || JSON.stringify(prevItem) !== JSON.stringify(item)) {
+      upsert(item).catch((err) => console.error(`Failed to sync marketing.${label} to Supabase`, err));
+    }
+  });
+  prevByKey.forEach((_item, key) => {
+    if (!nextByKey.has(key)) {
+      del(key).catch((err) => console.error(`Failed to sync marketing.${label} delete to Supabase`, err));
+    }
+  });
+}
+
+function persistMarketingDiff(prev: MarketingStore, next: MarketingStore) {
+  syncMarketingArray(prev.leads, next.leads, (x) => x.id, upsertMarketingLead, deleteMarketingLead, 'leads');
+  syncMarketingArray(prev.campaigns, next.campaigns, (x) => x.id, upsertMarketingCampaign, deleteMarketingCampaign, 'campaigns');
+  syncMarketingArray(prev.adSpend, next.adSpend, (x) => x.id, upsertMarketingAdSpend, deleteMarketingAdSpend, 'adSpend');
+  syncMarketingArray(prev.contentRequests, next.contentRequests, (x) => x.id, upsertMarketingContentRequest, deleteMarketingContentRequest, 'contentRequests');
+  syncMarketingArray(prev.contentItems, next.contentItems, (x) => x.id, upsertMarketingContentItem, deleteMarketingContentItem, 'contentItems');
+  syncMarketingArray(prev.designTasks, next.designTasks, (x) => x.id, upsertMarketingDesignTask, deleteMarketingDesignTask, 'designTasks');
+  syncMarketingArray(prev.videoTasks, next.videoTasks, (x) => x.id, upsertMarketingVideoTask, deleteMarketingVideoTask, 'videoTasks');
+  syncMarketingArray(prev.posts, next.posts, (x) => x.id, upsertMarketingPost, deleteMarketingPost, 'posts');
+  syncMarketingArray(prev.seoTasks, next.seoTasks, (x) => x.id, upsertMarketingSeoTask, deleteMarketingSeoTask, 'seoTasks');
+  syncMarketingArray(prev.keywords, next.keywords, (x) => x.keyword, upsertMarketingSeoKeyword, deleteMarketingSeoKeyword, 'keywords');
+  syncMarketingArray(prev.pings, next.pings, (x) => x.id, upsertMarketingPing, deleteMarketingPing, 'pings');
+}
 
 export default function App() {
   const isIntakeForm = window.location.pathname === '/intake';
@@ -124,74 +194,109 @@ export default function App() {
   const [commissions, setCommissions] = useState<CommissionRecord[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  // Daily Task Board — local only for now (no Supabase table yet), seeded with mock tasks.
-  const [tasks, setTasks] = useState<DailyTask[]>(demo(SEED_TASKS, []));
-  // Branch Communication Center — local only for now, like the task board.
-  const [notices, setNotices] = useState<BranchNotice[]>(demo(SEED_NOTICES, []));
-  // Issue & Escalation Management — local only for now.
-  const [issues, setIssues] = useState<BranchIssue[]>(demo(SEED_ISSUES, []));
-  // Branch Operations Control — local only for now.
-  const [attendance, setAttendance] = useState<AttendanceRecord[]>(demo(SEED_ATTENDANCE, []));
-  const [corrections, setCorrections] = useState<AttendanceCorrection[]>(demo(SEED_CORRECTIONS, []));
-  const [dayLogs, setDayLogs] = useState<BranchDayLog[]>(demo(SEED_DAY_LOGS, []));
+  // Daily Task Board.
+  const [tasks, setTasks] = useState<DailyTask[]>([]);
+  // Branch Communication Center.
+  const [notices, setNotices] = useState<BranchNotice[]>([]);
+  // Issue & Escalation Management.
+  const [issues, setIssues] = useState<BranchIssue[]>([]);
+  // Branch Operations Control.
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
+  const [corrections, setCorrections] = useState<AttendanceCorrection[]>([]);
+  const [dayLogs, setDayLogs] = useState<BranchDayLog[]>([]);
   // Leave requests (all statuses). Attendance reads the Approved ones from this same list, so
   // approving a request in Leave Management is immediately reflected there.
-  const [leave, setLeave] = useState<LeaveRecord[]>(demo(SEED_LEAVE, []));
-  const handleAddLeave = (l: LeaveRecord) => setLeave((prev) => [...prev, l]);
+  const [leave, setLeave] = useState<LeaveRecord[]>([]);
+  const handleAddLeave = (l: LeaveRecord) => {
+    setLeave((prev) => [...prev, l]);
+    insertLeave(l).catch((err) => console.error('Failed to insert leave record in Supabase', err));
+  };
   // Holidays — Attendance and Leave read these (filtered to the user's branch) to decide what
   // counts as a working day, so saving one here updates both immediately.
-  const [holidays, setHolidays] = useState<Holiday[]>(demo(SEED_HOLIDAYS, []));
-  const handleSaveHoliday = (h: Holiday) =>
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const handleSaveHoliday = (h: Holiday) => {
     setHolidays((prev) => (prev.some((x) => x.id === h.id) ? prev.map((x) => (x.id === h.id ? h : x)) : [...prev, h]));
-  const handleRemoveHoliday = (id: string) => setHolidays((prev) => prev.filter((h) => h.id !== id));
+    upsertHoliday(h).catch((err) => console.error('Failed to save holiday in Supabase', err));
+  };
+  const handleRemoveHoliday = (id: string) => {
+    setHolidays((prev) => prev.filter((h) => h.id !== id));
+    deleteHoliday(id).catch((err) => console.error('Failed to delete holiday in Supabase', err));
+  };
   // Performance reviews — written by the Branch Manager; the numbers beside them come from the CRM.
-  const [reviews, setReviews] = useState<PerformanceReview[]>(demo(SEED_REVIEWS, []));
+  const [reviews, setReviews] = useState<PerformanceReview[]>([]);
   // Payroll inputs — fixed inputs per employee and one run per branch per month.
-  const [payProfiles, setPayProfiles] = useState<PayProfile[]>(demo(SEED_PAY_PROFILES, []));
-  const [payrollRuns, setPayrollRuns] = useState<PayrollRun[]>(demo(SEED_PAYROLL_RUNS, []));
-  const handleSavePayProfile = (p: PayProfile) =>
+  const [payProfiles, setPayProfiles] = useState<PayProfile[]>([]);
+  const [payrollRuns, setPayrollRuns] = useState<PayrollRun[]>([]);
+  const handleSavePayProfile = (p: PayProfile) => {
     setPayProfiles((prev) => (prev.some((x) => x.staffName === p.staffName && x.branch === p.branch)
       ? prev.map((x) => (x.staffName === p.staffName && x.branch === p.branch ? p : x)) : [...prev, p]));
-  const handleSavePayrollRun = (r: PayrollRun) =>
+    upsertPayProfile(p).catch((err) => console.error('Failed to save pay profile in Supabase', err));
+  };
+  const handleSavePayrollRun = (r: PayrollRun) => {
     setPayrollRuns((prev) => (prev.some((x) => x.id === r.id) ? prev.map((x) => (x.id === r.id ? r : x)) : [...prev, r]));
+    upsertPayrollRun(r).catch((err) => console.error('Failed to save payroll run in Supabase', err));
+  };
   // Financial Management — one ledger per branch that every finance view reads.
-  const [finTransactions, setFinTransactions] = useState<FinTransaction[]>(demo(SEED_FIN_TRANSACTIONS, []));
-  // Marketing Department — leads, campaigns, content, social and SEO. Local only for now.
-  const [marketing, setMarketing] = useState<MarketingStore>(demo(SEED_MARKETING, EMPTY_MARKETING));
-  const handleSaveFinTransaction = (t: FinTransaction) =>
+  const [finTransactions, setFinTransactions] = useState<FinTransaction[]>([]);
+  // Marketing Department — leads, campaigns, content, social and SEO. `setMarketing` wraps the
+  // raw setter so every change (named handlers below, or deep inside MarketingModule's own
+  // subtree) is diffed and persisted to Supabase automatically — see persistMarketingDiff above.
+  const [marketing, setMarketingState] = useState<MarketingStore>(EMPTY_MARKETING);
+  const setMarketing: typeof setMarketingState = (update) => {
+    setMarketingState((prev) => {
+      const next = typeof update === 'function' ? (update as (p: MarketingStore) => MarketingStore)(prev) : update;
+      persistMarketingDiff(prev, next);
+      return next;
+    });
+  };
+  const handleSaveFinTransaction = (t: FinTransaction) => {
     setFinTransactions((prev) => (prev.some((x) => x.id === t.id) ? prev.map((x) => (x.id === t.id ? t : x)) : [...prev, t]));
+    upsertFinTransaction(t).catch((err) => console.error('Failed to save fin_transaction in Supabase', err));
+  };
   // Service Charges price list — set by the Super Admin (Finance → Service Charges), saved in
   // `service_prices`. Append-only: every change is a new version.
   const [servicePrices, setServicePrices] = useState<ServicePrice[]>([]);
   // Shared with every Client Profile (Financials tab) through context.
   const financeLedgerValue = useMemo(() => ({
     transactions: finTransactions,
-    addTransaction: (t: FinTransaction) => setFinTransactions((prev) => [...prev, t]),
+    addTransaction: (t: FinTransaction) => {
+      setFinTransactions((prev) => [...prev, t]);
+      upsertFinTransaction(t).catch((err) => console.error('Failed to insert fin_transaction in Supabase', err));
+    },
     servicePrices,
     counselorOf: (clientId: string) => counselorStudents.find((c) => c.clientId === clientId)?.assignedCounselor
       ?? applications.find((a) => a.clientId === clientId)?.counselor,
   }), [finTransactions, servicePrices, counselorStudents, applications]);
   // Expense claims — decided in the Manager Approval Center.
-  const [expenses, setExpenses] = useState<ExpenseRequest[]>(demo(SEED_EXPENSES, []));
+  const [expenses, setExpenses] = useState<ExpenseRequest[]>([]);
   // Branch Manager Workspace — branch requests to Head Office (content, marketing support, IT)
   // and inter-branch client transfers.
-  const [workspace, setWorkspace] = useState<ManagerWorkspaceStore>(demo(SEED_WORKSPACE, EMPTY_WORKSPACE));
+  const [workspace, setWorkspace] = useState<ManagerWorkspaceStore>(EMPTY_WORKSPACE);
   // Super Admin Command Center — its global filters (kept here so they survive moving between
   // sidebar tabs) and the append-only log of administrative overrides.
   const [adminFilters, setAdminFilters] = useState<GlobalFilters>(DEFAULT_FILTERS);
-  const [auditLog, setAuditLog] = useState<AuditOverrideEntry[]>(demo(SEED_AUDIT, []));
-  const handleSaveExpense = (e: ExpenseRequest) => setExpenses((prev) => prev.map((x) => (x.id === e.id ? e : x)));
-  const handleSaveReview = (r: PerformanceReview) =>
+  const [auditLog, setAuditLog] = useState<AuditOverrideEntry[]>([]);
+  const handleSaveExpense = (e: ExpenseRequest) => {
+    setExpenses((prev) => prev.map((x) => (x.id === e.id ? e : x)));
+    updateExpenseRequest(e.id, e).catch((err) => console.error('Failed to update expense_request in Supabase', err));
+  };
+  const handleSaveReview = (r: PerformanceReview) => {
     setReviews((prev) => (prev.some((x) => x.id === r.id) ? prev.map((x) => (x.id === r.id ? r : x)) : [...prev, r]));
-  const handleUpdateLeave = (id: string, updates: Partial<LeaveRecord>) =>
+    upsertPerformanceReview(r).catch((err) => console.error('Failed to save performance review in Supabase', err));
+  };
+  const handleUpdateLeave = (id: string, updates: Partial<LeaveRecord>) => {
     setLeave((prev) => prev.map((l) => (l.id === id ? { ...l, ...updates } : l)));
+    updateLeave(id, updates).catch((err) => console.error('Failed to update leave record in Supabase', err));
+  };
   // Late / absence explanations — requested by the manager, submitted by staff.
-  const [explanations, setExplanations] = useState<AttendanceExplanation[]>(demo(SEED_EXPLANATIONS, []));
-  const handleSaveExplanation = (e: AttendanceExplanation) =>
+  const [explanations, setExplanations] = useState<AttendanceExplanation[]>([]);
+  const handleSaveExplanation = (e: AttendanceExplanation) => {
     setExplanations((prev) => (prev.some((x) => x.id === e.id) ? prev.map((x) => (x.id === e.id ? e : x)) : [...prev, e]));
-  // Employee Onboarding & Offboarding — local only for now.
-  const [onboarding, setOnboarding] = useState<OnboardingCase[]>(demo(SEED_ONBOARDING, []));
-  const [offboarding, setOffboarding] = useState<OffboardingCase[]>(demo(SEED_OFFBOARDING, []));
+    upsertAttendanceExplanation(e).catch((err) => console.error('Failed to save attendance explanation in Supabase', err));
+  };
+  // Employee Onboarding & Offboarding.
+  const [onboarding, setOnboarding] = useState<OnboardingCase[]>([]);
+  const [offboarding, setOffboarding] = useState<OffboardingCase[]>([]);
   const [communications, setCommunications] = useState<CommunicationEntry[]>([]);
 
   // Each table loads in full once on mount, then stays in sync via realtime — but instead of
@@ -202,11 +307,8 @@ export default function App() {
   // don't drift out of order as changes come in from other staff.
   useEffect(() => {
     fetchCounselorStudents()
-      .then((rows) => setCounselorStudents(withSeed(rows, SEED_COUNSELOR_STUDENTS)))
-      .catch((err) => {
-        console.error('Failed to fetch counselor_students from Supabase — using mock data', err);
-        setCounselorStudents(demo(SEED_COUNSELOR_STUDENTS, []));
-      });
+      .then(setCounselorStudents)
+      .catch((err) => console.error('Failed to fetch counselor_students from Supabase', err));
     return subscribeToTable<CounselorStudentRow>('counselor_students', (change) => {
       setCounselorStudents((prev) => applyRealtimeChange(prev, change, counselorStudentFromRow,
         (a, b) => (a.assignedDate < b.assignedDate ? -1 : a.assignedDate > b.assignedDate ? 1 : 0)));
@@ -215,11 +317,8 @@ export default function App() {
 
   useEffect(() => {
     fetchStudents()
-      .then((rows) => setStudents(withSeed(rows, SEED_STUDENTS)))
-      .catch((err) => {
-        console.error('Failed to fetch students from Supabase — using mock data', err);
-        setStudents(demo(SEED_STUDENTS, []));
-      });
+      .then(setStudents)
+      .catch((err) => console.error('Failed to fetch students from Supabase', err));
     return subscribeToTable<StudentRow>('students', (change) => {
       setStudents((prev) => applyRealtimeChange(prev, change, studentFromRow,
         (a, b) => (a.submittedAt < b.submittedAt ? 1 : a.submittedAt > b.submittedAt ? -1 : 0)));
@@ -228,11 +327,8 @@ export default function App() {
 
   useEffect(() => {
     fetchCounselors()
-      .then((rows) => setCounselors(withSeed(rows, SEED_COUNSELORS)))
-      .catch((err) => {
-        console.error('Failed to fetch counselors from Supabase — using mock data', err);
-        setCounselors(demo(SEED_COUNSELORS, []));
-      });
+      .then(setCounselors)
+      .catch((err) => console.error('Failed to fetch counselors from Supabase', err));
     return subscribeToTable<CounselorRow>('counselors', (change) => {
       setCounselors((prev) => applyRealtimeChange(prev, change, counselorFromRow,
         (a, b) => a.name.localeCompare(b.name)));
@@ -241,11 +337,8 @@ export default function App() {
 
   useEffect(() => {
     fetchApplications()
-      .then((rows) => setApplications(withSeed(rows, SEED_APPLICATIONS)))
-      .catch((err) => {
-        console.error('Failed to fetch applications from Supabase — using mock data', err);
-        setApplications(demo(SEED_APPLICATIONS, []));
-      });
+      .then(setApplications)
+      .catch((err) => console.error('Failed to fetch applications from Supabase', err));
     return subscribeToTable<ApplicationRow>('applications', (change) => {
       setApplications((prev) => applyRealtimeChange(prev, change, applicationFromRow,
         (a, b) => (a.consultationDate < b.consultationDate ? 1 : a.consultationDate > b.consultationDate ? -1 : 0)));
@@ -254,11 +347,8 @@ export default function App() {
 
   useEffect(() => {
     fetchStaff()
-      .then((rows) => setStaff(withSeed(rows, SEED_STAFF)))
-      .catch((err) => {
-        console.error('Failed to fetch staff from Supabase — using mock data', err);
-        setStaff(demo(SEED_STAFF, []));
-      });
+      .then(setStaff)
+      .catch((err) => console.error('Failed to fetch staff from Supabase', err));
     return subscribeToTable<StaffRow>('staff', (change) => {
       setStaff((prev) => applyRealtimeChange(prev, change, staffFromRow,
         (a, b) => a.name.localeCompare(b.name)));
@@ -267,11 +357,8 @@ export default function App() {
 
   useEffect(() => {
     fetchBranches()
-      .then((rows) => setBranches(withSeed(rows, SEED_BRANCHES)))
-      .catch((err) => {
-        console.error('Failed to fetch branches from Supabase — using mock data', err);
-        setBranches(demo(SEED_BRANCHES, []));
-      });
+      .then(setBranches)
+      .catch((err) => console.error('Failed to fetch branches from Supabase', err));
     return subscribeToTable<BranchRow>('branches', (change) => {
       setBranches((prev) => applyRealtimeChange(prev, change, branchFromRow,
         (a, b) => a.name.localeCompare(b.name)));
@@ -280,11 +367,8 @@ export default function App() {
 
   useEffect(() => {
     fetchNotifications()
-      .then((rows) => setNotifications(withSeed(rows, SEED_NOTIFICATIONS)))
-      .catch((err) => {
-        console.error('Failed to fetch notifications from Supabase — using mock data', err);
-        setNotifications(demo(SEED_NOTIFICATIONS, []));
-      });
+      .then(setNotifications)
+      .catch((err) => console.error('Failed to fetch notifications from Supabase', err));
     return subscribeToTable<NotificationRow>('notifications', (change) => {
       setNotifications((prev) => applyRealtimeChange(prev, change, notificationFromRow,
         (a, b) => b.createdAt.getTime() - a.createdAt.getTime()));
@@ -293,11 +377,8 @@ export default function App() {
 
   useEffect(() => {
     fetchCommissions()
-      .then((rows) => setCommissions(withSeed(rows, SEED_COMMISSIONS)))
-      .catch((err) => {
-        console.error('Failed to fetch commissions from Supabase — using mock data', err);
-        setCommissions(demo(SEED_COMMISSIONS, []));
-      });
+      .then(setCommissions)
+      .catch((err) => console.error('Failed to fetch commissions from Supabase', err));
     return subscribeToTable<CommissionRow>('commissions', (change) => {
       setCommissions((prev) => applyRealtimeChange(prev, change, commissionFromRow,
         (a, b) => a.studentName.localeCompare(b.studentName)));
@@ -306,11 +387,8 @@ export default function App() {
 
   useEffect(() => {
     fetchPartners()
-      .then((rows) => setPartners(withSeed(rows, SEED_PARTNERS)))
-      .catch((err) => {
-        console.error('Failed to fetch partners from Supabase — using mock data', err);
-        setPartners(demo(SEED_PARTNERS, []));
-      });
+      .then(setPartners)
+      .catch((err) => console.error('Failed to fetch partners from Supabase', err));
     return subscribeToTable<PartnerRow>('partners', (change) => {
       setPartners((prev) => applyRealtimeChange(prev, change, partnerFromRow,
         (a, b) => a.name.localeCompare(b.name)));
@@ -319,11 +397,8 @@ export default function App() {
 
   useEffect(() => {
     fetchServicePrices()
-      .then((rows) => setServicePrices(withSeed(rows, SEED_SERVICE_PRICES)))
-      .catch((err) => {
-        console.error('Failed to fetch service prices from Supabase', err);
-        setServicePrices(demo(SEED_SERVICE_PRICES, []));
-      });
+      .then(setServicePrices)
+      .catch((err) => console.error('Failed to fetch service prices from Supabase', err));
     return subscribeToTable<ServicePriceRow>('service_prices', (change) => {
       setServicePrices((prev) => applyRealtimeChange(prev, change, servicePriceFromRow, (a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom)));
     });
@@ -341,14 +416,357 @@ export default function App() {
 
   useEffect(() => {
     fetchCommunications()
-      .then((rows) => setCommunications(withSeed(rows, SEED_COMMUNICATIONS)))
-      .catch((err) => {
-        console.error('Failed to fetch communication_logs from Supabase — using mock data', err);
-        setCommunications(demo(SEED_COMMUNICATIONS, []));
-      });
+      .then(setCommunications)
+      .catch((err) => console.error('Failed to fetch communication_logs from Supabase', err));
     return subscribeToTable<CommunicationRow>('communication_logs', (change) => {
       setCommunications((prev) => applyRealtimeChange(prev, change, communicationFromRow,
         (a, b) => b.occurredAt.localeCompare(a.occurredAt)));
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchTasks()
+      .then(setTasks)
+      .catch((err) => console.error('Failed to fetch tasks from Supabase', err));
+    return subscribeToTable<TaskRow>('tasks', (change) => {
+      setTasks((prev) => applyRealtimeChange(prev, change, taskFromRow,
+        (a, b) => a.date.localeCompare(b.date)));
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchBranchNotices()
+      .then(setNotices)
+      .catch((err) => console.error('Failed to fetch branch_notices from Supabase', err));
+    return subscribeToTable<BranchNoticeRow>('branch_notices', (change) => {
+      setNotices((prev) => applyRealtimeChange(prev, change, branchNoticeFromRow,
+        (a, b) => b.postedAt.localeCompare(a.postedAt)));
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchBranchIssues()
+      .then(setIssues)
+      .catch((err) => console.error('Failed to fetch branch_issues from Supabase', err));
+    return subscribeToTable<BranchIssueRow>('branch_issues', (change) => {
+      setIssues((prev) => applyRealtimeChange(prev, change, branchIssueFromRow,
+        (a, b) => b.reportedAt.localeCompare(a.reportedAt)));
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchAttendance()
+      .then(setAttendance)
+      .catch((err) => console.error('Failed to fetch attendance from Supabase', err));
+    return subscribeToTable<AttendanceRow>('attendance', (change) => {
+      setAttendance((prev) => applyRealtimeChange(prev, change, attendanceFromRow,
+        (a, b) => b.date.localeCompare(a.date)));
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchAttendanceCorrections()
+      .then(setCorrections)
+      .catch((err) => console.error('Failed to fetch attendance_corrections from Supabase', err));
+    return subscribeToTable<AttendanceCorrectionRow>('attendance_corrections', (change) => {
+      setCorrections((prev) => applyRealtimeChange(prev, change, attendanceCorrectionFromRow,
+        (a, b) => b.requestedAt.localeCompare(a.requestedAt)));
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchAttendanceExplanations()
+      .then(setExplanations)
+      .catch((err) => console.error('Failed to fetch attendance_explanations from Supabase', err));
+    return subscribeToTable<AttendanceExplanationRow>('attendance_explanations', (change) => {
+      setExplanations((prev) => applyRealtimeChange(prev, change, attendanceExplanationFromRow,
+        (a, b) => b.date.localeCompare(a.date)));
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchBranchDayLogs()
+      .then(setDayLogs)
+      .catch((err) => console.error('Failed to fetch branch_day_logs from Supabase', err));
+    return subscribeToTable<BranchDayLogRow>('branch_day_logs', (change) => {
+      setDayLogs((prev) => applyRealtimeChange(prev, change, branchDayLogFromRow,
+        (a, b) => b.date.localeCompare(a.date)));
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchLeave()
+      .then(setLeave)
+      .catch((err) => console.error('Failed to fetch leave_records from Supabase', err));
+    return subscribeToTable<LeaveRecordRow>('leave_records', (change) => {
+      setLeave((prev) => applyRealtimeChange(prev, change, leaveFromRow,
+        (a, b) => b.from.localeCompare(a.from)));
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchHolidays()
+      .then(setHolidays)
+      .catch((err) => console.error('Failed to fetch holidays from Supabase', err));
+    return subscribeToTable<HolidayRow>('holidays', (change) => {
+      setHolidays((prev) => applyRealtimeChange(prev, change, holidayFromRow,
+        (a, b) => b.from.localeCompare(a.from)));
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchPerformanceReviews()
+      .then(setReviews)
+      .catch((err) => console.error('Failed to fetch performance_reviews from Supabase', err));
+    return subscribeToTable<PerformanceReviewRow>('performance_reviews', (change) => {
+      setReviews((prev) => applyRealtimeChange(prev, change, performanceReviewFromRow,
+        (a, b) => b.reviewedAt.localeCompare(a.reviewedAt)));
+    });
+  }, []);
+
+  // PayProfile has no `id` (it's keyed by staffName+branch), so this merges by that pair
+  // instead of using applyRealtimeChange (which requires an `id`).
+  useEffect(() => {
+    fetchPayProfiles()
+      .then(setPayProfiles)
+      .catch((err) => console.error('Failed to fetch pay_profiles from Supabase', err));
+    return subscribeToTable<PayProfileRow>('pay_profiles', (change) => {
+      setPayProfiles((prev) => {
+        if (change.eventType === 'DELETE') {
+          const old = change.old as Partial<PayProfileRow> | null;
+          if (!old?.staff_name || !old.branch) return prev;
+          return prev.filter((p) => !(p.staffName === old.staff_name && p.branch === old.branch));
+        }
+        if (!change.new) return prev;
+        const record = payProfileFromRow(change.new);
+        const exists = prev.some((p) => p.staffName === record.staffName && p.branch === record.branch);
+        return exists
+          ? prev.map((p) => (p.staffName === record.staffName && p.branch === record.branch ? record : p))
+          : [...prev, record];
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchPayrollRuns()
+      .then(setPayrollRuns)
+      .catch((err) => console.error('Failed to fetch payroll_runs from Supabase', err));
+    return subscribeToTable<PayrollRunRow>('payroll_runs', (change) => {
+      setPayrollRuns((prev) => applyRealtimeChange(prev, change, payrollRunFromRow,
+        (a, b) => b.month.localeCompare(a.month)));
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchOnboardingCases()
+      .then(setOnboarding)
+      .catch((err) => console.error('Failed to fetch onboarding_cases from Supabase', err));
+    return subscribeToTable<OnboardingCaseRow>('onboarding_cases', (change) => {
+      setOnboarding((prev) => applyRealtimeChange(prev, change, onboardingCaseFromRow,
+        (a, b) => b.createdAt.localeCompare(a.createdAt)));
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchOffboardingCases()
+      .then(setOffboarding)
+      .catch((err) => console.error('Failed to fetch offboarding_cases from Supabase', err));
+    return subscribeToTable<OffboardingCaseRow>('offboarding_cases', (change) => {
+      setOffboarding((prev) => applyRealtimeChange(prev, change, offboardingCaseFromRow,
+        (a, b) => b.createdAt.localeCompare(a.createdAt)));
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchAuditLog()
+      .then(setAuditLog)
+      .catch((err) => console.error('Failed to fetch audit_log from Supabase', err));
+    return subscribeToTable<AuditLogRow>('audit_log', (change) => {
+      setAuditLog((prev) => applyRealtimeChange(prev, change, auditLogFromRow,
+        (a, b) => b.at.localeCompare(a.at)));
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchFinTransactions()
+      .then(setFinTransactions)
+      .catch((err) => console.error('Failed to fetch fin_transactions from Supabase', err));
+    return subscribeToTable<FinTransactionRow>('fin_transactions', (change) => {
+      setFinTransactions((prev) => applyRealtimeChange(prev, change, finTransactionFromRow,
+        (a, b) => b.at.localeCompare(a.at)));
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchExpenseRequests()
+      .then(setExpenses)
+      .catch((err) => console.error('Failed to fetch expense_requests from Supabase', err));
+    return subscribeToTable<ExpenseRequestRow>('expense_requests', (change) => {
+      setExpenses((prev) => applyRealtimeChange(prev, change, expenseRequestFromRow,
+        (a, b) => b.requestedAt.localeCompare(a.requestedAt)));
+    });
+  }, []);
+
+  // Marketing — 11 tables, one per MarketingStore array. Loaded with the RAW setter
+  // (setMarketingState), not the diffing `setMarketing` wrapper above: this is data coming
+  // FROM the database, not a local edit that needs to be pushed back to it.
+  useEffect(() => {
+    fetchMarketingLeads()
+      .then((rows) => setMarketingState((prev) => ({ ...prev, leads: rows })))
+      .catch((err) => console.error('Failed to fetch marketing_leads from Supabase', err));
+    return subscribeToTable<MarketingLeadRow>('marketing_leads', (change) => {
+      setMarketingState((prev) => ({ ...prev, leads: applyRealtimeChange(prev.leads, change, marketingLeadFromRow,
+        (a, b) => b.receivedAt.localeCompare(a.receivedAt)) }));
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchMarketingCampaigns()
+      .then((rows) => setMarketingState((prev) => ({ ...prev, campaigns: rows })))
+      .catch((err) => console.error('Failed to fetch marketing_campaigns from Supabase', err));
+    return subscribeToTable<MarketingCampaignRow>('marketing_campaigns', (change) => {
+      setMarketingState((prev) => ({ ...prev, campaigns: applyRealtimeChange(prev.campaigns, change, marketingCampaignFromRow,
+        (a, b) => b.startDate.localeCompare(a.startDate)) }));
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchMarketingAdSpend()
+      .then((rows) => setMarketingState((prev) => ({ ...prev, adSpend: rows })))
+      .catch((err) => console.error('Failed to fetch marketing_ad_spend from Supabase', err));
+    return subscribeToTable<MarketingAdSpendRow>('marketing_ad_spend', (change) => {
+      setMarketingState((prev) => ({ ...prev, adSpend: applyRealtimeChange(prev.adSpend, change, marketingAdSpendFromRow,
+        (a, b) => b.date.localeCompare(a.date)) }));
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchMarketingContentRequests()
+      .then((rows) => setMarketingState((prev) => ({ ...prev, contentRequests: rows })))
+      .catch((err) => console.error('Failed to fetch marketing_content_requests from Supabase', err));
+    return subscribeToTable<MarketingContentRequestRow>('marketing_content_requests', (change) => {
+      setMarketingState((prev) => ({ ...prev, contentRequests: applyRealtimeChange(prev.contentRequests, change, marketingContentRequestFromRow,
+        (a, b) => b.requestedAt.localeCompare(a.requestedAt)) }));
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchMarketingContentItems()
+      .then((rows) => setMarketingState((prev) => ({ ...prev, contentItems: rows })))
+      .catch((err) => console.error('Failed to fetch marketing_content_items from Supabase', err));
+    return subscribeToTable<MarketingContentItemRow>('marketing_content_items', (change) => {
+      setMarketingState((prev) => ({ ...prev, contentItems: applyRealtimeChange(prev.contentItems, change, marketingContentItemFromRow,
+        (a, b) => b.deadline.localeCompare(a.deadline)) }));
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchMarketingDesignTasks()
+      .then((rows) => setMarketingState((prev) => ({ ...prev, designTasks: rows })))
+      .catch((err) => console.error('Failed to fetch marketing_design_tasks from Supabase', err));
+    return subscribeToTable<MarketingDesignTaskRow>('marketing_design_tasks', (change) => {
+      setMarketingState((prev) => ({ ...prev, designTasks: applyRealtimeChange(prev.designTasks, change, marketingDesignTaskFromRow,
+        (a, b) => b.deadline.localeCompare(a.deadline)) }));
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchMarketingVideoTasks()
+      .then((rows) => setMarketingState((prev) => ({ ...prev, videoTasks: rows })))
+      .catch((err) => console.error('Failed to fetch marketing_video_tasks from Supabase', err));
+    return subscribeToTable<MarketingVideoTaskRow>('marketing_video_tasks', (change) => {
+      setMarketingState((prev) => ({ ...prev, videoTasks: applyRealtimeChange(prev.videoTasks, change, marketingVideoTaskFromRow,
+        (a, b) => b.deadline.localeCompare(a.deadline)) }));
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchMarketingPosts()
+      .then((rows) => setMarketingState((prev) => ({ ...prev, posts: rows })))
+      .catch((err) => console.error('Failed to fetch marketing_posts from Supabase', err));
+    return subscribeToTable<MarketingPostRow>('marketing_posts', (change) => {
+      setMarketingState((prev) => ({ ...prev, posts: applyRealtimeChange(prev.posts, change, marketingPostFromRow,
+        (a, b) => b.scheduledAt.localeCompare(a.scheduledAt)) }));
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchMarketingSeoTasks()
+      .then((rows) => setMarketingState((prev) => ({ ...prev, seoTasks: rows })))
+      .catch((err) => console.error('Failed to fetch marketing_seo_tasks from Supabase', err));
+    return subscribeToTable<MarketingSeoTaskRow>('marketing_seo_tasks', (change) => {
+      setMarketingState((prev) => ({ ...prev, seoTasks: applyRealtimeChange(prev.seoTasks, change, marketingSeoTaskFromRow,
+        (a, b) => a.due.localeCompare(b.due)) }));
+    });
+  }, []);
+
+  // No `id` column on marketing_seo_keywords (keyed by `keyword`), so this can't use the
+  // shared applyRealtimeChange helper (requires `{ id: string }`) — merged by hand instead.
+  useEffect(() => {
+    fetchMarketingSeoKeywords()
+      .then((rows) => setMarketingState((prev) => ({ ...prev, keywords: rows })))
+      .catch((err) => console.error('Failed to fetch marketing_seo_keywords from Supabase', err));
+    return subscribeToTable<{ keyword: string }>('marketing_seo_keywords', (change) => {
+      setMarketingState((prev) => {
+        if (change.eventType === 'DELETE') {
+          const key = change.old?.keyword;
+          return key ? { ...prev, keywords: prev.keywords.filter((k) => k.keyword !== key) } : prev;
+        }
+        if (!change.new) return prev;
+        const record = marketingSeoKeywordFromRow(change.new as Parameters<typeof marketingSeoKeywordFromRow>[0]);
+        const exists = prev.keywords.some((k) => k.keyword === record.keyword);
+        return { ...prev, keywords: exists ? prev.keywords.map((k) => (k.keyword === record.keyword ? record : k)) : [...prev.keywords, record] };
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchMarketingPings()
+      .then((rows) => setMarketingState((prev) => ({ ...prev, pings: rows })))
+      .catch((err) => console.error('Failed to fetch marketing_pings from Supabase', err));
+    return subscribeToTable<MarketingPingRow>('marketing_pings', (change) => {
+      setMarketingState((prev) => ({ ...prev, pings: applyRealtimeChange(prev.pings, change, marketingPingFromRow,
+        (a, b) => b.at.localeCompare(a.at)) }));
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchBranchContentRequests()
+      .then((rows) => setWorkspace((prev) => ({ ...prev, contentRequests: rows })))
+      .catch((err) => console.error('Failed to fetch branch_content_requests from Supabase', err));
+    return subscribeToTable<BranchContentRequestRow>('branch_content_requests', (change) => {
+      setWorkspace((prev) => ({ ...prev, contentRequests: applyRealtimeChange(prev.contentRequests, change, branchContentRequestFromRow,
+        (a, b) => b.requestedAt.localeCompare(a.requestedAt)) }));
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchMarketingSupportRequests()
+      .then((rows) => setWorkspace((prev) => ({ ...prev, supportRequests: rows })))
+      .catch((err) => console.error('Failed to fetch marketing_support_requests from Supabase', err));
+    return subscribeToTable<MarketingSupportRequestRow>('marketing_support_requests', (change) => {
+      setWorkspace((prev) => ({ ...prev, supportRequests: applyRealtimeChange(prev.supportRequests, change, marketingSupportRequestFromRow,
+        (a, b) => b.requestedAt.localeCompare(a.requestedAt)) }));
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchItTickets()
+      .then((rows) => setWorkspace((prev) => ({ ...prev, itTickets: rows })))
+      .catch((err) => console.error('Failed to fetch it_tickets from Supabase', err));
+    return subscribeToTable<ItTicketRow>('it_tickets', (change) => {
+      setWorkspace((prev) => ({ ...prev, itTickets: applyRealtimeChange(prev.itTickets, change, itTicketFromRow,
+        (a, b) => b.raisedAt.localeCompare(a.raisedAt)) }));
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchBranchTransfers()
+      .then((rows) => setWorkspace((prev) => ({ ...prev, transfers: rows })))
+      .catch((err) => console.error('Failed to fetch branch_transfers from Supabase', err));
+    return subscribeToTable<BranchTransferRow>('branch_transfers', (change) => {
+      setWorkspace((prev) => ({ ...prev, transfers: applyRealtimeChange(prev.transfers, change, branchTransferFromRow,
+        (a, b) => b.requestedAt.localeCompare(a.requestedAt)) }));
     });
   }, []);
 
@@ -375,6 +793,39 @@ export default function App() {
     }
   };
 
+  // Rehydrate the session on load/refresh. Supabase persists its own Auth session in
+  // localStorage, so once the staff directory has loaded we just need to match it to whoever
+  // is signed in — this is what makes a page refresh no longer sign people out.
+  useEffect(() => {
+    if (!supabase || user || staff.length === 0) return;
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) return;
+      const match = staff.find((s) => s.authUserId === session.user.id);
+      if (!match || match.status !== 'Active') return;
+      handleLogin({
+        name: match.name,
+        role: STAFF_ROLE_TO_ROLE[match.role],
+        branch: match.branch,
+        email: match.email,
+        authUserId: session.user.id,
+        ...(match.role === 'Marketing' ? { marketingRole: match.marketingRole ?? 'Marketing Manager' } : {}),
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staff, user]);
+
+  // External sign-out (token expiry, another tab) clears the local session too.
+  useEffect(() => {
+    if (!supabase) return;
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setActiveKey('overview');
+      }
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
   // A deactivated (or removed) employee loses access immediately, including an open session —
   // the staff table is realtime, so this fires as soon as Staff Management saves the change.
   useEffect(() => {
@@ -389,6 +840,7 @@ export default function App() {
   const handleLogout = () => {
     setUser(null);
     setActiveKey('overview');
+    supabase?.auth.signOut().catch((err) => console.error('Failed to sign out of Supabase', err));
   };
 
   const handleNavigate = (key: string, intent?: NavIntent) => {
@@ -873,7 +1325,7 @@ export default function App() {
     if (prevApp && interviewAt) {
       const interview = new Date(interviewAt);
       const due = new Date(Math.max(Date.now(), interview.getTime() - 2 * 86_400_000));
-      setTasks((prev) => [{
+      const interviewPrepTask: DailyTask = {
         id: `task-usa-prep-${prevApp.id}-${Date.now()}`,
         title: `Schedule USA Interview Prep with Client — ${prevApp.name}`,
         notes: `US visa interview on ${formatInterview(interviewAt)}. Run a mock interview and check the DS-160, I-20 and financial documents.`,
@@ -885,7 +1337,9 @@ export default function App() {
         priority: 'High',
         status: 'To Do',
         createdBy: 'System · Country Pipeline',
-      }, ...prev]);
+      };
+      setTasks((prev) => [interviewPrepTask, ...prev]);
+      insertTask(interviewPrepTask).catch((err) => console.error('Failed to insert task in Supabase', err));
       const ping: AppNotification = {
         ...withActor(createBranchManagerNotification('status-update', prevApp.name, 'US visa interview scheduled for ', ` on ${formatInterview(interviewAt)} — an interview-prep task was added to your Daily Tasks.`, prevApp.branch, 'daily-tasks')),
         role: 'counselor', branch: undefined, recipientName: prevApp.counselor,
@@ -908,9 +1362,11 @@ export default function App() {
     }
   };
 
-  const handleAddStaff = (member: StaffMember, counselorCountries?: string[]) => {
-    setStaff((prev) => [...prev, member]);
-    insertStaff(member).catch((err) => console.error('Failed to insert staff in Supabase', err));
+  const handleAddStaff = async (member: StaffMember, password: string, counselorCountries?: string[]) => {
+    const authUserId = await createStaffAccount(member.email, password, member.branch);
+    const withAuth: StaffMember = { ...member, authUserId };
+    setStaff((prev) => [...prev, withAuth]);
+    insertStaff(withAuth).catch((err) => console.error('Failed to insert staff in Supabase', err));
     if (member.role === 'Branch Manager') {
       setBranches((prev) =>
         prev.map((b) => (b.name === member.branch ? { ...b, manager: member.name } : b))
@@ -935,7 +1391,12 @@ export default function App() {
     }
   };
 
-  const handleUpdateStaff = (id: string, updates: Partial<StaffMember>) => {
+  const handleUpdateStaff = async (id: string, updates: Partial<StaffMember>, password?: string) => {
+    const target = staff.find((s) => s.id === id);
+    if (target?.authUserId) {
+      if (password) await resetStaffPassword(target.authUserId, password);
+      if (updates.email !== undefined && updates.email !== target.email) await updateStaffEmail(target.authUserId, updates.email);
+    }
     setStaff((prev) => prev.map((s) => (s.id === id ? { ...s, ...updates } : s)));
     updateStaff(id, updates).catch((err) => console.error('Failed to update staff in Supabase', err));
   };
@@ -944,6 +1405,9 @@ export default function App() {
     const target = staff.find((s) => s.id === id);
     setStaff((prev) => prev.filter((s) => s.id !== id));
     deleteStaff(id).catch((err) => console.error('Failed to delete staff in Supabase', err));
+    if (target?.authUserId) {
+      deleteStaffAccount(target.authUserId).catch((err) => console.error('Failed to delete staff Auth account', err));
+    }
     if (target?.role === 'Branch Manager') {
       setBranches((prev) =>
         prev.map((b) => (b.manager === target.name ? { ...b, manager: null } : b))
@@ -998,10 +1462,18 @@ export default function App() {
     updateCommission(id, updates).catch((err) => console.error('Failed to update commission in Supabase', err));
   };
 
-  const handleAddTask = (task: DailyTask) => setTasks((prev) => [task, ...prev]);
-  const handleUpdateTask = (id: string, updates: Partial<DailyTask>) =>
+  const handleAddTask = (task: DailyTask) => {
+    setTasks((prev) => [task, ...prev]);
+    insertTask(task).catch((err) => console.error('Failed to insert task in Supabase', err));
+  };
+  const handleUpdateTask = (id: string, updates: Partial<DailyTask>) => {
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)));
-  const handleDeleteTask = (id: string) => setTasks((prev) => prev.filter((t) => t.id !== id));
+    updateTask(id, updates).catch((err) => console.error('Failed to update task in Supabase', err));
+  };
+  const handleDeleteTask = (id: string) => {
+    setTasks((prev) => prev.filter((t) => t.id !== id));
+    deleteTask(id).catch((err) => console.error('Failed to delete task in Supabase', err));
+  };
   // Insert-or-replace by id — check-in creates a record, check-out and corrections update it.
   const upsert = <T extends { id: string }>(item: T) => (prev: T[]) =>
     prev.some((x) => x.id === item.id) ? prev.map((x) => (x.id === item.id ? item : x)) : [...prev, item];
@@ -1010,24 +1482,54 @@ export default function App() {
   const handleSaveAttendance = (record: AttendanceRecord) =>
     setAttendance((prev) => {
       const existing = prev.find((r) => r.id === record.id || (r.staffName === record.staffName && r.date === record.date));
-      return existing ? prev.map((r) => (r === existing ? { ...record, id: existing.id } : r)) : [...prev, record];
+      const resolved = existing ? { ...record, id: existing.id } : record;
+      upsertAttendance(resolved).catch((err) => console.error('Failed to save attendance record in Supabase', err));
+      return existing ? prev.map((r) => (r === existing ? resolved : r)) : [...prev, resolved];
     });
-  const handleSaveDayLog = (log: BranchDayLog) => setDayLogs(upsert(log));
-  const handleAddCorrection = (c: AttendanceCorrection) => setCorrections((prev) => [...prev, c]);
-  const handleUpdateCorrection = (id: string, updates: Partial<AttendanceCorrection>) =>
+  const handleSaveDayLog = (log: BranchDayLog) => {
+    setDayLogs(upsert(log));
+    upsertBranchDayLog(log).catch((err) => console.error('Failed to save branch day log in Supabase', err));
+  };
+  const handleAddCorrection = (c: AttendanceCorrection) => {
+    setCorrections((prev) => [...prev, c]);
+    insertAttendanceCorrection(c).catch((err) => console.error('Failed to insert attendance correction in Supabase', err));
+  };
+  const handleUpdateCorrection = (id: string, updates: Partial<AttendanceCorrection>) => {
     setCorrections((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)));
+    updateAttendanceCorrection(id, updates).catch((err) => console.error('Failed to update attendance correction in Supabase', err));
+  };
   // Case updates take a function of the latest case, so several quick changes (e.g. a bulk
   // handover logging one transfer per category) never overwrite each other.
   const handleUpdateOnboarding = (id: string, update: (c: OnboardingCase) => Partial<OnboardingCase>) =>
-    setOnboarding((prev) => prev.map((c) => (c.id === id ? { ...c, ...update(c) } : c)));
+    setOnboarding((prev) => prev.map((c) => {
+      if (c.id !== id) return c;
+      const updates = update(c);
+      updateOnboardingCase(id, updates).catch((err) => console.error('Failed to update onboarding case in Supabase', err));
+      return { ...c, ...updates };
+    }));
   const handleUpdateOffboarding = (id: string, update: (c: OffboardingCase) => Partial<OffboardingCase>) =>
-    setOffboarding((prev) => prev.map((c) => (c.id === id ? { ...c, ...update(c) } : c)));
-  const handleAddIssue = (issue: BranchIssue) => setIssues((prev) => [issue, ...prev]);
-  const handleUpdateIssue = (id: string, updates: Partial<BranchIssue>) =>
+    setOffboarding((prev) => prev.map((c) => {
+      if (c.id !== id) return c;
+      const updates = update(c);
+      updateOffboardingCase(id, updates).catch((err) => console.error('Failed to update offboarding case in Supabase', err));
+      return { ...c, ...updates };
+    }));
+  const handleAddIssue = (issue: BranchIssue) => {
+    setIssues((prev) => [issue, ...prev]);
+    insertBranchIssue(issue).catch((err) => console.error('Failed to insert branch issue in Supabase', err));
+  };
+  const handleUpdateIssue = (id: string, updates: Partial<BranchIssue>) => {
     setIssues((prev) => prev.map((i) => (i.id === id ? { ...i, ...updates } : i)));
-  const handleAddNotice = (notice: BranchNotice) => setNotices((prev) => [notice, ...prev]);
-  const handleUpdateNotice = useCallback((id: string, updates: Partial<BranchNotice>) =>
-    setNotices((prev) => prev.map((n) => (n.id === id ? { ...n, ...updates } : n))), []);
+    updateBranchIssue(id, updates).catch((err) => console.error('Failed to update branch issue in Supabase', err));
+  };
+  const handleAddNotice = (notice: BranchNotice) => {
+    setNotices((prev) => [notice, ...prev]);
+    insertBranchNotice(notice).catch((err) => console.error('Failed to insert branch notice in Supabase', err));
+  };
+  const handleUpdateNotice = useCallback((id: string, updates: Partial<BranchNotice>) => {
+    setNotices((prev) => prev.map((n) => (n.id === id ? { ...n, ...updates } : n)));
+    updateBranchNotice(id, updates).catch((err) => console.error('Failed to update branch notice in Supabase', err));
+  }, []);
 
   const branchNames = useMemo(() => branches.map((b) => b.name), [branches]);
 
@@ -1053,19 +1555,20 @@ export default function App() {
     if (!user || user.role !== 'super_admin' || !task || task.status === status || reason.trim().length < 10) return;
     const at = formatSubmittedAt(new Date());
     handleUpdateTask(taskId, { status, updatedBy: user.name, updatedAt: at });
-    setAuditLog((prev) => [{
+    const entry: AuditOverrideEntry = {
       id: `ovr-${Date.now()}`, at, by: user.name, record: `Task · ${task.title} (${task.branch})`, field: 'Status', from: task.status, to: status, reason: reason.trim(),
-    }, ...prev]);
+    };
+    setAuditLog((prev) => [entry, ...prev]);
+    insertAuditLogEntry(entry).catch((err) => console.error('Failed to insert audit log entry in Supabase', err));
   };
 
   const workspaceActions: WorkspaceActions = {
     addContentRequest: (input) => {
       if (!user || user.role !== 'branch_manager' || input.neededBy < dateKey(new Date())) return;
       const code = nextCode('MKR', workspace.contentRequests.map((r) => r.code));
-      setWorkspace((w) => ({
-        ...w,
-        contentRequests: [{ ...input, id: `bcr-${Date.now()}`, code, branch: user.branch, requestedBy: user.name, requestedAt: formatSubmittedAt(new Date()), status: 'Requested' }, ...w.contentRequests],
-      }));
+      const newRequest: BranchContentRequest = { ...input, id: `bcr-${Date.now()}`, code, branch: user.branch, requestedBy: user.name, requestedAt: formatSubmittedAt(new Date()), status: 'Requested' };
+      setWorkspace((w) => ({ ...w, contentRequests: [newRequest, ...w.contentRequests] }));
+      insertBranchContentRequest(newRequest).catch((err) => console.error('Failed to insert branch_content_request in Supabase', err));
       notifyMarketingManager(`${user.branch} branch`, '', ` requested a ${input.type.toLowerCase()} for ${input.country} (${input.intake}) — needed by ${input.neededBy}.`);
     },
     cancelContentRequest: (id) => {
@@ -1073,14 +1576,14 @@ export default function App() {
       // Only while Marketing hasn't started on it.
       if (!user || user.role !== 'branch_manager' || !r || r.branch !== user.branch || r.status !== 'Requested') return;
       setWorkspace((w) => ({ ...w, contentRequests: w.contentRequests.filter((x) => x.id !== id) }));
+      deleteBranchContentRequest(id).catch((err) => console.error('Failed to delete branch_content_request in Supabase', err));
     },
     addSupportRequest: (input) => {
       if (!user || user.role !== 'branch_manager' || input.budget < 0) return;
       const code = nextCode('MSR', workspace.supportRequests.map((r) => r.code));
-      setWorkspace((w) => ({
-        ...w,
-        supportRequests: [{ ...input, id: `msr-${Date.now()}`, code, branch: user.branch, requestedBy: user.name, requestedAt: formatSubmittedAt(new Date()), status: 'Submitted' }, ...w.supportRequests],
-      }));
+      const newRequest: MarketingSupportRequest = { ...input, id: `msr-${Date.now()}`, code, branch: user.branch, requestedBy: user.name, requestedAt: formatSubmittedAt(new Date()), status: 'Submitted' };
+      setWorkspace((w) => ({ ...w, supportRequests: [newRequest, ...w.supportRequests] }));
+      insertMarketingSupportRequest(newRequest).catch((err) => console.error('Failed to insert marketing_support_request in Supabase', err));
       notifyMarketingManager(`${user.branch} branch`, '', ` asked for marketing support: ${input.kind} — “${input.title}”.`);
     },
     delegateDirective: (id, to, internalDue, note) => {
@@ -1139,6 +1642,7 @@ export default function App() {
         log: [{ at, by: user.name, role: `Branch Manager · ${user.branch}`, text: `Requested transfer ${fromBranch} → ${user.branch}. Reason: ${reason.trim()}` }],
       };
       setWorkspace((w) => ({ ...w, transfers: [transfer, ...w.transfers] }));
+      insertBranchTransfer(transfer).catch((err) => console.error('Failed to insert branch_transfer in Supabase', err));
       pushNotification(withActor(createBranchManagerNotification('status-update', client.name, `${user.branch} asked to take over `, ` — Transfer Pending Approval (${fromBranch} → ${user.branch}).`, fromBranch, 'approvals')));
     },
     decideTransfer: (id, decision, note) => {
@@ -1168,10 +1672,11 @@ export default function App() {
           const open = chargeLines(oldRows).find((l) => l.remaining > 0)?.charge;
           const meta = { code: t.code, from: t.fromBranch, to: t.toBranch };
           const base = { clientId: client.clientId, clientName: client.name, country: open?.country ?? client.country, service: open?.service ?? 'Other Charge' as const, amount: owed, at, by: user.name, transfer: meta };
-          setFinTransactions((prev) => [...prev,
-            { ...base, id: `fin-trf-out-${Date.now()}`, branch: t.fromBranch, kind: 'Transfer', counselor: client.assignedCounselor, title: `Balance transferred to ${t.toBranch} (${t.code})` },
-            { ...base, id: `fin-trf-in-${Date.now()}`, branch: t.toBranch, kind: 'Charge', counselor: t.toCounselor, title: `Balance transferred from ${t.fromBranch} (${t.code})`, dueDate: dateKey(new Date()) },
-          ]);
+          const transferOut: FinTransaction = { ...base, id: `fin-trf-out-${Date.now()}`, branch: t.fromBranch, kind: 'Transfer', counselor: client.assignedCounselor, title: `Balance transferred to ${t.toBranch} (${t.code})` };
+          const transferIn: FinTransaction = { ...base, id: `fin-trf-in-${Date.now()}`, branch: t.toBranch, kind: 'Charge', counselor: t.toCounselor, title: `Balance transferred from ${t.fromBranch} (${t.code})`, dueDate: dateKey(new Date()) };
+          setFinTransactions((prev) => [...prev, transferOut, transferIn]);
+          upsertFinTransaction(transferOut).catch((err) => console.error('Failed to insert fin_transaction in Supabase', err));
+          upsertFinTransaction(transferIn).catch((err) => console.error('Failed to insert fin_transaction in Supabase', err));
           log.push({ at, by: 'System', role: 'Finance', text: `Unpaid balance moved to ${t.toBranch}; payments already collected stay with ${t.fromBranch}.` });
         }
         log.push({ at, by: 'System', role: 'Audit', text: `Primary branch changed ${t.fromBranch} → ${t.toBranch}; counselor ${client.assignedCounselor} → ${t.toCounselor}.` });
@@ -1180,10 +1685,12 @@ export default function App() {
           role: 'counselor', branch: undefined, recipientName: t.toCounselor,
         });
       }
+      const decidedNote = note.trim() || undefined;
       setWorkspace((w) => ({
         ...w,
-        transfers: w.transfers.map((x) => (x.id !== id ? x : { ...x, status: decision, decidedBy: user.name, decidedAt: at, decisionNote: note.trim() || undefined, log })),
+        transfers: w.transfers.map((x) => (x.id !== id ? x : { ...x, status: decision, decidedBy: user.name, decidedAt: at, decisionNote: decidedNote, log })),
       }));
+      updateBranchTransfer(id, { status: decision, decidedBy: user.name, decidedAt: at, decisionNote: decidedNote, log }).catch((err) => console.error('Failed to update branch_transfer in Supabase', err));
       pushNotification(withActor(createBranchManagerNotification('status-update', t.clientName, `${user.branch} ${decision.toLowerCase()} the transfer of `, decision === 'Rejected' ? ` — ${note.trim()}` : ` — now registered at ${t.toBranch}.`, t.toBranch, 'bm-transfers')));
     },
     reassignTask: (id, assignee) => {
@@ -1196,24 +1703,23 @@ export default function App() {
     addItTicket: (input) => {
       if (!user || user.role !== 'branch_manager') return;
       const at = formatSubmittedAt(new Date());
-      setWorkspace((w) => ({
-        ...w,
-        itTickets: [{
-          ...input, id: `it-${Date.now()}`, code: nextCode('IT', w.itTickets.map((t) => t.code)), branch: user.branch,
-          raisedBy: user.name, raisedAt: at, status: 'Open', history: [{ at, by: user.name, text: 'Ticket raised' }],
-        }, ...w.itTickets],
-      }));
+      const newTicket: ItTicket = {
+        ...input, id: `it-${Date.now()}`, code: nextCode('IT', workspace.itTickets.map((t) => t.code)), branch: user.branch,
+        raisedBy: user.name, raisedAt: at, status: 'Open', history: [{ at, by: user.name, text: 'Ticket raised' }],
+      };
+      setWorkspace((w) => ({ ...w, itTickets: [newTicket, ...w.itTickets] }));
+      insertItTicket(newTicket).catch((err) => console.error('Failed to insert it_ticket in Supabase', err));
     },
     reopenItTicket: (id, note) => {
       const t = workspace.itTickets.find((x) => x.id === id);
       if (!user || user.role !== 'branch_manager' || !t || t.branch !== user.branch || t.status !== 'Resolved' || note.trim().length < 5) return;
       const at = formatSubmittedAt(new Date());
+      const history = [...t.history, { at, by: user.name, text: `Reopened: ${note.trim()}` }];
       setWorkspace((w) => ({
         ...w,
-        itTickets: w.itTickets.map((x) => (x.id !== id ? x : {
-          ...x, status: 'Open', resolvedAt: undefined, history: [...x.history, { at, by: user.name, text: `Reopened: ${note.trim()}` }],
-        })),
+        itTickets: w.itTickets.map((x) => (x.id !== id ? x : { ...x, status: 'Open', resolvedAt: undefined, history })),
       }));
+      updateItTicket(id, { status: 'Open', resolvedAt: undefined, history }).catch((err) => console.error('Failed to update it_ticket in Supabase', err));
     },
   };
 
@@ -1649,7 +2155,7 @@ export default function App() {
         <HrReportsPage
           currentUser={user}
           staff={staff.filter((s) => s.branch === user.branch)}
-          joinDates={demo(SEED_JOIN_DATES, {})}
+          joinDates={Object.fromEntries(staff.filter((s) => s.joinDate).map((s) => [s.name, s.joinDate!]))}
           onboarding={onboarding.filter((c) => c.branch === user.branch)}
           attendance={attendance.filter((r) => r.branch === user.branch)}
           leave={leave.filter((l) => l.branch === user.branch)}
@@ -1762,13 +2268,20 @@ export default function App() {
             tasks: tasks.filter((t) => t.branch === user.branch),
             issues: issues.filter((i) => i.branch === user.branch),
           }}
-          onAddOnboarding={(c) => setOnboarding((prev) => [c, ...prev])}
+          onAddOnboarding={(c) => {
+            setOnboarding((prev) => [c, ...prev]);
+            insertOnboardingCase(c).catch((err) => console.error('Failed to insert onboarding case in Supabase', err));
+          }}
           onUpdateOnboarding={handleUpdateOnboarding}
-          onAddOffboarding={(c) => setOffboarding((prev) => [c, ...prev])}
+          onAddOffboarding={(c) => {
+            setOffboarding((prev) => [c, ...prev]);
+            insertOffboardingCase(c).catch((err) => console.error('Failed to insert offboarding case in Supabase', err));
+          }}
           onUpdateOffboarding={handleUpdateOffboarding}
           onCreateAccount={(c) => {
             if (staff.some((s) => s.name === c.employeeName && s.branch === c.branch)) return;
-            handleAddStaff({ id: `st${Date.now()}`, name: c.employeeName, email: c.email, password: 'Test12345', role: c.role, status: 'Active', branch: c.branch });
+            handleAddStaff({ id: `st${Date.now()}`, name: c.employeeName, email: c.email, role: c.role, status: 'Active', branch: c.branch }, 'Test12345')
+              .catch((err) => console.error('Failed to create staff account from onboarding', err));
           }}
           // Never delete: the leaver stays on record as Inactive so client history keeps its author.
           onMarkInactive={(name) => {
@@ -2040,7 +2553,7 @@ export default function App() {
       >
         {DEMO_MODE && (
           <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            Demo mode — sample data, and several modules are not saved to the database yet. Don’t enter real client information.
+            Demo mode — don’t enter real client information here.
           </p>
         )}
         <div key={`${activeKey}-${navSeq}`} className="dissolve-in">{renderPage()}</div>

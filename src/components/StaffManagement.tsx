@@ -12,8 +12,8 @@ const COUNTRY_OPTIONS = [...COUNTRIES, 'Others'];
 
 interface StaffManagementProps {
   staff: StaffMember[];
-  onAddStaff: (member: StaffMember, counselorCountries?: string[]) => void;
-  onUpdateStaff: (id: string, updates: Partial<StaffMember>) => void;
+  onAddStaff: (member: StaffMember, password: string, counselorCountries?: string[]) => Promise<void>;
+  onUpdateStaff: (id: string, updates: Partial<StaffMember>, password?: string) => Promise<void>;
   onRemoveStaff: (id: string) => void;
   branches?: string[];
   showBranchFilter?: boolean;
@@ -72,6 +72,8 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
   // Freeform extra countries (e.g. Europe) not in the preset list — comma-separated.
   const [countriesOther, setCountriesOther] = useState('');
   const newStaffEmailRef = useRef<HTMLInputElement>(null);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [addSubmitting, setAddSubmitting] = useState(false);
 
   const [editingCredentials, setEditingCredentials] = useState(false);
   const [editEmail, setEditEmail] = useState('');
@@ -104,7 +106,7 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
     });
   }, [staff, search, branchFilter, showBranchFilter]);
 
-  const handleAddSubmit = (e: React.FormEvent) => {
+  const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     // type="email" only rejects grossly malformed values (e.g. missing "@") — it does not
     // enforce `pattern` — so the stricter email shape is checked here instead.
@@ -117,7 +119,6 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
       id: `st${Date.now()}`,
       name: newStaff.name,
       email: newStaff.email,
-      password: newStaff.password,
       role: newStaff.role,
       status: 'Active',
       branch: newStaff.branch,
@@ -126,14 +127,24 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
     const counselorCountries = Array.from(
       new Set([...newStaff.countries.filter((c) => c !== 'Others'), ...extraCountries])
     );
-    onAddStaff(member, newStaff.role === 'Counselor' ? counselorCountries : undefined);
-    setNewStaff({ name: '', email: '', password: '', role: 'Front Desk Officer', branch: defaultNewStaffBranch(), countries: [] });
-    setCountriesOther('');
-    setShowPassword(false);
-    setShowAddForm(false);
+    setAddError(null);
+    setAddSubmitting(true);
+    try {
+      await onAddStaff(member, newStaff.password, newStaff.role === 'Counselor' ? counselorCountries : undefined);
+      setNewStaff({ name: '', email: '', password: '', role: 'Front Desk Officer', branch: defaultNewStaffBranch(), countries: [] });
+      setCountriesOther('');
+      setShowPassword(false);
+      setShowAddForm(false);
+    } catch (err) {
+      setAddError(err instanceof Error ? err.message : 'Could not create this account. Please try again.');
+    } finally {
+      setAddSubmitting(false);
+    }
   };
 
-  const handleSaveCredentials = () => {
+  const [editSubmitting, setEditSubmitting] = useState(false);
+
+  const handleSaveCredentials = async () => {
     if (!selectedStaff) return;
     if (!isValidEmail(editEmail)) {
       editEmailRef.current?.setCustomValidity('Enter a valid email address, e.g. name@csc.edu.np');
@@ -151,13 +162,18 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
       setEditError('Password must be 9–15 characters, with at least one letter and one number.');
       return;
     }
-    onUpdateStaff(selectedStaff.id, {
-      email: editEmail.trim(),
-      ...(editPassword ? { password: editPassword } : {}),
-    });
-    setEditingCredentials(false);
-    setEditPassword('');
     setEditError(null);
+    setEditSubmitting(true);
+    try {
+      await onUpdateStaff(selectedStaff.id, { email: editEmail.trim() }, editPassword || undefined);
+      setEditingCredentials(false);
+      setEditPassword('');
+      setEditError(null);
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : 'Could not save these changes. Please try again.');
+    } finally {
+      setEditSubmitting(false);
+    }
   };
 
   const handleConfirmRemove = () => {
@@ -496,6 +512,7 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
                   </div>
                 </div>
               )}
+              {addError && <p className="text-xs text-red-600">{addError}</p>}
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
@@ -506,9 +523,10 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 bg-navy text-white rounded-lg text-sm font-semibold hover:bg-navy-light transition-colors active:scale-[0.98]"
+                  disabled={addSubmitting}
+                  className="flex-1 py-2.5 bg-navy text-white rounded-lg text-sm font-semibold hover:bg-navy-light transition-colors active:scale-[0.98] disabled:opacity-60"
                 >
-                  Add Staff
+                  {addSubmitting ? 'Creating…' : 'Add Staff'}
                 </button>
               </div>
             </form>
@@ -672,9 +690,10 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
                       <button
                         type="button"
                         onClick={handleSaveCredentials}
-                        className="flex-1 py-2 bg-navy text-white rounded-lg text-xs font-semibold hover:bg-navy-light transition-colors"
+                        disabled={editSubmitting}
+                        className="flex-1 py-2 bg-navy text-white rounded-lg text-xs font-semibold hover:bg-navy-light transition-colors disabled:opacity-60"
                       >
-                        Save
+                        {editSubmitting ? 'Saving…' : 'Save'}
                       </button>
                     </div>
                   </div>

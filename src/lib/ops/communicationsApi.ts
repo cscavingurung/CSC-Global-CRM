@@ -1,5 +1,5 @@
-import { supabase } from './supabaseClient';
-import { CommunicationEntry } from '../types';
+import { supabase } from '../supabaseClient';
+import { CommunicationEntry } from '../../types';
 
 export interface CommunicationRow {
   id: string;

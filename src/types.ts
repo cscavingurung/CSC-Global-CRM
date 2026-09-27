@@ -11,6 +11,8 @@ export interface MockUser {
   role: Role;
   branch: string;
   email: string;
+  /** Supabase Auth user id for this session (see `staff.auth_user_id`). */
+  authUserId: string;
   /** Marketing Department only — picks which role dashboard and actions they get. */
   marketingRole?: MarketingRole;
 }
@@ -427,10 +429,13 @@ export interface StaffMember {
   id: string;
   name: string;
   email: string;
-  password: string;
+  /** Supabase Auth user id backing this staff member's login (see `admin-staff` Edge Function). */
+  authUserId?: string;
   role: StaffRole;
   status: StaffStatus;
   branch: string;
+  /** YYYY-MM-DD — used by HR Reports when no onboarding case gives a start date. */
+  joinDate?: string;
   /** Marketing Department only. */
   marketingRole?: MarketingRole;
 }
