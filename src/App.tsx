@@ -313,7 +313,7 @@ export default function App() {
       setCounselorStudents((prev) => applyRealtimeChange(prev, change, counselorStudentFromRow,
         (a, b) => (a.assignedDate < b.assignedDate ? -1 : a.assignedDate > b.assignedDate ? 1 : 0)));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchStudents()
@@ -323,7 +323,7 @@ export default function App() {
       setStudents((prev) => applyRealtimeChange(prev, change, studentFromRow,
         (a, b) => (a.submittedAt < b.submittedAt ? 1 : a.submittedAt > b.submittedAt ? -1 : 0)));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchCounselors()
@@ -333,7 +333,7 @@ export default function App() {
       setCounselors((prev) => applyRealtimeChange(prev, change, counselorFromRow,
         (a, b) => a.name.localeCompare(b.name)));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchApplications()
@@ -343,7 +343,7 @@ export default function App() {
       setApplications((prev) => applyRealtimeChange(prev, change, applicationFromRow,
         (a, b) => (a.consultationDate < b.consultationDate ? 1 : a.consultationDate > b.consultationDate ? -1 : 0)));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchStaff()
@@ -353,7 +353,7 @@ export default function App() {
       setStaff((prev) => applyRealtimeChange(prev, change, staffFromRow,
         (a, b) => a.name.localeCompare(b.name)));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchBranches()
@@ -363,7 +363,7 @@ export default function App() {
       setBranches((prev) => applyRealtimeChange(prev, change, branchFromRow,
         (a, b) => a.name.localeCompare(b.name)));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchNotifications()
@@ -373,7 +373,7 @@ export default function App() {
       setNotifications((prev) => applyRealtimeChange(prev, change, notificationFromRow,
         (a, b) => b.createdAt.getTime() - a.createdAt.getTime()));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchCommissions()
@@ -383,7 +383,7 @@ export default function App() {
       setCommissions((prev) => applyRealtimeChange(prev, change, commissionFromRow,
         (a, b) => a.studentName.localeCompare(b.studentName)));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchPartners()
@@ -393,7 +393,7 @@ export default function App() {
       setPartners((prev) => applyRealtimeChange(prev, change, partnerFromRow,
         (a, b) => a.name.localeCompare(b.name)));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchServicePrices()
@@ -402,7 +402,7 @@ export default function App() {
     return subscribeToTable<ServicePriceRow>('service_prices', (change) => {
       setServicePrices((prev) => applyRealtimeChange(prev, change, servicePriceFromRow, (a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom)));
     });
-  }, []);
+  }, [user]);
 
   /** Super Admin sets or changes a service charge — always a new version, never an edit. */
   const handleAddServicePrice = (price: ServicePrice) => {
@@ -422,7 +422,7 @@ export default function App() {
       setCommunications((prev) => applyRealtimeChange(prev, change, communicationFromRow,
         (a, b) => b.occurredAt.localeCompare(a.occurredAt)));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchTasks()
@@ -432,7 +432,7 @@ export default function App() {
       setTasks((prev) => applyRealtimeChange(prev, change, taskFromRow,
         (a, b) => a.date.localeCompare(b.date)));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchBranchNotices()
@@ -442,7 +442,7 @@ export default function App() {
       setNotices((prev) => applyRealtimeChange(prev, change, branchNoticeFromRow,
         (a, b) => b.postedAt.localeCompare(a.postedAt)));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchBranchIssues()
@@ -452,7 +452,7 @@ export default function App() {
       setIssues((prev) => applyRealtimeChange(prev, change, branchIssueFromRow,
         (a, b) => b.reportedAt.localeCompare(a.reportedAt)));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchAttendance()
@@ -462,7 +462,7 @@ export default function App() {
       setAttendance((prev) => applyRealtimeChange(prev, change, attendanceFromRow,
         (a, b) => b.date.localeCompare(a.date)));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchAttendanceCorrections()
@@ -472,7 +472,7 @@ export default function App() {
       setCorrections((prev) => applyRealtimeChange(prev, change, attendanceCorrectionFromRow,
         (a, b) => b.requestedAt.localeCompare(a.requestedAt)));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchAttendanceExplanations()
@@ -482,7 +482,7 @@ export default function App() {
       setExplanations((prev) => applyRealtimeChange(prev, change, attendanceExplanationFromRow,
         (a, b) => b.date.localeCompare(a.date)));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchBranchDayLogs()
@@ -492,7 +492,7 @@ export default function App() {
       setDayLogs((prev) => applyRealtimeChange(prev, change, branchDayLogFromRow,
         (a, b) => b.date.localeCompare(a.date)));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchLeave()
@@ -502,7 +502,7 @@ export default function App() {
       setLeave((prev) => applyRealtimeChange(prev, change, leaveFromRow,
         (a, b) => b.from.localeCompare(a.from)));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchHolidays()
@@ -512,7 +512,7 @@ export default function App() {
       setHolidays((prev) => applyRealtimeChange(prev, change, holidayFromRow,
         (a, b) => b.from.localeCompare(a.from)));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchPerformanceReviews()
@@ -522,7 +522,7 @@ export default function App() {
       setReviews((prev) => applyRealtimeChange(prev, change, performanceReviewFromRow,
         (a, b) => b.reviewedAt.localeCompare(a.reviewedAt)));
     });
-  }, []);
+  }, [user]);
 
   // PayProfile has no `id` (it's keyed by staffName+branch), so this merges by that pair
   // instead of using applyRealtimeChange (which requires an `id`).
@@ -545,7 +545,7 @@ export default function App() {
           : [...prev, record];
       });
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchPayrollRuns()
@@ -555,7 +555,7 @@ export default function App() {
       setPayrollRuns((prev) => applyRealtimeChange(prev, change, payrollRunFromRow,
         (a, b) => b.month.localeCompare(a.month)));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchOnboardingCases()
@@ -565,7 +565,7 @@ export default function App() {
       setOnboarding((prev) => applyRealtimeChange(prev, change, onboardingCaseFromRow,
         (a, b) => b.createdAt.localeCompare(a.createdAt)));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchOffboardingCases()
@@ -575,7 +575,7 @@ export default function App() {
       setOffboarding((prev) => applyRealtimeChange(prev, change, offboardingCaseFromRow,
         (a, b) => b.createdAt.localeCompare(a.createdAt)));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchAuditLog()
@@ -585,7 +585,7 @@ export default function App() {
       setAuditLog((prev) => applyRealtimeChange(prev, change, auditLogFromRow,
         (a, b) => b.at.localeCompare(a.at)));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchFinTransactions()
@@ -595,7 +595,7 @@ export default function App() {
       setFinTransactions((prev) => applyRealtimeChange(prev, change, finTransactionFromRow,
         (a, b) => b.at.localeCompare(a.at)));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchExpenseRequests()
@@ -605,7 +605,7 @@ export default function App() {
       setExpenses((prev) => applyRealtimeChange(prev, change, expenseRequestFromRow,
         (a, b) => b.requestedAt.localeCompare(a.requestedAt)));
     });
-  }, []);
+  }, [user]);
 
   // Marketing — 11 tables, one per MarketingStore array. Loaded with the RAW setter
   // (setMarketingState), not the diffing `setMarketing` wrapper above: this is data coming
@@ -618,7 +618,7 @@ export default function App() {
       setMarketingState((prev) => ({ ...prev, leads: applyRealtimeChange(prev.leads, change, marketingLeadFromRow,
         (a, b) => b.receivedAt.localeCompare(a.receivedAt)) }));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchMarketingCampaigns()
@@ -628,7 +628,7 @@ export default function App() {
       setMarketingState((prev) => ({ ...prev, campaigns: applyRealtimeChange(prev.campaigns, change, marketingCampaignFromRow,
         (a, b) => b.startDate.localeCompare(a.startDate)) }));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchMarketingAdSpend()
@@ -638,7 +638,7 @@ export default function App() {
       setMarketingState((prev) => ({ ...prev, adSpend: applyRealtimeChange(prev.adSpend, change, marketingAdSpendFromRow,
         (a, b) => b.date.localeCompare(a.date)) }));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchMarketingContentRequests()
@@ -648,7 +648,7 @@ export default function App() {
       setMarketingState((prev) => ({ ...prev, contentRequests: applyRealtimeChange(prev.contentRequests, change, marketingContentRequestFromRow,
         (a, b) => b.requestedAt.localeCompare(a.requestedAt)) }));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchMarketingContentItems()
@@ -658,7 +658,7 @@ export default function App() {
       setMarketingState((prev) => ({ ...prev, contentItems: applyRealtimeChange(prev.contentItems, change, marketingContentItemFromRow,
         (a, b) => b.deadline.localeCompare(a.deadline)) }));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchMarketingDesignTasks()
@@ -668,7 +668,7 @@ export default function App() {
       setMarketingState((prev) => ({ ...prev, designTasks: applyRealtimeChange(prev.designTasks, change, marketingDesignTaskFromRow,
         (a, b) => b.deadline.localeCompare(a.deadline)) }));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchMarketingVideoTasks()
@@ -678,7 +678,7 @@ export default function App() {
       setMarketingState((prev) => ({ ...prev, videoTasks: applyRealtimeChange(prev.videoTasks, change, marketingVideoTaskFromRow,
         (a, b) => b.deadline.localeCompare(a.deadline)) }));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchMarketingPosts()
@@ -688,7 +688,7 @@ export default function App() {
       setMarketingState((prev) => ({ ...prev, posts: applyRealtimeChange(prev.posts, change, marketingPostFromRow,
         (a, b) => b.scheduledAt.localeCompare(a.scheduledAt)) }));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchMarketingSeoTasks()
@@ -698,7 +698,7 @@ export default function App() {
       setMarketingState((prev) => ({ ...prev, seoTasks: applyRealtimeChange(prev.seoTasks, change, marketingSeoTaskFromRow,
         (a, b) => a.due.localeCompare(b.due)) }));
     });
-  }, []);
+  }, [user]);
 
   // No `id` column on marketing_seo_keywords (keyed by `keyword`), so this can't use the
   // shared applyRealtimeChange helper (requires `{ id: string }`) — merged by hand instead.
@@ -718,7 +718,7 @@ export default function App() {
         return { ...prev, keywords: exists ? prev.keywords.map((k) => (k.keyword === record.keyword ? record : k)) : [...prev.keywords, record] };
       });
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchMarketingPings()
@@ -728,7 +728,7 @@ export default function App() {
       setMarketingState((prev) => ({ ...prev, pings: applyRealtimeChange(prev.pings, change, marketingPingFromRow,
         (a, b) => b.at.localeCompare(a.at)) }));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchBranchContentRequests()
@@ -738,7 +738,7 @@ export default function App() {
       setWorkspace((prev) => ({ ...prev, contentRequests: applyRealtimeChange(prev.contentRequests, change, branchContentRequestFromRow,
         (a, b) => b.requestedAt.localeCompare(a.requestedAt)) }));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchMarketingSupportRequests()
@@ -748,7 +748,7 @@ export default function App() {
       setWorkspace((prev) => ({ ...prev, supportRequests: applyRealtimeChange(prev.supportRequests, change, marketingSupportRequestFromRow,
         (a, b) => b.requestedAt.localeCompare(a.requestedAt)) }));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchItTickets()
@@ -758,7 +758,7 @@ export default function App() {
       setWorkspace((prev) => ({ ...prev, itTickets: applyRealtimeChange(prev.itTickets, change, itTicketFromRow,
         (a, b) => b.raisedAt.localeCompare(a.raisedAt)) }));
     });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchBranchTransfers()
@@ -768,7 +768,7 @@ export default function App() {
       setWorkspace((prev) => ({ ...prev, transfers: applyRealtimeChange(prev.transfers, change, branchTransferFromRow,
         (a, b) => b.requestedAt.localeCompare(a.requestedAt)) }));
     });
-  }, []);
+  }, [user]);
 
   const communicationsValue = useMemo(() => ({
     entries: communications,
@@ -1832,7 +1832,7 @@ export default function App() {
   }
 
   if (!user) {
-    return <Login staff={staff} onLogin={handleLogin} />;
+    return <Login onLogin={handleLogin} />;
   }
 
   // A new hire with an open onboarding case gets "My Onboarding" at the top of Branch Hub.

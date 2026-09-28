@@ -10,6 +10,7 @@ export interface StaffRow {
   status: StaffMember['status'];
   branch: string;
   join_date: string | null;
+  marketing_role: StaffMember['marketingRole'] | null;
 }
 
 export function fromRow(row: StaffRow): StaffMember {
@@ -22,6 +23,7 @@ export function fromRow(row: StaffRow): StaffMember {
     status: row.status,
     branch: row.branch,
     joinDate: row.join_date ?? undefined,
+    marketingRole: row.marketing_role ?? undefined,
   };
 }
 
@@ -35,6 +37,7 @@ function toRow(member: StaffMember): StaffRow {
     status: member.status,
     branch: member.branch,
     join_date: member.joinDate ?? null,
+    marketing_role: member.marketingRole ?? null,
   };
 }
 
@@ -47,6 +50,7 @@ function toRowUpdates(updates: Partial<StaffMember>): Record<string, unknown> {
   if (updates.status !== undefined) row.status = updates.status;
   if (updates.branch !== undefined) row.branch = updates.branch;
   if (updates.joinDate !== undefined) row.join_date = updates.joinDate;
+  if (updates.marketingRole !== undefined) row.marketing_role = updates.marketingRole;
   return row;
 }
 

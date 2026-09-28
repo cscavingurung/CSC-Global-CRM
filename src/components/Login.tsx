@@ -1,19 +1,22 @@
 import { useState } from 'react';
 import { Lock, Mail } from 'lucide-react';
-import { MockUser, StaffMember } from '../types';
+import { MockUser } from '../types';
 import { STAFF_ROLE_TO_ROLE } from '../mockData';
 import { supabase } from '../lib/supabaseClient';
+import { fromRow, StaffRow } from '../lib/staffApi';
 import cscLogo from './images/Logo.png';
 
 interface LoginProps {
-  staff: StaffMember[];
   onLogin: (user: MockUser) => void;
 }
 
 // Real Supabase Auth (see supabase/functions/admin-staff and docs/SECURITY_AUDIT.md, P0 —
 // resolved): sign-in goes through supabase.auth.signInWithPassword, then the matching `staff`
-// row (looked up by authUserId) supplies role/branch/marketingRole for the session.
-export default function Login({ staff, onLogin }: LoginProps) {
+// row (looked up by authUserId) supplies role/branch/marketingRole for the session. That lookup
+// must happen *after* signing in, scoped to just this user's row (`auth_user_id = auth.uid()`) —
+// RLS denies an anonymous, pre-login read of the whole `staff` table, so it can't be resolved
+// from a list fetched before authentication.
+export default function Login({ onLogin }: LoginProps) {
   return (
     <div className="min-h-screen flex items-center justify-center py-10 px-4">
       <div className="w-full max-w-lg">
@@ -26,14 +29,14 @@ export default function Login({ staff, onLogin }: LoginProps) {
 
         <div className="bg-white rounded-2xl p-6 border border-grey-border">
           <h2 className="text-xl font-semibold text-navy mb-1">Sign in</h2>
-          <PasswordSignIn staff={staff} onLogin={onLogin} />
+          <PasswordSignIn onLogin={onLogin} />
         </div>
       </div>
     </div>
   );
 }
 
-function PasswordSignIn({ staff, onLogin }: { staff: StaffMember[]; onLogin: (user: MockUser) => void }) {
+function PasswordSignIn({ onLogin }: { onLogin: (user: MockUser) => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -51,7 +54,20 @@ function PasswordSignIn({ staff, onLogin }: { staff: StaffMember[]; onLogin: (us
       setSubmitting(false);
       return;
     }
-    const match = staff.find((s) => s.authUserId === data.user!.id);
+    // Fetch this user's own staff row now that we're authenticated — RLS allows a self-read
+    // (auth_user_id = auth.uid()) even though the pre-login page couldn't see any staff rows.
+    const { data: staffRow, error: staffError } = await supabase
+      .from('staff')
+      .select('*')
+      .eq('auth_user_id', data.user.id)
+      .maybeSingle<StaffRow>();
+    if (staffError) {
+      await supabase.auth.signOut();
+      setError('Could not load your staff record. Try again, or contact the Super Admin.');
+      setSubmitting(false);
+      return;
+    }
+    const match = staffRow ? fromRow(staffRow) : undefined;
     if (!match || match.status !== 'Active') {
       await supabase.auth.signOut();
       setError(match ? 'This account is inactive. Contact your manager or the Super Admin.' : 'No staff record is linked to this account. Contact the Super Admin.');

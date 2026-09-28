@@ -3,7 +3,9 @@ import {
   UserPlus, Trash2, Search, X, Mail, Briefcase, Circle,
   ChevronDown, Lock, Eye, EyeOff, Pencil,
 } from 'lucide-react';
-import { ApplicationRecord, CounselorStudent, MockUser, NavIntent, Partner, StaffMember, StaffRole, StaffStatus } from '../types';
+import { ApplicationRecord, CounselorStudent, MarketingRole, MockUser, NavIntent, Partner, StaffMember, StaffRole, StaffStatus } from '../types';
+
+const MARKETING_ROLE_OPTIONS: MarketingRole[] = ['Marketing Manager', 'Leads Specialist', 'Content Planner', 'Graphics Designer'];
 import StaffActivityPanel from './StaffActivityPanel';
 import { isValidEmail, PASSWORD_PATTERN } from '../validation';
 import { COUNTRIES } from '../mockData';
@@ -68,7 +70,7 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
   // submitting it would assign the new staff member to a branch that doesn't exist.
   const defaultNewStaffBranch = () =>
     showBranchFilter ? (branches && branches[0]) || '' : currentUser?.branch || '';
-  const [newStaff, setNewStaff] = useState({ name: '', email: '', password: '', role: 'Front Desk Officer' as StaffRole, branch: defaultNewStaffBranch(), countries: [] as string[] });
+  const [newStaff, setNewStaff] = useState({ name: '', email: '', password: '', role: 'Front Desk Officer' as StaffRole, branch: defaultNewStaffBranch(), countries: [] as string[], marketingRole: 'Marketing Manager' as MarketingRole });
   // Freeform extra countries (e.g. Europe) not in the preset list — comma-separated.
   const [countriesOther, setCountriesOther] = useState('');
   const newStaffEmailRef = useRef<HTMLInputElement>(null);
@@ -122,6 +124,7 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
       role: newStaff.role,
       status: 'Active',
       branch: newStaff.branch,
+      ...(newStaff.role === 'Marketing' ? { marketingRole: newStaff.marketingRole } : {}),
     };
     const extraCountries = countriesOther.split(',').map((c) => c.trim()).filter(Boolean);
     const counselorCountries = Array.from(
@@ -131,7 +134,7 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
     setAddSubmitting(true);
     try {
       await onAddStaff(member, newStaff.password, newStaff.role === 'Counselor' ? counselorCountries : undefined);
-      setNewStaff({ name: '', email: '', password: '', role: 'Front Desk Officer', branch: defaultNewStaffBranch(), countries: [] });
+      setNewStaff({ name: '', email: '', password: '', role: 'Front Desk Officer', branch: defaultNewStaffBranch(), countries: [], marketingRole: 'Marketing Manager' });
       setCountriesOther('');
       setShowPassword(false);
       setShowAddForm(false);
@@ -451,6 +454,21 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
                   <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
                 </div>
               </div>
+              {newStaff.role === 'Marketing' && (
+                <div>
+                  <label className="block text-sm font-medium text-navy mb-1.5">Marketing Sub-Role</label>
+                  <div className="relative">
+                    <select
+                      value={newStaff.marketingRole}
+                      onChange={(e) => setNewStaff({ ...newStaff, marketingRole: e.target.value as MarketingRole })}
+                      className="w-full px-4 py-2.5 border border-grey-border rounded-lg text-sm focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light transition-colors appearance-none bg-white"
+                    >
+                      {MARKETING_ROLE_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                    <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                  </div>
+                </div>
+              )}
               {newStaff.role === 'Counselor' && (
                 <div>
                   <label className="block text-sm font-medium text-navy mb-1.5">Specialization Countries</label>
