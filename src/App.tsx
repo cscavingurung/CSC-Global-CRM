@@ -28,7 +28,6 @@ import { MARKETING_PAGES } from './components/marketing/mktPages';
 import DesignerModule from './components/designer/DesignerModule';
 import CounselorMarketing from './components/counselor/CounselorMarketing';
 import { assignedContentRequests } from './counselorMarketing';
-import { DEMO_MODE } from './appMode';
 import { chargeLines, clientBalances } from './finance';
 import { formatInterview, newlyScheduledInterview } from './countryPipeline';
 import ManagerWorkspace from './components/manager/ManagerWorkspace';
@@ -2551,11 +2550,6 @@ export default function App() {
           ? <HeaderSearch onSearch={(q) => handleNavigate('sa-search', { adminPath: `/admin/search?q=${encodeURIComponent(q)}` })} />
           : undefined}
       >
-        {DEMO_MODE && (
-          <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            Demo mode — don’t enter real client information here.
-          </p>
-        )}
         <div key={`${activeKey}-${navSeq}`} className="dissolve-in">{renderPage()}</div>
       </DashboardShell>
       </FinanceLedgerContext.Provider>
