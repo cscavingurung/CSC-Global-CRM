@@ -19,6 +19,11 @@ export interface MarketingActions {
   disqualifyLead: (id: string, reason: string) => void;
   /** Assigns a Qualified lead — or, with `fields`, qualifies a Raw one and assigns it in one go. */
   assignLead: (id: string, branch: string, fields?: QualifyFields) => void;
+  /** Routes a Qualified lead into a shared city pool instead of one branch — any counselor at a
+   * branch in that city can then claim it first-come, first-served (see City Lead Pool). */
+  assignToCityPool: (id: string, city: string, fields?: QualifyFields) => void;
+  /** Manual entry that goes straight into a city pool instead of one branch. */
+  addAndAssignToCityPool: (fields: Omit<MarketingLead, 'id' | 'receivedAt' | 'stage'>, city: string) => void;
   /** Flag stuck leads to the Branch Manager of `branch`. */
   pingBranch: (branch: string, rule: BranchPing['rule'], leadIds: string[], message: string) => void;
   createCampaign: (c: Omit<Campaign, 'id' | 'createdBy'>) => void;

@@ -15,10 +15,10 @@ interface AssignCounselorPageProps {
 export default function AssignCounselorPage({ students, counselors, onAssign }: AssignCounselorPageProps) {
   const [assignStudent, setAssignStudent] = useState<IntakeStudent | null>(null);
 
-  // Marketing leads sitting in a branch broadcast pool are claimed by counselors themselves,
-  // so they're excluded here until someone accepts them.
+  // Marketing leads sitting in a branch broadcast pool or a City Lead Pool are claimed by
+  // counselors themselves, so they're excluded here until someone accepts them.
   const unassigned = useMemo(
-    () => students.filter((s) => s.status === 'New' && !(s.broadcastBranch && !s.claimedBy)),
+    () => students.filter((s) => s.status === 'New' && !((s.broadcastBranch || s.broadcastCity) && !s.claimedBy)),
     [students]
   );
 

@@ -61,6 +61,7 @@ const TRIGGER_TO_ACTIVITY_TYPE: Record<AppNotification['trigger'], ActivityEntry
   'assigned-to-counselor': 'assignment',
   'consultation-ready': 'consultation',
   'lead-broadcast': 'intake',
+  'city-lead-broadcast': 'intake',
   'status-update': 'status',
 };
 

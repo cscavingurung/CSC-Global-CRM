@@ -9,7 +9,7 @@ import { CONTACT_SLA_HOURS, LEAD_CHANNELS, MKT_CAN, ago, campaignName, LeadTrack
 import { Lead360Drawer, LeadForm } from './MktLeadsSpecialist';
 import { ExcelSheet, ViewToggle } from './MktSheet';
 import { leadColumns, trackColumns, trackTone } from './mktSheetColumns';
-import { useViewMode } from './mktUtils';
+import { CITY_POOLS, useViewMode } from './mktUtils';
 import { MarketingLead } from '../../types';
 
 const CHANNEL_CHIPS = ['All', ...LEAD_CHANNELS] as const;
@@ -38,27 +38,50 @@ export function QualifyModal({ lead, onClose }: { lead: MarketingLead; onClose: 
   );
 }
 
-// ── Assign to Branch modal ──────────────────────────────────────────────────
+// ── Assign to Branch / City Pool modal ──────────────────────────────────────
 export function AssignModal({ lead, onClose }: { lead: MarketingLead; onClose: () => void }) {
   const { branches, actions } = useMarketing();
+  const [destination, setDestination] = useState<'Branch' | 'City Pool'>('Branch');
   const [branch, setBranch] = useState(lead.preferredBranch ?? '');
+  const [city, setCity] = useState('');
+  const ready = destination === 'Branch' ? Boolean(branch) : Boolean(city);
+  const confirm = () => {
+    if (destination === 'City Pool') actions.assignToCityPool(lead.id, city);
+    else actions.assignLead(lead.id, branch);
+    onClose();
+  };
   return (
-    <Modal title={`Assign ${lead.name} to a branch`} onClose={onClose}>
+    <Modal title={`Assign ${lead.name}`} onClose={onClose}>
       <div className="space-y-4">
         <dl className="grid grid-cols-2 gap-2 rounded-lg border border-grey-border p-3 text-sm">
           <dt className="text-gray-500">Country</dt><dd className="text-navy">{lead.preferredCountry}</dd>
           <dt className="text-gray-500">Program</dt><dd className="text-navy">{lead.interestedProgram}</dd>
           <dt className="text-gray-500">Source</dt><dd><SourceTag source={lead.source} /></dd>
         </dl>
-        <Field label="Branch" required hint="The lead leaves the Marketing inbox and lands in this branch's New Leads queue for its counselors to claim.">
-          <SelectInput value={branch} onChange={setBranch} label="Branch">
-            <option value="">Select branch</option>
-            {branches.map((b) => <option key={b} value={b}>{b}{b === lead.preferredBranch ? ' (preferred)' : ''}</option>)}
-          </SelectInput>
-        </Field>
+        <div>
+          <span className="mb-1 block text-xs font-medium text-gray-600">Assign to</span>
+          <Chips options={['Branch', 'City Pool'] as const} value={destination} onChange={(v) => { setDestination(v); if (v === 'City Pool') setBranch(''); else setCity(''); }} />
+        </div>
+        {destination === 'Branch' ? (
+          <Field label="Branch" required hint="The lead leaves the Marketing inbox and lands in this branch's New Leads queue for its counselors to claim.">
+            <SelectInput value={branch} onChange={setBranch} label="Branch">
+              <option value="">Select branch</option>
+              {branches.map((b) => <option key={b} value={b}>{b}{b === lead.preferredBranch ? ' (preferred)' : ''}</option>)}
+            </SelectInput>
+          </Field>
+        ) : (
+          <Field label="City Pool" required hint="Visible to every counselor at a branch in this city — first to accept claims it, so no single branch gets first pick.">
+            <SelectInput value={city} onChange={setCity} label="City Pool">
+              <option value="">Select city</option>
+              {CITY_POOLS.map((c) => <option key={c}>{c}</option>)}
+            </SelectInput>
+          </Field>
+        )}
         <div className="flex justify-end gap-2">
           <GhostButton onClick={onClose}>Cancel</GhostButton>
-          <PrimaryButton disabled={!branch} onClick={() => { actions.assignLead(lead.id, branch); onClose(); }}><Send size={15} /> Assign to Branch</PrimaryButton>
+          <PrimaryButton disabled={!ready} onClick={confirm}>
+            <Send size={15} /> {destination === 'City Pool' ? 'Assign to City Pool' : 'Assign to Branch'}
+          </PrimaryButton>
         </div>
       </div>
     </Modal>
@@ -222,7 +245,7 @@ export function LeadsAssignment() {
             return (
               <li key={l.id} className="flex flex-wrap items-center gap-2 px-5 py-2.5 text-sm">
                 <span className="font-medium text-navy">{l.name}</span>
-                <span className="text-xs text-gray-500">→ {t?.branch ?? l.preferredBranch}</span>
+                <span className="text-xs text-gray-500">→ {t?.branch || (l.cityPool ? `${l.cityPool} City Pool (unclaimed)` : l.preferredBranch)}</span>
                 <span className="flex-1" />
                 {t && <Pill text={t.status} cls={t.slaBreached ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'} />}
                 <span className="text-xs text-gray-400">{ago(l.assignedAt)}</span>

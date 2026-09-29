@@ -18,6 +18,8 @@ interface MarketingModuleProps {
   team: { name: string; role: MarketingRole }[];
   /** Creates the lead in the branch's CRM queue and returns the new intake id. */
   onPushToBranch: (lead: MarketingLead, branch: string) => string;
+  /** Creates the lead in the city's shared, unclaimed pool and returns the new intake id. */
+  onPushToCityPool: (lead: MarketingLead, city: string) => string;
   /** Notifies the target Branch Manager and counselor of a content request (new, reminder or send-back). */
   onContentRequest: (req: ContentRequest, kind?: 'new' | 'reminder' | 'reopened') => void;
   /** Sends a Leads Specialist's escalation to that branch's Branch Manager. */
@@ -36,7 +38,7 @@ const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}${(seq++)
 
 export default function MarketingModule({
   activeKey, me, role = 'Marketing Manager', store, setStore, tracks, branches, contributorsByBranch, team,
-  onPushToBranch, onContentRequest, onPingBranch, onNavigate, preset,
+  onPushToBranch, onPushToCityPool, onContentRequest, onPingBranch, onNavigate, preset,
 }: MarketingModuleProps) {
   const actions = useMemo<MarketingActions>(() => {
     const now = () => formatSubmittedAt(new Date());
@@ -71,6 +73,28 @@ export default function MarketingModule({
           ...fields, stage: 'Assigned', preferredBranch: branch, assignedBy: me, assignedAt: stamp, intakeId,
           ...(current.stage === 'Raw' ? { qualifiedBy: me, qualifiedAt: stamp } : {}),
         });
+      },
+      // City pool leads carry `cityPool` instead of `preferredBranch` — onPushToCityPool creates
+      // them unclaimed and visible to every branch in that city, same as onPushToBranch does for
+      // one branch, so they show up in "My Assigned Leads" once a counselor claims one.
+      assignToCityPool: (id, city, fields) => {
+        const current = store.leads.find((l) => l.id === id);
+        if (!current || (current.stage !== 'Qualified' && !(fields && current.stage === 'Raw'))) return;
+        const stamp = now();
+        const lead = { ...current, ...fields, preferredBranch: undefined, cityPool: city };
+        const intakeId = onPushToCityPool(lead, city);
+        patchLead(id, {
+          ...fields, stage: 'Assigned', preferredBranch: undefined, cityPool: city, assignedBy: me, assignedAt: stamp, intakeId,
+          ...(current.stage === 'Raw' ? { qualifiedBy: me, qualifiedAt: stamp } : {}),
+        });
+      },
+      addAndAssignToCityPool: (fields, city) => {
+        const stamp = now();
+        const lead: MarketingLead = {
+          ...fields, id: newId('mkl'), receivedAt: stamp, stage: 'Qualified', cityPool: city, qualifiedBy: me, qualifiedAt: stamp,
+        };
+        const intakeId = onPushToCityPool(lead, city);
+        setStore((s) => ({ ...s, leads: [{ ...lead, stage: 'Assigned', assignedBy: me, assignedAt: stamp, intakeId }, ...s.leads] }));
       },
       pingBranch: (branch, rule, leadIds, message) => {
         const ping: BranchPing = { id: newId('ping'), branch, rule, leadIds, at: now(), by: me };
@@ -193,7 +217,7 @@ export default function MarketingModule({
       addSeoTask: (t) => setStore((s) => ({ ...s, seoTasks: [...s.seoTasks, { ...t, id: newId('seo') }] })),
       setSeoStatus: (id, status) => setStore((s) => ({ ...s, seoTasks: s.seoTasks.map((t) => (t.id === id ? { ...t, status } : t)) })),
     };
-  }, [store.leads, store.contentRequests, setStore, me, onPushToBranch, onContentRequest, onPingBranch]);
+  }, [store.leads, store.contentRequests, setStore, me, onPushToBranch, onPushToCityPool, onContentRequest, onPingBranch]);
 
   const value: MarketingContextValue = {
     me, role, store, tracks, branches, contributorsByBranch, team, actions, preset,

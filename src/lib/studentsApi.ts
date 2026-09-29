@@ -22,6 +22,7 @@ export interface StudentRow {
   referred_through: string | null;
   platform_source: string | null;
   broadcast_branch: string | null;
+  broadcast_city: string | null;
   broadcast_at: string | null;
   claimed_by: string | null;
   claimed_at: string | null;
@@ -53,6 +54,7 @@ export function fromRow(row: StudentRow): IntakeStudent {
     referredThrough: row.referred_through ?? undefined,
     platformSource: row.platform_source ?? undefined,
     broadcastBranch: row.broadcast_branch,
+    broadcastCity: row.broadcast_city,
     broadcastAt: row.broadcast_at ?? undefined,
     claimedBy: row.claimed_by,
     claimedAt: row.claimed_at ?? undefined,
@@ -85,6 +87,7 @@ function toRow(student: IntakeStudent): StudentRow {
     referred_through: student.referredThrough ?? null,
     platform_source: student.platformSource ?? null,
     broadcast_branch: student.broadcastBranch ?? null,
+    broadcast_city: student.broadcastCity ?? null,
     broadcast_at: student.broadcastAt ?? null,
     claimed_by: student.claimedBy ?? null,
     claimed_at: student.claimedAt ?? null,
@@ -116,6 +119,7 @@ function toRowUpdates(updates: Partial<IntakeStudent>): Record<string, unknown> 
   if (updates.referredThrough !== undefined) row.referred_through = updates.referredThrough;
   if (updates.platformSource !== undefined) row.platform_source = updates.platformSource;
   if (updates.broadcastBranch !== undefined) row.broadcast_branch = updates.broadcastBranch;
+  if (updates.broadcastCity !== undefined) row.broadcast_city = updates.broadcastCity;
   if (updates.broadcastAt !== undefined) row.broadcast_at = updates.broadcastAt;
   if (updates.claimedBy !== undefined) row.claimed_by = updates.claimedBy;
   if (updates.claimedAt !== undefined) row.claimed_at = updates.claimedAt;
@@ -147,6 +151,33 @@ export async function updateStudent(id: string, updates: Partial<IntakeStudent>)
   if (!supabase) return;
   const { error } = await supabase.from('students').update(toRowUpdates(updates)).eq('id', id);
   if (error) throw error;
+}
+
+/**
+ * First-accept-first-get: atomically claims a broadcast lead — `claimed_by is null` is checked
+ * and set in the same UPDATE, so Postgres's row lock decides the race, not the client. Returns
+ * the claimed row, or `null` when another counselor's claim landed first (0 rows matched).
+ */
+export async function claimStudent(
+  id: string,
+  claim: { claimedBy: string; claimedAt: string; branch: string; assignedCounselor: string },
+): Promise<IntakeStudent | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('students')
+    .update({
+      claimed_by: claim.claimedBy,
+      claimed_at: claim.claimedAt,
+      branch: claim.branch,
+      status: 'Assigned',
+      assigned_counselor: claim.assignedCounselor,
+    })
+    .eq('id', id)
+    .is('claimed_by', null)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  return data ? fromRow(data as StudentRow) : null;
 }
 
 export async function deleteStudent(id: string): Promise<void> {

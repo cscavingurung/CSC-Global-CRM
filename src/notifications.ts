@@ -69,6 +69,25 @@ export function createLeadBroadcastNotification(leadId: string, country: string,
   };
 }
 
+// Blind marketing broadcast to a whole city instead of one branch — sent once per branch in that
+// city (same visibility rule as createLeadBroadcastNotification: role + branch match), so every
+// counselor at any of those branches sees it and can claim it first-come, first-served.
+export function createCityLeadBroadcastNotification(leadId: string, city: string, country: string, purpose: string, branch: string): AppNotification {
+  return {
+    id: nextId(),
+    trigger: 'city-lead-broadcast',
+    studentName: '',
+    messageBefore: `New lead available in the ${city} City Pool — ${country} · ${purpose}`,
+    messageAfter: '. Contact details stay hidden until you accept.',
+    createdAt: new Date(),
+    read: false,
+    role: 'counselor',
+    branch,
+    navigateTo: 'co-city-pool',
+    leadId,
+  };
+}
+
 // A client's status tracker (offer stage or visa stage) advanced — branch manager only, since
 // no other role needs a push for their own case work.
 export function createStatusUpdateNotification(studentName: string, statusLabel: string, branch: string, updatedBy?: string): AppNotification {

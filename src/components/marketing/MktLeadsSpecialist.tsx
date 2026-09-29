@@ -7,7 +7,7 @@
 // Journey statuses are read-only: they sync from the branch Counselor / V/A Officer modules and
 // there is deliberately no control to set "Client" or "Visa Approved" by hand.
 import { useMemo, useState } from 'react';
-import { AlertTriangle, BellRing, Check, CheckCircle2, Clock, Flag, Minus, Search, Send, UserPlus, XCircle } from 'lucide-react';
+import { AlertTriangle, BellRing, Building2, Check, CheckCircle2, Clock, Flag, Minus, Search, UserPlus, Users, XCircle } from 'lucide-react';
 import { QualifyFields, useMarketing } from './mktContext';
 import {
   CampaignTag, Card, Chips, Drawer, EmptyRow, Field, GhostButton, Kpi, PageIntro, Pill, PrimaryButton, ReadOnlyNote,
@@ -18,7 +18,7 @@ import {
   ago, campaignName, trackStatusStyle, whenLabel,
 } from '../../marketingDept';
 import { BranchPing, LeadChannel, MarketingLead } from '../../types';
-import { COUNTRIES, needsAttention } from './mktUtils';
+import { CITY_POOLS, COUNTRIES, needsAttention } from './mktUtils';
 import NewIntakeForm, { IntakeFormData, MarketingSubmitAction } from '../NewIntakeForm';
 import { ExcelSheet, ViewToggle } from './MktSheet';
 import { AlertRow, alertColumns, trackColumns, trackTone } from './mktSheetColumns';
@@ -49,10 +49,13 @@ export function LeadForm({ lead, onDone }: { lead?: MarketingLead; onDone: (mess
   const [f, setF] = useState<QualifyFields>(() => blank(lead));
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState('');
+  const [destination, setDestination] = useState<'Branch' | 'City Pool'>('Branch');
+  const [city, setCity] = useState('');
   const set = <K extends keyof QualifyFields>(k: K, v: QualifyFields[K]) => setF((p) => ({ ...p, [k]: v }));
 
   const basicsOk = Boolean(f.name.trim() && f.phone.trim() && f.source);
-  const qualified = basicsOk && Boolean(f.preferredCountry && f.interestedProgram?.trim() && f.preferredBranch);
+  const destinationOk = destination === 'Branch' ? Boolean(f.preferredBranch) : Boolean(city);
+  const qualified = basicsOk && Boolean(f.preferredCountry && f.interestedProgram?.trim()) && destinationOk;
   const branch = f.preferredBranch ?? '';
 
   const save = () => {
@@ -70,9 +73,15 @@ export function LeadForm({ lead, onDone }: { lead?: MarketingLead; onDone: (mess
   const assign = () => {
     if (!qualified) return;
     const data = clean(f);
-    if (lead) actions.assignLead(lead.id, branch, data);
-    else actions.addAndAssign(data, branch);
-    onDone(`${f.name} was assigned to ${branch} and is now in that branch's lead queue.`);
+    if (destination === 'City Pool') {
+      if (lead) actions.assignToCityPool(lead.id, city, data);
+      else actions.addAndAssignToCityPool(data, city);
+      onDone(`${f.name} was routed to the ${city} City Pool — any counselor in that city can now claim it.`);
+    } else {
+      if (lead) actions.assignLead(lead.id, branch, data);
+      else actions.addAndAssign(data, branch);
+      onDone(`${f.name} was assigned to ${branch} and is now in that branch's lead queue.`);
+    }
     setF(blank());
   };
 
@@ -124,12 +133,29 @@ export function LeadForm({ lead, onDone }: { lead?: MarketingLead; onDone: (mess
           <TextInput list="english-tests" value={f.englishTest ?? ''} placeholder="e.g. IELTS 6.5" onChange={(e) => set('englishTest', e.target.value)} />
           <datalist id="english-tests">{ENGLISH.map((e) => <option key={e} value={e} />)}</datalist>
         </Field>
-        <Field label="Preferred Branch">
-          <SelectInput value={branch} onChange={(v) => set('preferredBranch', v)} label="Preferred Branch">
-            <option value="">Select branch</option>
-            {branches.map((b) => <option key={b}>{b}</option>)}
-          </SelectInput>
-        </Field>
+        <div className="sm:col-span-3">
+          <span className="mb-1 block text-xs font-medium text-gray-600">Assign to</span>
+          <Chips
+            options={['Branch', 'City Pool'] as const}
+            value={destination}
+            onChange={(v) => { setDestination(v); if (v === 'Branch') setCity(''); else set('preferredBranch', ''); }}
+          />
+        </div>
+        {destination === 'Branch' ? (
+          <Field label="Preferred Branch">
+            <SelectInput value={branch} onChange={(v) => set('preferredBranch', v)} label="Preferred Branch">
+              <option value="">Select branch</option>
+              {branches.map((b) => <option key={b}>{b}</option>)}
+            </SelectInput>
+          </Field>
+        ) : (
+          <Field label="City Pool" hint="Visible to every counselor at a branch in this city — no single branch gets first pick.">
+            <SelectInput value={city} onChange={setCity} label="City Pool">
+              <option value="">Select city</option>
+              {CITY_POOLS.map((c) => <option key={c}>{c}</option>)}
+            </SelectInput>
+          </Field>
+        )}
       </fieldset>
       <fieldset className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <legend className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400">Marketing attribution</legend>
@@ -153,9 +179,15 @@ export function LeadForm({ lead, onDone }: { lead?: MarketingLead; onDone: (mess
       </fieldset>
       <div className="flex flex-col-reverse gap-2 border-t border-grey-border pt-4 sm:flex-row sm:items-center">
         {lead && <GhostButton danger onClick={() => setRejecting(true)}><XCircle size={15} /> Disqualify</GhostButton>}
-        <p className="flex-1 text-xs text-gray-400">{qualified ? `Ready to route to ${branch}.` : 'Country, program and preferred branch are needed to assign.'}</p>
+        <p className="flex-1 text-xs text-gray-400">
+          {qualified
+            ? destination === 'City Pool' ? `Ready to route into the ${city} City Pool.` : `Ready to route to ${branch}.`
+            : `Country, program and a ${destination === 'City Pool' ? 'city pool' : 'preferred branch'} are needed to assign.`}
+        </p>
         <GhostButton onClick={save}>{lead ? 'Save as qualified' : 'Save to Inbox'}</GhostButton>
-        <PrimaryButton type="submit" disabled={!qualified}><Send size={15} /> Assign to Branch</PrimaryButton>
+        <PrimaryButton type="submit" disabled={!qualified}>
+          {destination === 'City Pool' ? <><Users size={15} /> Assign to City Pool</> : <><Building2 size={15} /> Assign to Branch</>}
+        </PrimaryButton>
       </div>
     </form>
   );
@@ -283,7 +315,8 @@ export function Lead360Drawer({ leadId, onClose }: { leadId: string; onClose: ()
             ['Phone', lead.phone], ['Email', lead.email], ['Interested country', lead.preferredCountry],
             ['Purpose', lead.purpose], ['Program', lead.interestedProgram],
             ['Intake', lead.intake], ['Academic background', lead.academicBackground], ['English test', lead.englishTest],
-            ['Work experience', lead.workExperience], ['Preferred branch', lead.preferredBranch],
+            ['Work experience', lead.workExperience],
+            [lead.cityPool ? 'City Pool' : 'Preferred branch', lead.cityPool ? `${lead.cityPool} City Pool` : lead.preferredBranch],
           ])}
         </section>
         <section>

@@ -204,6 +204,9 @@ export const NAV_CONFIG: NavConfig = {
     { key: 'my-students', label: 'Clients', icon: 'GraduationCap' },
     { key: 'consultations', label: 'Enrolled', icon: 'CalendarDays' },
     { key: 'follow-ups', label: 'Follow Ups', icon: 'PhoneCall' },
+    // Leads Marketing routed to the whole city instead of one branch — first counselor to
+    // accept claims it (see cityLeadPool.ts / components/counselor/CityLeadPool.tsx).
+    { key: 'co-city-pool', label: 'City Lead Pool', icon: 'Users' },
     { key: 'smart-match', label: 'Smart Client Matching', icon: 'Compass' },
     { key: 'visa-approved', label: 'Visa Approved', icon: 'BadgeCheck' },
     { key: 'archive', label: 'Archive', icon: 'Archive' },

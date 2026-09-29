@@ -68,8 +68,9 @@ export default function NotificationBell({ notifications, user, onMarkRead, onMa
               <div className="max-h-96 overflow-y-auto">
                 {visible.map((n) => {
                   // Blind broadcast: no personal contact details, just country + case type
-                  // and an Accept Lead button until someone claims it.
-                  if (n.trigger === 'lead-broadcast') {
+                  // and an Accept Lead button until someone claims it. Covers both the
+                  // single-branch pool (lead-broadcast) and the City Lead Pool (city-lead-broadcast).
+                  if (n.trigger === 'lead-broadcast' || n.trigger === 'city-lead-broadcast') {
                     const lead = leadFor(n);
                     const claimedBy = lead?.claimedBy;
                     return (

@@ -39,6 +39,10 @@ export function deadlineText(deadline: string) {
 
 export const COUNTRIES = ['Australia', 'Canada', 'United Kingdom', 'USA', 'New Zealand', 'Europe', 'Japan', 'Other'];
 
+/** Cities with more than one branch — a lead assigned here goes to a shared City Lead Pool
+ * instead of one branch, so no single branch gets first pick of it. */
+export const CITY_POOLS = ['Kathmandu', 'Pokhara', 'Chitwan', 'Butwal', 'Biratnagar'];
+
 /** Stuck in the branch pipeline: past contact SLA, consultation not converting, or gone quiet. */
 export const needsAttention = (t: LeadTrack) => t.slaBreached || t.consultationStuck || t.noActivity;
 

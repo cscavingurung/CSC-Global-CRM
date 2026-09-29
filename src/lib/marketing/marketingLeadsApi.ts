@@ -17,6 +17,7 @@ export interface MarketingLeadRow {
   academic_background: string | null;
   english_test: string | null;
   preferred_branch: string | null;
+  city_pool: string | null;
   notes: string | null;
   purpose: string | null;
   address: string | null;
@@ -50,6 +51,7 @@ export function fromRow(row: MarketingLeadRow): MarketingLead {
     academicBackground: row.academic_background ?? undefined,
     englishTest: row.english_test ?? undefined,
     preferredBranch: row.preferred_branch ?? undefined,
+    cityPool: row.city_pool ?? undefined,
     notes: row.notes ?? undefined,
     purpose: row.purpose ?? undefined,
     address: row.address ?? undefined,
@@ -84,6 +86,7 @@ function toRow(lead: MarketingLead): MarketingLeadRow {
     academic_background: lead.academicBackground ?? null,
     english_test: lead.englishTest ?? null,
     preferred_branch: lead.preferredBranch ?? null,
+    city_pool: lead.cityPool ?? null,
     notes: lead.notes ?? null,
     purpose: lead.purpose ?? null,
     address: lead.address ?? null,

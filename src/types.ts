@@ -103,7 +103,11 @@ export interface IntakeStudent {
   platformSource?: string;
   /** Branch group the lead was broadcast to by Marketing — blind claim pool. */
   broadcastBranch?: string | null;
-  /** When the lead was broadcast to the branch group. */
+  /** City the lead was broadcast to instead of one branch — every branch in this city can claim
+   * it (City Lead Pool). Mutually exclusive with `broadcastBranch`; `branch` stays '' until
+   * claimed. Matches the originating MarketingLead.cityPool. */
+  broadcastCity?: string | null;
+  /** When the lead was broadcast to the branch group or city pool. */
   broadcastAt?: string;
   /** Counselor who claimed the broadcast lead first (first-come, first-served). */
   claimedBy?: string | null;
@@ -484,7 +488,7 @@ export interface CommissionRecord {
   commissionStatus: CommissionStatus;
 }
 
-export type NotificationTrigger = 'new-intake' | 'assigned-to-counselor' | 'consultation-ready' | 'lead-broadcast' | 'status-update';
+export type NotificationTrigger = 'new-intake' | 'assigned-to-counselor' | 'consultation-ready' | 'lead-broadcast' | 'city-lead-broadcast' | 'status-update';
 
 export interface AppNotification {
   id: string;
@@ -1079,6 +1083,10 @@ export interface MarketingLead {
   /** e.g. "IELTS 6.5", "Preparing for PTE", "Not taken" */
   englishTest?: string;
   preferredBranch?: string;
+  /** Set instead of `preferredBranch` when Marketing routes this lead into a shared city pool
+   * (e.g. "Kathmandu") rather than one branch — any counselor at a branch in that city can then
+   * claim it first-come, first-served instead of Marketing picking the branch. */
+  cityPool?: string;
   /** Marketing's own notes from the enquiry — never the branch's counselor notes. */
   notes?: string;
   /** Full intake profile captured by the Add Lead form (same fields as the Front Desk intake),

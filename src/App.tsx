@@ -27,6 +27,8 @@ import MarketingModule from './components/marketing/MarketingModule';
 import { MARKETING_PAGES } from './components/marketing/mktPages';
 import DesignerModule from './components/designer/DesignerModule';
 import CounselorMarketing from './components/counselor/CounselorMarketing';
+import CityLeadPool from './components/counselor/CityLeadPool';
+import { CityPoolLead } from './cityLeadPool';
 import { assignedContentRequests } from './counselorMarketing';
 import { chargeLines, clientBalances } from './finance';
 import { formatInterview, newlyScheduledInterview } from './countryPipeline';
@@ -75,11 +77,11 @@ import { MockUser, NavIntent, DailyTask, BranchNotice, BranchIssue, AttendanceRe
 import { isStudyCase, getClientStatusLabel } from './clientPipeline';
 import { clientIdFor, generateClientId } from './clientId';
 import { STAFF_ROLE_TO_ROLE, NAV_CONFIG, LEADS_SPECIALIST_NAV, CONTENT_PLANNER_NAV, DESIGNER_NAV, findNavEntry } from './mockData';
-import { createIntakeNotification, createAssignmentNotification, createConsultationReadyNotification, createBranchManagerNotification, createLeadBroadcastNotification, createStatusUpdateNotification } from './notifications';
+import { createIntakeNotification, createAssignmentNotification, createConsultationReadyNotification, createBranchManagerNotification, createLeadBroadcastNotification, createCityLeadBroadcastNotification, createStatusUpdateNotification } from './notifications';
 import { dateKey, formatSubmittedAt } from './dateTime';
 import { fetchNotifications, insertNotification, markNotificationRead, markNotificationsRead, fromRow as notificationFromRow, NotificationRow } from './lib/notificationsApi';
 import { fetchCounselorStudents, updateCounselorStudent, upsertCounselorStudent, fromRow as counselorStudentFromRow, CounselorStudentRow } from './lib/counselorStudentsApi';
-import { fetchStudents, insertStudent, updateStudent, fromRow as studentFromRow, StudentRow } from './lib/studentsApi';
+import { fetchStudents, insertStudent, updateStudent, claimStudent, fromRow as studentFromRow, StudentRow } from './lib/studentsApi';
 import { fetchCounselors, insertCounselor, deleteCounselor, fromRow as counselorFromRow, CounselorRow } from './lib/counselorsApi';
 import { fetchApplications, updateApplication, insertApplication, fromRow as applicationFromRow, ApplicationRow } from './lib/applicationsApi';
 import { fetchStaff, insertStaff, updateStaff, deleteStaff, fromRow as staffFromRow, StaffRow } from './lib/staffApi';
@@ -955,6 +957,52 @@ export default function App() {
     return intake.id;
   };
 
+  /** Marketing "Assign to City Pool": the qualified lead becomes a New lead visible to every
+   * branch in `city` (branches.location) instead of one branch — `branch` stays '' until a
+   * counselor claims it (see handleAcceptLead). Returns the new intake id. */
+  const handleMarketingPushToCityPool = (lead: MarketingLead, city: string): string => {
+    const stamp = formatSubmittedAt(new Date());
+    const intake: IntakeStudent = {
+      id: `ml${Date.now()}`,
+      name: lead.name,
+      phone: lead.phone,
+      email: lead.email ?? '',
+      address: lead.address ?? '',
+      country: lead.preferredCountry ?? '',
+      purpose: lead.purpose ?? 'Study',
+      dob: lead.dob ?? '',
+      gender: lead.gender ?? '',
+      maritalStatus: lead.maritalStatus ?? '',
+      academics: lead.academics ?? [],
+      ieltsPte: lead.englishTest ?? '',
+      workExperience: lead.workExperience ?? (lead.interestedProgram ? `Interested in: ${lead.interestedProgram}` : ''),
+      submittedAt: stamp,
+      addedBy: user?.name ?? 'Marketing',
+      visitDateTime: stamp,
+      referredThrough: 'Marketing',
+      platformSource: lead.source === 'TikTok' ? 'Tiktok' : lead.source,
+      broadcastCity: city,
+      broadcastAt: stamp,
+      claimedBy: null,
+      status: 'New',
+      assignedCounselor: null,
+      branch: '',
+    };
+    setStudents((prev) => [intake, ...prev]);
+    insertStudent(intake).catch((err) => console.error('Failed to insert student in Supabase', err));
+    const cityBranches = branches.filter((b) => b.location === city).map((b) => b.name);
+    const pings = cityBranches.flatMap((branch) => [
+      withActor(createCityLeadBroadcastNotification(intake.id, city, intake.country || 'Any country', lead.interestedProgram || intake.purpose, branch)),
+      withActor(createBranchManagerNotification(
+        'city-lead-broadcast', intake.name, `Marketing added a lead to the ${city} City Pool: `,
+        ` — ${lead.interestedProgram ?? intake.purpose}, ${intake.country} (${lead.source})`, branch, 'co-city-pool'
+      )),
+    ]);
+    setNotifications((prev) => [...pings, ...prev]);
+    pings.forEach((n) => insertNotification(n).catch((err) => console.error('Failed to insert notification in Supabase', err)));
+    return intake.id;
+  };
+
   /** Content requests go to counselors and Front Desk Officers — notify them in their own role,
    * pointing at their own Marketing inbox. */
   const contributorRole = (name: string) => {
@@ -1100,19 +1148,22 @@ export default function App() {
     insertNotification(counselorPing).catch((err) => console.error('Failed to insert notification in Supabase', err));
   };
 
-  /** First counselor to accept a broadcast lead claims it and unlocks the contact details. */
-  const handleAcceptLead = (leadId: string) => {
+  /** First counselor to accept a broadcast lead (single-branch or City Pool) claims it. The race
+   * is decided by claimStudent's atomic `UPDATE ... WHERE claimed_by IS NULL`, not by this
+   * function — a lost race returns `false` and this is a no-op. City Pool claims go to the
+   * claiming counselor's own branch; single-branch broadcasts keep the broadcast branch. Returns
+   * whether this call actually won the claim, so callers (e.g. the City Lead Pool tab) can tell
+   * a lost race from a win without re-reading possibly-stale state. */
+  const handleAcceptLead = async (leadId: string): Promise<boolean> => {
     const lead = students.find((s) => s.id === leadId);
-    if (!lead || lead.claimedBy || !user) return;
+    if (!lead || lead.claimedBy || !user) return false;
     const stamp = formatSubmittedAt(new Date());
-    setStudents((prev) =>
-      prev.map((s) =>
-        s.id === leadId
-          ? { ...s, claimedBy: user.name, claimedAt: stamp, branch: s.broadcastBranch || s.branch }
-          : s
-      )
-    );
+    const targetBranch = lead.broadcastCity ? user.branch : (lead.broadcastBranch || lead.branch);
+    const claimed = await claimStudent(leadId, { claimedBy: user.name, claimedAt: stamp, branch: targetBranch, assignedCounselor: user.name });
+    if (!claimed) return false;
+    setStudents((prev) => prev.map((s) => (s.id === leadId ? claimed : s)));
     handleAssign(leadId, user.name);
+    return true;
   };
 
   const handleAssign = (studentId: string, counselorName: string) => {
@@ -1797,6 +1848,35 @@ export default function App() {
     return counselorStudents.filter((s) => s.assignedCounselor === user.name);
   }, [counselorStudents, user]);
 
+  // City Lead Pool: the counselor's own branch's city (branches.location), and every unclaimed
+  // (or self-claimed) broadcast-city lead — RLS already limits `students` to rows this counselor
+  // may see, so this is just shaping them into CityPoolLead cards.
+  const myCity = useMemo(() => branches.find((b) => b.name === user?.branch)?.location, [branches, user]);
+  const cityPoolLeads = useMemo((): CityPoolLead[] => {
+    if (!user || user.role !== 'counselor' || !myCity) return [];
+    return students
+      .filter((s) => s.broadcastCity === myCity && (!s.claimedBy || s.claimedBy === user.name))
+      .map((s): CityPoolLead => {
+        const interested = s.workExperience?.startsWith('Interested in: ') ? s.workExperience.slice('Interested in: '.length) : undefined;
+        return {
+          id: s.id,
+          city: s.broadcastCity!,
+          fullName: s.name,
+          fullPhone: s.phone,
+          email: s.email || undefined,
+          interestedCountry: s.country,
+          targetProgram: interested ?? s.purpose,
+          source: s.platformSource === 'Tiktok' ? 'TikTok' : ((s.platformSource ?? 'Website') as CityPoolLead['source']),
+          notes: interested ? undefined : (s.workExperience || undefined),
+          enteredPoolAt: s.broadcastAt ?? s.submittedAt,
+          claim: s.claimedBy ? { counselorName: s.claimedBy, branch: s.branch, claimedAt: s.claimedAt ?? '' } : undefined,
+        };
+      });
+  }, [students, user, myCity]);
+  /** Resolves once the claim (or its rejection by another counselor's earlier claim) is durable. */
+  const handleClaimCityPoolLead = async (leadId: string): Promise<'claimed' | 'already-claimed'> =>
+    (await handleAcceptLead(leadId)) ? 'claimed' : 'already-claimed';
+
   // Marketing data boundary: the department only ever receives these whitelisted rows —
   // never the raw intake / consultation / application / ledger records (see marketingDept.ts).
   // The Leads Specialist sees outcomes only — the finance ledger isn't even passed in, so no
@@ -1883,6 +1963,7 @@ export default function App() {
           contributorsByBranch={contributorsByBranch}
           team={marketingTeam}
           onPushToBranch={handleMarketingPush}
+          onPushToCityPool={handleMarketingPushToCityPool}
           onContentRequest={handleContentRequest}
           onPingBranch={handleMarketingPing}
           onNavigate={handleNavigate}
@@ -2425,6 +2506,11 @@ export default function App() {
           onSubmit={handleBranchContentSubmit}
         />
       );
+    // City-Wide Lead Pool — leads Marketing routed to the whole city instead of one branch.
+    if (activeKey === 'co-city-pool' && user.role === 'counselor')
+      return myCity
+        ? <CityLeadPool city={myCity} me={{ name: user.name, branch: user.branch }} leads={cityPoolLeads} onClaim={handleClaimCityPoolLead} />
+        : <p className="text-sm text-gray-500">Your branch has no city set yet — ask a Super Admin to fill in its location in Branch Management.</p>;
     if (activeKey === 'my-students')
       return (
         <CounselorClientsPage
