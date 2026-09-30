@@ -7,6 +7,7 @@ import {
 } from './MktShared';
 import { LEAD_CHANNELS, MKT_CAN, ago, dayOf, isoToday, shortDay } from '../../marketingDept';
 import { parseLeadDate } from '../../marketing';
+import { clampDateInput } from '../../dateTime';
 import { LeadChannel, SeoTask, SocialPost } from '../../types';
 import { deadlineText, deadlineTone } from './mktUtils';
 
@@ -44,7 +45,7 @@ function NewPostModal({ onClose }: { onClose: () => void }) {
               {store.campaigns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </SelectInput>
           </Field>
-          <Field label="Date" required><TextInput type="date" min={isoToday()} value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+          <Field label="Date" required><TextInput type="date" min={isoToday()} value={date} onChange={(e) => setDate(e.target.value)} onBlur={(e) => { const c = clampDateInput(e.target.value, { min: isoToday() }); if (c) setDate(c); }} /></Field>
           <Field label="Time" required><TextInput type="time" value={time} onChange={(e) => setTime(e.target.value)} /></Field>
         </div>
         <Field label="Caption" required><TextArea value={caption} onChange={(e) => setCaption(e.target.value)} /></Field>

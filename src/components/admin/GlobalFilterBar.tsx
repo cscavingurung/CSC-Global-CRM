@@ -1,6 +1,7 @@
 import { ChevronDown, RotateCcw, X } from 'lucide-react';
 import { DEFAULT_FILTERS, DEPARTMENTS, Dim, GlobalFilters, PERIODS, Period, periodLabel } from '../../superAdmin';
 import { CommandSources } from '../../superAdmin';
+import { clampDateInput } from '../../dateTime';
 
 // Compact global filter bar. Filters that don't apply to the current view stay visible but are
 // disabled, with the reason as a tooltip — so the manager always sees what shapes the numbers.
@@ -82,9 +83,9 @@ export default function GlobalFilterBar({ filters: f, onChange, sources, dims, n
       {on('date') && f.period === 'Custom' && (
         <div className="mt-2 flex flex-wrap items-end gap-2">
           <label className="flex flex-col gap-1"><span className="text-[11px] font-medium uppercase tracking-wide text-gray-400">From</span>
-            <input type="date" value={f.from} max={f.to || undefined} onChange={(e) => set({ from: e.target.value })} className="h-9 rounded-lg border border-grey-border px-3 text-sm text-navy focus:border-navy-light focus:outline-none" /></label>
+            <input type="date" value={f.from} max={f.to || undefined} onChange={(e) => set({ from: e.target.value })} onBlur={(e) => { const c = clampDateInput(e.target.value, { max: f.to || undefined }); if (c) set({ from: c }); }} className="h-9 rounded-lg border border-grey-border px-3 text-sm text-navy focus:border-navy-light focus:outline-none" /></label>
           <label className="flex flex-col gap-1"><span className="text-[11px] font-medium uppercase tracking-wide text-gray-400">To</span>
-            <input type="date" value={f.to} min={f.from || undefined} onChange={(e) => set({ to: e.target.value })} className="h-9 rounded-lg border border-grey-border px-3 text-sm text-navy focus:border-navy-light focus:outline-none" /></label>
+            <input type="date" value={f.to} min={f.from || undefined} onChange={(e) => set({ to: e.target.value })} onBlur={(e) => { const c = clampDateInput(e.target.value, { min: f.from || undefined }); if (c) set({ to: c }); }} className="h-9 rounded-lg border border-grey-border px-3 text-sm text-navy focus:border-navy-light focus:outline-none" /></label>
         </div>
       )}
       <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">

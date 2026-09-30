@@ -5,7 +5,7 @@ import { useFinanceLedger } from '../financeLedger';
 import {
   DUE_STYLES, DueStatus, chargeLines, clientBalances, dueStatus, finDayLabel, methodText, rs, serviceLabel, stampMs, txStatus,
 } from '../finance';
-import { dateKey, formatSubmittedAt } from '../dateTime';
+import { clampDateInput, dateKey, formatSubmittedAt } from '../dateTime';
 import DocumentChargesPanel from './DocumentChargesPanel';
 import ServiceFeesPanel from './ServiceFeesPanel';
 
@@ -317,7 +317,7 @@ export default function ClientFinancials({ clientId, clientName, counselor, coun
           {exception.type === 'Due date extension' && (
             <div>
               <label htmlFor="exc-date" className="mb-1.5 block text-xs font-semibold text-navy">Proposed new due date <span className="font-normal text-gray-400">(optional)</span></label>
-              <input id="exc-date" type="date" value={exception.dueDate} min={today} onChange={(e) => setException({ ...exception, dueDate: e.target.value })} className={inputClass} />
+              <input id="exc-date" type="date" value={exception.dueDate} min={today} onChange={(e) => setException({ ...exception, dueDate: e.target.value })} onBlur={(e) => { const c = clampDateInput(e.target.value, { min: today }); if (c) setException({ ...exception, dueDate: c }); }} className={inputClass} />
             </div>
           )}
           <div>
