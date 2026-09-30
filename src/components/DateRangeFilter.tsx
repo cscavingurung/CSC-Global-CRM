@@ -1,4 +1,5 @@
 import { Calendar, X } from 'lucide-react';
+import { clampDateInput } from '../dateTime';
 
 interface DateRangeFilterProps {
   from: string;
@@ -10,8 +11,9 @@ interface DateRangeFilterProps {
 const MIN_DATE = '1990-01-01';
 const MAX_DATE = '2099-12-31';
 
-// The picker is the only way to set a date — reject anything that isn't a clean in-range
-// YYYY-MM-DD before it reaches state, since filtering elsewhere assumes that exact shape.
+// Reject anything that isn't a clean in-range YYYY-MM-DD before it reaches state, since
+// filtering elsewhere assumes that exact shape (a mid-type keystroke can fire onChange with
+// a partial value, e.g. while only the day is filled in).
 function sanitizeDate(value: string): string | null {
   if (value === '') return '';
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
@@ -19,18 +21,11 @@ function sanitizeDate(value: string): string | null {
   return value;
 }
 
-// Typing is disabled (see className below hiding the native icon + this blocking edits) so the
-// calendar popup is the only way to set a value — but Tab must still move focus normally.
-function blockTyping(e: React.KeyboardEvent<HTMLInputElement>) {
-  if (e.key !== 'Tab') e.preventDefault();
-}
-
 function openPicker(e: React.SyntheticEvent<HTMLInputElement>) {
   e.currentTarget.showPicker?.();
 }
 
-const dateInputClass =
-  'text-navy focus:outline-none bg-transparent w-[104px] cursor-pointer caret-transparent [&::-webkit-calendar-picker-indicator]:hidden';
+const dateInputClass = 'text-navy focus:outline-none bg-transparent w-[104px] cursor-pointer';
 
 export default function DateRangeFilter({ from, to, onFromChange, onToChange }: DateRangeFilterProps) {
   const active = Boolean(from || to);
@@ -48,13 +43,16 @@ export default function DateRangeFilter({ from, to, onFromChange, onToChange }: 
         value={from}
         min={MIN_DATE}
         max={MAX_DATE}
-        onKeyDown={blockTyping}
         onClick={openPicker}
         onChange={(e) => {
           const sanitized = sanitizeDate(e.target.value);
           if (sanitized === null) return;
           onFromChange(sanitized);
           if (sanitized && to && sanitized > to) onToChange('');
+        }}
+        onBlur={(e) => {
+          const c = clampDateInput(e.target.value, { min: MIN_DATE, max: to || MAX_DATE });
+          if (c) onFromChange(c);
         }}
         className={dateInputClass}
       />
@@ -65,13 +63,16 @@ export default function DateRangeFilter({ from, to, onFromChange, onToChange }: 
         value={to}
         min={MIN_DATE}
         max={MAX_DATE}
-        onKeyDown={blockTyping}
         onClick={openPicker}
         onChange={(e) => {
           const sanitized = sanitizeDate(e.target.value);
           if (sanitized === null) return;
           onToChange(sanitized);
           if (sanitized && from && sanitized < from) onFromChange('');
+        }}
+        onBlur={(e) => {
+          const c = clampDateInput(e.target.value, { min: from || MIN_DATE, max: MAX_DATE });
+          if (c) onToChange(c);
         }}
         className={dateInputClass}
       />
