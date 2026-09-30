@@ -5,7 +5,6 @@ import {
 } from 'lucide-react';
 import { COUNTRIES, PURPOSES } from '../mockData';
 import { today } from '../clientPipeline';
-import { clampDateInput } from '../dateTime';
 import { AcademicEntry } from '../types';
 
 export interface IntakeFormData {
@@ -385,8 +384,16 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
                 onChange={(e) => setForm({ ...form, dob: e.target.value })}
                 onClick={(e) => e.currentTarget.showPicker?.()}
                 onBlur={(e) => {
-                  const clamped = clampDateInput(e.target.value, { min: '1900-01-01', max: today() });
-                  if (clamped) setForm((f) => ({ ...f, dob: clamped }));
+                  // The year segment of a native date input isn't capped at 4 digits by the
+                  // browser (Chrome allows up to 6) — min/max only affect validity, not how
+                  // much you can type. Clamp once the field is left, rather than mid-keystroke
+                  // (blocking onChange fights the widget and breaks normal typing).
+                  const value = e.target.value;
+                  if (!value) return;
+                  const year = Number(value.slice(0, 4));
+                  const maxYear = new Date().getFullYear();
+                  if (year > maxYear) setForm((f) => ({ ...f, dob: today() }));
+                  else if (year < 1900) setForm((f) => ({ ...f, dob: '1900-01-01' }));
                 }}
                 className={fieldClass}
               />

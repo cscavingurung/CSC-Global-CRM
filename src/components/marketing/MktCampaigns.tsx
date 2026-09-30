@@ -7,7 +7,6 @@ import {
 } from './MktShared';
 import { CampaignState, LEAD_CHANNELS, MKT_CAN, campaignRoi, campaignState, isoToday, shortDay } from '../../marketingDept';
 import { rs } from '../../finance';
-import { clampDateInput } from '../../dateTime';
 import { Campaign, CampaignObjective } from '../../types';
 
 const OBJECTIVES: CampaignObjective[] = ['Lead Generation', 'Brand Awareness', 'Event Registration', 'Engagement'];
@@ -51,7 +50,7 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
           <Field label="Target (leads)" required><TextInput type="number" min={1} value={target} onChange={(e) => setTarget(e.target.value)} /></Field>
           <Field label="Budget (Rs)" required><TextInput type="number" min={1} value={budget} onChange={(e) => setBudget(e.target.value)} /></Field>
           <Field label="Start date" required><TextInput type="date" value={startDate} onChange={(e) => setStart(e.target.value)} /></Field>
-          <Field label="End date" required hint={endDate && !datesOk ? 'Must be on or after the start date.' : undefined}><TextInput type="date" min={startDate} value={endDate} onChange={(e) => setEnd(e.target.value)} onBlur={(e) => { const c = clampDateInput(e.target.value, { min: startDate }); if (c) setEnd(c); }} /></Field>
+          <Field label="End date" required hint={endDate && !datesOk ? 'Must be on or after the start date.' : undefined}><TextInput type="date" min={startDate} value={endDate} onChange={(e) => setEnd(e.target.value)} /></Field>
         </div>
         <div className="flex justify-end gap-2 pt-1">
           <GhostButton onClick={onClose}>Cancel</GhostButton>
@@ -154,7 +153,7 @@ export function AdvertisingPage() {
               <Field label="Ad / ad set" required><TextInput value={adName} onChange={(e) => setAdName(e.target.value)} /></Field>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Amount (Rs)" required><TextInput type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} /></Field>
-                <Field label="Date" required><TextInput type="date" max={isoToday()} value={date} onChange={(e) => setDate(e.target.value)} onBlur={(e) => { const c = clampDateInput(e.target.value, { max: isoToday() }); if (c) setDate(c); }} /></Field>
+                <Field label="Date" required><TextInput type="date" max={isoToday()} value={date} onChange={(e) => setDate(e.target.value)} /></Field>
               </div>
               <PrimaryButton type="submit" disabled={!valid}>Add spend</PrimaryButton>
             </form>

@@ -5,7 +5,7 @@ import {
   CASE_ROLES, nextCaseCode, offboardingProgress, offboardingStage, offboardingTasksFor, onboardingProgress, onboardingStage,
   onboardingTasksFor, WorkloadSources, workloadOf, workloadTotal,
 } from '../hrCases';
-import { clampDateInput, dateKey, formatSubmittedAt } from '../dateTime';
+import { dateKey, formatSubmittedAt } from '../dateTime';
 import { HandoverActions } from './HandoverEngine';
 import { ProgressBar } from './HrCaseParts';
 import OnboardingCaseView from './OnboardingCaseView';
@@ -372,7 +372,7 @@ export default function OnboardingOffboardingPage(props: OnboardingOffboardingPa
             </div>
             <div>
               <label htmlFor="off-last" className={labelClass}>Last working day</label>
-              <input id="off-last" type="date" value={offDraft.lastWorkingDay} min={offDraft.noticeDate} onChange={(e) => setOffDraft({ ...offDraft, lastWorkingDay: e.target.value })} onBlur={(e) => { const c = clampDateInput(e.target.value, { min: offDraft.noticeDate }); if (c) setOffDraft({ ...offDraft, lastWorkingDay: c }); }} className={inputClass} />
+              <input id="off-last" type="date" value={offDraft.lastWorkingDay} min={offDraft.noticeDate} onChange={(e) => setOffDraft({ ...offDraft, lastWorkingDay: e.target.value })} className={inputClass} />
             </div>
           </div>
           <p className="text-xs text-gray-500">The employee keeps working normally until the case is finalised. Their record is never deleted.</p>

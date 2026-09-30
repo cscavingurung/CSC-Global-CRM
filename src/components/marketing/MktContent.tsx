@@ -7,7 +7,6 @@ import {
 } from './MktShared';
 import { DESIGN_STAGES, LEAD_CHANNELS, MKT_CAN, dayOf, isoToday, shortDay } from '../../marketingDept';
 import { parseLeadDate } from '../../marketing';
-import { clampDateInput } from '../../dateTime';
 import { DeliveredFile, DesignStage, DesignTask, LeadChannel, VideoStatus, VideoTask } from '../../types';
 import { DESIGN_STYLES, deadlineText, deadlineTone } from './mktUtils';
 
@@ -44,7 +43,7 @@ function NewDesignModal({ onClose }: { onClose: () => void }) {
               {DIMENSIONS[platform].map((d) => <option key={d}>{d}</option>)}
             </SelectInput>
           </Field>
-          <Field label="Deadline" required><TextInput type="date" min={isoToday()} value={deadline} onChange={(e) => setDeadline(e.target.value)} onBlur={(e) => { const c = clampDateInput(e.target.value, { min: isoToday() }); if (c) setDeadline(c); }} /></Field>
+          <Field label="Deadline" required><TextInput type="date" min={isoToday()} value={deadline} onChange={(e) => setDeadline(e.target.value)} /></Field>
           <Field label="Campaign">
             <SelectInput value={campaignId} onChange={setCampaignId} label="Campaign">
               <option value="">None</option>
@@ -80,7 +79,7 @@ function SchedulePostModal({ task, onClose }: { task: DesignTask; onClose: () =>
         <p className="text-xs text-gray-500">Posts to <b className="text-navy">{task.platform}</b> · {task.dimensions}</p>
         <Field label="Caption" required><TextArea value={caption} onChange={(e) => setCaption(e.target.value)} /></Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Date" required><TextInput type="date" min={isoToday()} value={date} onChange={(e) => setDate(e.target.value)} onBlur={(e) => { const c = clampDateInput(e.target.value, { min: isoToday() }); if (c) setDate(c); }} /></Field>
+          <Field label="Date" required><TextInput type="date" min={isoToday()} value={date} onChange={(e) => setDate(e.target.value)} /></Field>
           <Field label="Time" required><TextInput type="time" value={time} onChange={(e) => setTime(e.target.value)} /></Field>
         </div>
         <div className="flex justify-end gap-2 pt-1">

@@ -19,7 +19,6 @@ import {
   CONTENT_PLATFORMS, CONTENT_STATUSES, CONTENT_STATUS_STYLES, REQUEST_STYLES, deadlineText, deadlineTone, requestState,
 } from './mktUtils';
 import { MKT_CAN, addDaysIso, ago, isoToday, shortDay, weekBounds, whenLabel } from '../../marketingDept';
-import { clampDateInput } from '../../dateTime';
 import GreetingBanner from '../GreetingBanner';
 import PeriodFilter from '../PeriodFilter';
 import { PeriodKey, periodStart, periodSuffix } from '../../reportPeriod';
@@ -404,7 +403,7 @@ function RequestModal({ fromItem, onClose }: { fromItem?: ContentItem; onClose: 
             <datalist id="needed-suggestions">{NEEDED_SUGGESTIONS.map((n) => <option key={n} value={n} />)}</datalist>
           </Field>
           <Field label="Deadline" required>
-            <TextInput type="date" min={isoToday()} value={deadline} onChange={(e) => setDeadline(e.target.value)} onBlur={(e) => { const c = clampDateInput(e.target.value, { min: isoToday() }); if (c) setDeadline(c); }} />
+            <TextInput type="date" min={isoToday()} value={deadline} onChange={(e) => setDeadline(e.target.value)} />
             <span className="mt-1 flex gap-1">
               {[2, 3, 7].map((d) => (
                 <button key={d} type="button" onClick={() => setDeadline(addDaysIso(isoToday(), d))} className="rounded-full border border-grey-border px-2 py-0.5 text-[11px] text-gray-600 transition-colors hover:border-navy-light hover:text-navy-light">+{d} days</button>
@@ -495,7 +494,7 @@ function RequestDrawer({ reqId, startAction, onClose }: { reqId: string; startAc
                     </SelectInput>
                   </Field>
                   <Field label="Platform" required><SelectInput value={platform} onChange={setPlatform} label="Platform">{CONTENT_PLATFORMS.map((p) => <option key={p}>{p}</option>)}</SelectInput></Field>
-                  <Field label="Design deadline" required><TextInput type="date" min={isoToday()} value={designDeadline} onChange={(e) => setDesignDeadline(e.target.value)} onBlur={(e) => { const c = clampDateInput(e.target.value, { min: isoToday() }); if (c) setDesignDeadline(c); }} /></Field>
+                  <Field label="Design deadline" required><TextInput type="date" min={isoToday()} value={designDeadline} onChange={(e) => setDesignDeadline(e.target.value)} /></Field>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <PrimaryButton disabled={!designer || !designDeadline} onClick={() => { actions.sendToDesigner(req.id, designer, platform, designDeadline); setFlash(`Sent to ${designer}. It's on the Content Calendar as In Progress.`); }}><Palette size={14} /> Send to Designer</PrimaryButton>

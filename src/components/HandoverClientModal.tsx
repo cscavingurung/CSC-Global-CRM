@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, ArrowRightLeft, X } from 'lucide-react';
-import { clampDateInput, dateKey } from '../dateTime';
+import { dateKey } from '../dateTime';
 
 interface HandoverClientModalProps {
   clientName: string;
@@ -62,7 +62,7 @@ export default function HandoverClientModal({ clientName, currentCounselor, coun
           {managerView && (
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-gray-600">Handover Date <span className="text-red-500">*</span></span>
-              <input type="date" value={date} min={today} onChange={(e) => setDate(e.target.value)} onBlur={(e) => { const c = clampDateInput(e.target.value, { min: today }); if (c) setDate(c); }} className={field} />
+              <input type="date" value={date} min={today} onChange={(e) => setDate(e.target.value)} className={field} />
               <span className="mt-1 block text-[11px] text-gray-400">Effective date recorded on the audit trail. The new counselor gets the client straight away.</span>
             </label>
           )}

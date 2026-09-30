@@ -7,7 +7,7 @@ import {
   dayLabel, inRange, pct, summarise,
 } from '../../managerWorkspace';
 import { rs } from '../../finance';
-import { clampDateInput, dateKey } from '../../dateTime';
+import { dateKey } from '../../dateTime';
 import { Card, Field, GhostButton, Kpi, Modal, PrimaryButton, SelectInput, SourceTag, TextArea, TextInput } from '../marketing/MktShared';
 import { NewContentRequest, NewSupportRequest, useWorkspace } from './workspaceContext';
 import { Badge, Column, DataList, DateRangeControl, FilterBar, FilterSelect, SearchFilter, SectionHeading, StepTrack } from './WorkspaceShared';
@@ -213,7 +213,7 @@ function ContentRequestForm({ onClose }: { onClose: () => void }) {
           <TextArea value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} placeholder="e.g. A5 flyer for the Saturday college fair — nursing pathways, QR to booking form." />
         </Field>
         <Field label="Needed Date" required>
-          <TextInput type="date" min={todayKey()} value={f.neededBy} onChange={(e) => setF({ ...f, neededBy: e.target.value })} onBlur={(e) => { const c = clampDateInput(e.target.value, { min: todayKey() }); if (c) setF({ ...f, neededBy: c }); }} />
+          <TextInput type="date" min={todayKey()} value={f.neededBy} onChange={(e) => setF({ ...f, neededBy: e.target.value })} />
         </Field>
         <div className="flex justify-end gap-2 border-t border-grey-border pt-4">
           <GhostButton onClick={onClose}>Cancel</GhostButton>
@@ -253,10 +253,10 @@ function SupportRequestForm({ onClose }: { onClose: () => void }) {
             <TextInput type="number" min={0} step={500} value={f.budget || ''} onChange={(e) => setF({ ...f, budget: Math.max(0, Number(e.target.value) || 0) })} />
           </Field>
           <Field label="Start Date" required>
-            <TextInput type="date" min={todayKey()} value={f.startDate} onChange={(e) => setF({ ...f, startDate: e.target.value })} onBlur={(e) => { const c = clampDateInput(e.target.value, { min: todayKey() }); if (c) setF({ ...f, startDate: c }); }} />
+            <TextInput type="date" min={todayKey()} value={f.startDate} onChange={(e) => setF({ ...f, startDate: e.target.value })} />
           </Field>
           <Field label="End Date">
-            <TextInput type="date" min={f.startDate || todayKey()} value={f.endDate ?? ''} onChange={(e) => setF({ ...f, endDate: e.target.value })} onBlur={(e) => { const c = clampDateInput(e.target.value, { min: f.startDate || todayKey() }); if (c) setF({ ...f, endDate: c }); }} />
+            <TextInput type="date" min={f.startDate || todayKey()} value={f.endDate ?? ''} onChange={(e) => setF({ ...f, endDate: e.target.value })} />
           </Field>
         </div>
         <Field label="Target Audience">
@@ -445,7 +445,7 @@ function DelegateModal({ req, onClose }: { req: ContentRequest; onClose: () => v
           </SelectInput>
         </Field>
         <Field label="Internal Due Date" required>
-          <TextInput type="date" min={today} value={due} onChange={(e) => setDue(e.target.value)} onBlur={(e) => { const c = clampDateInput(e.target.value, { min: today }); if (c) setDue(c); }} />
+          <TextInput type="date" min={today} value={due} onChange={(e) => setDue(e.target.value)} />
         </Field>
         {afterDeadline && (
           <p className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800"><AlertTriangle size={14} className="mt-0.5 shrink-0" /> This is after Marketing’s deadline — they will receive it late.</p>

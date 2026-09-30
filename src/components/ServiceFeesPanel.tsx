@@ -4,7 +4,7 @@ import { FinTransaction, MockUser } from '../types';
 import { useFinanceLedger } from '../financeLedger';
 import { CLIENT_SERVICES, finDayLabel, rs } from '../finance';
 import { ALL_COUNTRIES, servicesFor } from '../servicePricing';
-import { clampDateInput, dateKey, formatSubmittedAt } from '../dateTime';
+import { dateKey, formatSubmittedAt } from '../dateTime';
 
 // ─── Client Profile · Financials · Service Fees ──────────────────────────────
 // Where a client's service fee is applied. The client's counselor (or the Branch Manager) picks the
@@ -95,7 +95,7 @@ export default function ServiceFeesPanel({ clientId, clientName, counselor, coun
             </label>
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-gray-600">Due date</span>
-              <input type="date" min={today} value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} onBlur={(e) => { const c = clampDateInput(e.target.value, { min: today }); if (c) setForm({ ...form, dueDate: c }); }} className={inputClass} />
+              <input type="date" min={today} value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} className={inputClass} />
             </label>
           </div>
           {chosen ? (

@@ -5,7 +5,7 @@ import { FinService, ServicePrice } from '../../types';
 import { ALL_COUNTRIES, PRICE_CATEGORIES, PriceRow, SUGGESTED_SERVICES, priceRows } from '../../servicePricing';
 import { COUNTRIES } from '../../mockData';
 import { finDayLabel, rs } from '../../finance';
-import { clampDateInput, dateKey, formatSubmittedAt } from '../../dateTime';
+import { dateKey, formatSubmittedAt } from '../../dateTime';
 import { downloadWorkbook } from '../../xlsxExport';
 import { ADMIN_BASE, useAdmin } from './adminContext';
 
@@ -263,7 +263,7 @@ export default function ServiceChargesPage() {
                 )}
                 <label className="block">
                   <span className="mb-1 block text-xs font-medium text-gray-600">{draft.mode === 'retire' ? 'Retire from' : 'Effective from'}</span>
-                  <input type="date" min={today} value={draft.effectiveFrom} onChange={(e) => setDraft({ ...draft, effectiveFrom: e.target.value })} onBlur={(e) => { const c = clampDateInput(e.target.value, { min: today }); if (c) setDraft({ ...draft, effectiveFrom: c }); }} className={inputCls} />
+                  <input type="date" min={today} value={draft.effectiveFrom} onChange={(e) => setDraft({ ...draft, effectiveFrom: e.target.value })} className={inputCls} />
                 </label>
               </div>
               <label className="block">

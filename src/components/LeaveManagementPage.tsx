@@ -4,7 +4,7 @@ import { Holiday, LeaveRecord, LeaveType, MockUser, NavIntent, StaffMember } fro
 import {
   ALLOWANCE, BALANCE_TYPES, LEAVE_STATUS_STYLES, LEAVE_TYPES, balancesFor, countDays, leaveDays, overlapping,
 } from '../leave';
-import { clampDateInput, dateKey, formatSubmittedAt } from '../dateTime';
+import { dateKey, formatSubmittedAt } from '../dateTime';
 
 // ─── HRM · Leave Management ─────────────────────────────────────────────────
 // Request → approve/reject, nothing more. The Branch Manager gets all four views; staff (via
@@ -270,7 +270,7 @@ export default function LeaveManagementPage({ currentUser, staff, leave, holiday
                 </div>
                 <div>
                   <label htmlFor="lv-to" className="mb-1.5 block text-xs font-semibold text-navy">To</label>
-                  <input id="lv-to" type="date" value={form.to} min={form.from} onChange={(e) => setForm({ ...form, to: e.target.value })} onBlur={(e) => { const c = clampDateInput(e.target.value, { min: form.from }); if (c) setForm({ ...form, to: c }); }} className={inputClass} />
+                  <input id="lv-to" type="date" value={form.to} min={form.from} onChange={(e) => setForm({ ...form, to: e.target.value })} className={inputClass} />
                 </div>
               </div>
 

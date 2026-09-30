@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ArrowRight, ArrowRightLeft, CheckCircle, ChevronDown, History, Inbox, Lock, Search, Send, XCircle } from 'lucide-react';
 import { BranchTransfer, ConsultationStatus, CounselorStudent } from '../../types';
 import { ALL_TIME, DateRange, TRANSFER_STYLES, TransferCandidate, dayLabel, inRange } from '../../managerWorkspace';
-import { clampDateInput, dateKey } from '../../dateTime';
+import { dateKey } from '../../dateTime';
 import HandoverClientModal from '../HandoverClientModal';
 import { Field, GhostButton, Kpi, Modal, PrimaryButton, SelectInput, TextArea, TextInput } from '../marketing/MktShared';
 import { useWorkspace } from './workspaceContext';
@@ -224,7 +224,7 @@ function RequestModal({ c, onClose }: { c: TransferCandidate; onClose: () => voi
           </SelectInput>
         </Field>
         <Field label="Date Client Visited This Branch" required>
-          <TextInput type="date" max={today} value={visitDate} onChange={(e) => setVisitDate(e.target.value)} onBlur={(e) => { const c = clampDateInput(e.target.value, { max: today }); if (c) setVisitDate(c); }} />
+          <TextInput type="date" max={today} value={visitDate} onChange={(e) => setVisitDate(e.target.value)} />
         </Field>
         <Field label="Counselor Reason" required hint="The origin branch manager sees this when deciding.">
           <TextArea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Client relocated for work and wants to continue the file here." />
