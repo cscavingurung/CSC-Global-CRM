@@ -383,6 +383,7 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
                 max={today()}
                 value={form.dob}
                 onChange={(e) => setForm({ ...form, dob: e.target.value })}
+                onClick={(e) => e.currentTarget.showPicker?.()}
                 onBlur={(e) => {
                   const clamped = clampDateInput(e.target.value, { min: '1900-01-01', max: today() });
                   if (clamped) setForm((f) => ({ ...f, dob: clamped }));

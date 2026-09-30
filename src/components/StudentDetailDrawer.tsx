@@ -388,6 +388,7 @@ export default function StudentDetailDrawer({ student, onClose, onUpdate, handov
                   value={inputDate}
                   min={new Date().toISOString().split('T')[0]}
                   onChange={(e) => setInputDate(e.target.value)}
+                  onClick={(e) => e.currentTarget.showPicker?.()}
                   onBlur={(e) => {
                     const c = clampDateInput(e.target.value, { min: new Date().toISOString().split('T')[0] });
                     if (c) setInputDate(c);
