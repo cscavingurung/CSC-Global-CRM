@@ -9,9 +9,10 @@
 // revenue figure. Consultation notes, documents, academics, fee lines and every HR/finance
 // table stay on the App side of this function.
 import {
-  ApplicationRecord, Campaign, CounselorStudent, DesignStage, FinTransaction, IntakeStudent,
+  Campaign, DesignStage, FinTransaction,
   LeadChannel, MarketingLead, MarketingRole, MarketingStore,
 } from './types';
+import { TrackedApplication, TrackedConsultation, TrackedIntake } from './lib/marketing/marketingTrackingApi';
 import { isLivePayment, isPaidOutRefund } from './finance';
 import { parseLeadDate } from './marketing';
 
@@ -108,9 +109,9 @@ const DAY_MS = 86_400_000;
  */
 export function trackMarketingLeads(
   leads: MarketingLead[],
-  intakes: IntakeStudent[],
-  consultations: CounselorStudent[],
-  applications: ApplicationRecord[],
+  intakes: TrackedIntake[],
+  consultations: TrackedConsultation[],
+  applications: TrackedApplication[],
   transactions: FinTransaction[] | null,
   now = new Date(),
 ): LeadTrack[] {

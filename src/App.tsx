@@ -121,6 +121,7 @@ import { fetchMarketingPosts, upsertMarketingPost, deleteMarketingPost, fromRow 
 import { fetchMarketingSeoTasks, upsertMarketingSeoTask, deleteMarketingSeoTask, fromRow as marketingSeoTaskFromRow, SeoTaskRow as MarketingSeoTaskRow } from './lib/marketing/marketingSeoTasksApi';
 import { fetchMarketingSeoKeywords, upsertMarketingSeoKeyword, deleteMarketingSeoKeyword, fromRow as marketingSeoKeywordFromRow } from './lib/marketing/marketingSeoKeywordsApi';
 import { fetchMarketingPings, upsertMarketingPing, deleteMarketingPing, fromRow as marketingPingFromRow, BranchPingRow as MarketingPingRow } from './lib/marketing/marketingPingsApi';
+import { fetchMarketingTrackedIntakes, fetchMarketingTrackedConsultations, fetchMarketingTrackedApplications, TrackedIntake, TrackedConsultation, TrackedApplication } from './lib/marketing/marketingTrackingApi';
 import { fetchBranchContentRequests, insertBranchContentRequest, updateBranchContentRequest, deleteBranchContentRequest, fromRow as branchContentRequestFromRow, BranchContentRequestRow } from './lib/ops/branchContentRequestsApi';
 import { fetchMarketingSupportRequests, insertMarketingSupportRequest, updateMarketingSupportRequest, fromRow as marketingSupportRequestFromRow, MarketingSupportRequestRow } from './lib/marketing/marketingSupportRequestsApi';
 import { fetchItTickets, insertItTicket, updateItTicket, fromRow as itTicketFromRow, ItTicketRow } from './lib/ops/itTicketsApi';
@@ -254,6 +255,14 @@ export default function App() {
     setFinTransactions((prev) => (prev.some((x) => x.id === t.id) ? prev.map((x) => (x.id === t.id ? t : x)) : [...prev, t]));
     upsertFinTransaction(t).catch((err) => console.error('Failed to save fin_transaction in Supabase', err));
   };
+  // Lead Monitoring's read-only view into the branch pipeline for Marketing — `students`/
+  // `counselorStudents`/`applications` above are always empty for a Marketing session (RLS
+  // denies Marketing any select on those tables), so this comes from narrow RPCs instead
+  // (2026-09-30-marketing-lead-tracking.sql) that return only the whitelisted columns
+  // trackMarketingLeads needs. Each RPC returns no rows for a non-Marketing caller.
+  const [marketingTrackedIntakes, setMarketingTrackedIntakes] = useState<TrackedIntake[]>([]);
+  const [marketingTrackedConsultations, setMarketingTrackedConsultations] = useState<TrackedConsultation[]>([]);
+  const [marketingTrackedApplications, setMarketingTrackedApplications] = useState<TrackedApplication[]>([]);
   // Service Charges price list — set by the Super Admin (Finance → Service Charges), saved in
   // `service_prices`. Append-only: every change is a new version.
   const [servicePrices, setServicePrices] = useState<ServicePrice[]>([]);
@@ -344,6 +353,19 @@ export default function App() {
       setApplications((prev) => applyRealtimeChange(prev, change, applicationFromRow,
         (a, b) => (a.consultationDate < b.consultationDate ? 1 : a.consultationDate > b.consultationDate ? -1 : 0)));
     });
+  }, [user]);
+
+  // No realtime here — these RPCs aren't table changefeeds, and Marketing couldn't receive
+  // postgres_changes on students/counselor_students/applications anyway (Realtime honors the
+  // same RLS that denies Marketing a direct select). Refetches on every login instead.
+  useEffect(() => {
+    if (user?.role !== 'marketing') return;
+    fetchMarketingTrackedIntakes().then(setMarketingTrackedIntakes)
+      .catch((err) => console.error('Failed to fetch marketing_tracked_intakes from Supabase', err));
+    fetchMarketingTrackedConsultations().then(setMarketingTrackedConsultations)
+      .catch((err) => console.error('Failed to fetch marketing_tracked_consultations from Supabase', err));
+    fetchMarketingTrackedApplications().then(setMarketingTrackedApplications)
+      .catch((err) => console.error('Failed to fetch marketing_tracked_applications from Supabase', err));
   }, [user]);
 
   useEffect(() => {
@@ -1886,8 +1908,11 @@ export default function App() {
   // Graphics Designer data boundary: a production-queue projection, nothing else (designerData.ts).
   const designerData = useMemo(() => designerView(marketing), [marketing]);
   const marketingTracks = useMemo(
-    () => trackMarketingLeads(marketing.leads, students, counselorStudents, applications, marketingSeesRevenue ? finTransactions : null),
-    [marketing.leads, students, counselorStudents, applications, finTransactions, marketingSeesRevenue]
+    () => trackMarketingLeads(
+      marketing.leads, marketingTrackedIntakes, marketingTrackedConsultations, marketingTrackedApplications,
+      marketingSeesRevenue ? finTransactions : null,
+    ),
+    [marketing.leads, marketingTrackedIntakes, marketingTrackedConsultations, marketingTrackedApplications, finTransactions, marketingSeesRevenue]
   );
   const marketingTeam = useMemo(() => staff
     .filter((s) => s.role === 'Marketing' && s.status === 'Active')
