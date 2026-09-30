@@ -25,12 +25,13 @@ export const rs = (n: number) => `Rs ${Math.round(n).toLocaleString('en-IN')}`;
 /** What to call a ledger line — a typed charge title if there is one, else the service. */
 export const serviceLabel = (t: { service: string; title?: string }) => t.title ?? t.service;
 
-/** A payment that counts — not voided. */
-export const isLivePayment = (t: FinTransaction) => t.kind === 'Payment' && !t.void;
+/** A payment that counts — not voided. Takes just `kind`/`void` so it also works on the
+ * narrower whitelisted rows Marketing's lead-tracking RPCs return (see marketingTrackingApi.ts). */
+export const isLivePayment = (t: Pick<FinTransaction, 'kind' | 'void'>) => t.kind === 'Payment' && !t.void;
 /** Discounts reduce what's owed once approved. */
 export const isAppliedDiscount = (t: FinTransaction) => t.kind === 'Discount' && (t.status === 'Approved' || t.status === 'Processed');
-/** Refunds only move money back once processed. */
-export const isPaidOutRefund = (t: FinTransaction) => t.kind === 'Refund' && t.status === 'Processed';
+/** Refunds only move money back once processed. Same narrowing as isLivePayment above. */
+export const isPaidOutRefund = (t: Pick<FinTransaction, 'kind' | 'status'>) => t.kind === 'Refund' && t.status === 'Processed';
 /** Unpaid balance handed to another branch with a client transfer — a credit in this branch. */
 export const isTransferCredit = (t: FinTransaction) => t.kind === 'Transfer';
 

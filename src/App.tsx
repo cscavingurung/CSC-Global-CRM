@@ -121,7 +121,7 @@ import { fetchMarketingPosts, upsertMarketingPost, deleteMarketingPost, fromRow 
 import { fetchMarketingSeoTasks, upsertMarketingSeoTask, deleteMarketingSeoTask, fromRow as marketingSeoTaskFromRow, SeoTaskRow as MarketingSeoTaskRow } from './lib/marketing/marketingSeoTasksApi';
 import { fetchMarketingSeoKeywords, upsertMarketingSeoKeyword, deleteMarketingSeoKeyword, fromRow as marketingSeoKeywordFromRow } from './lib/marketing/marketingSeoKeywordsApi';
 import { fetchMarketingPings, upsertMarketingPing, deleteMarketingPing, fromRow as marketingPingFromRow, BranchPingRow as MarketingPingRow } from './lib/marketing/marketingPingsApi';
-import { fetchMarketingTrackedIntakes, fetchMarketingTrackedConsultations, fetchMarketingTrackedApplications, TrackedIntake, TrackedConsultation, TrackedApplication } from './lib/marketing/marketingTrackingApi';
+import { fetchMarketingTrackedIntakes, fetchMarketingTrackedConsultations, fetchMarketingTrackedApplications, fetchMarketingTrackedRevenue, TrackedIntake, TrackedConsultation, TrackedApplication, TrackedRevenueTransaction } from './lib/marketing/marketingTrackingApi';
 import { fetchBranchContentRequests, insertBranchContentRequest, updateBranchContentRequest, deleteBranchContentRequest, fromRow as branchContentRequestFromRow, BranchContentRequestRow } from './lib/ops/branchContentRequestsApi';
 import { fetchMarketingSupportRequests, insertMarketingSupportRequest, updateMarketingSupportRequest, fromRow as marketingSupportRequestFromRow, MarketingSupportRequestRow } from './lib/marketing/marketingSupportRequestsApi';
 import { fetchItTickets, insertItTicket, updateItTicket, fromRow as itTicketFromRow, ItTicketRow } from './lib/ops/itTicketsApi';
@@ -263,6 +263,10 @@ export default function App() {
   const [marketingTrackedIntakes, setMarketingTrackedIntakes] = useState<TrackedIntake[]>([]);
   const [marketingTrackedConsultations, setMarketingTrackedConsultations] = useState<TrackedConsultation[]>([]);
   const [marketingTrackedApplications, setMarketingTrackedApplications] = useState<TrackedApplication[]>([]);
+  // Same gap, same fix, for the revenue figure Lead Monitoring shows the Marketing Manager
+  // (2026-09-30-marketing-lead-revenue.sql) — `fin_transactions` above is likewise always
+  // empty for Marketing, since RLS denies it entirely.
+  const [marketingTrackedRevenue, setMarketingTrackedRevenue] = useState<TrackedRevenueTransaction[]>([]);
   // Service Charges price list — set by the Super Admin (Finance → Service Charges), saved in
   // `service_prices`. Append-only: every change is a new version.
   const [servicePrices, setServicePrices] = useState<ServicePrice[]>([]);
@@ -366,6 +370,12 @@ export default function App() {
       .catch((err) => console.error('Failed to fetch marketing_tracked_consultations from Supabase', err));
     fetchMarketingTrackedApplications().then(setMarketingTrackedApplications)
       .catch((err) => console.error('Failed to fetch marketing_tracked_applications from Supabase', err));
+    // The RPC itself is gated to Marketing Manager (is_marketing_manager()) and returns no rows
+    // for any other sub-role — this check just skips the pointless call for them.
+    if ((user.marketingRole ?? 'Marketing Manager') === 'Marketing Manager') {
+      fetchMarketingTrackedRevenue().then(setMarketingTrackedRevenue)
+        .catch((err) => console.error('Failed to fetch marketing_tracked_revenue from Supabase', err));
+    }
   }, [user]);
 
   useEffect(() => {
@@ -1910,9 +1920,9 @@ export default function App() {
   const marketingTracks = useMemo(
     () => trackMarketingLeads(
       marketing.leads, marketingTrackedIntakes, marketingTrackedConsultations, marketingTrackedApplications,
-      marketingSeesRevenue ? finTransactions : null,
+      marketingSeesRevenue ? marketingTrackedRevenue : null,
     ),
-    [marketing.leads, marketingTrackedIntakes, marketingTrackedConsultations, marketingTrackedApplications, finTransactions, marketingSeesRevenue]
+    [marketing.leads, marketingTrackedIntakes, marketingTrackedConsultations, marketingTrackedApplications, marketingTrackedRevenue, marketingSeesRevenue]
   );
   const marketingTeam = useMemo(() => staff
     .filter((s) => s.role === 'Marketing' && s.status === 'Active')

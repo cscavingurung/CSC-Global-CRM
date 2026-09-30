@@ -1,17 +1,19 @@
 import { supabase } from '../supabaseClient';
-import { ApplicationRecord, CounselorStudent, IntakeStudent } from '../../types';
+import { ApplicationRecord, CounselorStudent, FinTransaction, IntakeStudent } from '../../types';
 
 // Backs Lead Monitoring (src/components/marketing/MktLeads.tsx LeadsMonitoring) via
 // trackMarketingLeads() in src/marketingDept.ts. Marketing has no `select` on students/
-// counselor_students/applications (RLS denies it — see 2026-09-27-rls-lockdown.sql /
-// marketing-branch-leak-fix.sql), so these call narrow SECURITY DEFINER RPCs
-// (2026-09-30-marketing-lead-tracking.sql) that return only the whitelisted columns
+// counselor_students/applications/fin_transactions (RLS denies it — see 2026-09-27-
+// rls-lockdown.sql / marketing-branch-leak-fix.sql), so these call narrow SECURITY
+// DEFINER RPCs (2026-09-30-marketing-lead-tracking.sql /
+// 2026-09-30-marketing-lead-revenue.sql) that return only the whitelisted columns
 // trackMarketingLeads reads, for rows behind one of this org's own marketing_leads —
-// never a whole branch's data. Each RPC returns no rows for a non-Marketing caller.
+// never a whole branch's data. Each RPC returns no rows for a caller it isn't meant for.
 
 export type TrackedIntake = Pick<IntakeStudent, 'id' | 'branch' | 'broadcastBranch' | 'assignedCounselor' | 'claimedAt'>;
 export type TrackedConsultation = Pick<CounselorStudent, 'id' | 'clientId' | 'assignedCounselor' | 'assignedDate' | 'consultationStatus' | 'completedDate' | 'outcome' | 'followUpDate'>;
 export type TrackedApplication = Pick<ApplicationRecord, 'clientId' | 'offerApplications' | 'visaApplication' | 'consultationDate' | 'withdrawn'>;
+export type TrackedRevenueTransaction = Pick<FinTransaction, 'clientId' | 'kind' | 'amount' | 'void' | 'status'>;
 
 interface TrackedIntakeRow {
   id: string;
@@ -38,6 +40,14 @@ interface TrackedApplicationRow {
   visa_application: ApplicationRecord['visaApplication'] | null;
   consultation_date: string;
   withdrawn: boolean | null;
+}
+
+interface TrackedRevenueRow {
+  client_id: string;
+  kind: FinTransaction['kind'];
+  amount: number;
+  void: FinTransaction['void'] | null;
+  status: FinTransaction['status'] | null;
 }
 
 export async function fetchMarketingTrackedIntakes(): Promise<TrackedIntake[]> {
@@ -79,5 +89,19 @@ export async function fetchMarketingTrackedApplications(): Promise<TrackedApplic
     visaApplication: row.visa_application,
     consultationDate: row.consultation_date,
     withdrawn: row.withdrawn ?? false,
+  }));
+}
+
+/** Marketing Manager only — the RPC itself returns no rows for any other sub-role. */
+export async function fetchMarketingTrackedRevenue(): Promise<TrackedRevenueTransaction[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc('marketing_tracked_revenue');
+  if (error) throw error;
+  return (data as TrackedRevenueRow[]).map((row) => ({
+    clientId: row.client_id,
+    kind: row.kind,
+    amount: row.amount,
+    void: row.void ?? undefined,
+    status: row.status ?? undefined,
   }));
 }

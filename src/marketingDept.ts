@@ -9,10 +9,10 @@
 // revenue figure. Consultation notes, documents, academics, fee lines and every HR/finance
 // table stay on the App side of this function.
 import {
-  Campaign, DesignStage, FinTransaction,
+  Campaign, DesignStage,
   LeadChannel, MarketingLead, MarketingRole, MarketingStore,
 } from './types';
-import { TrackedApplication, TrackedConsultation, TrackedIntake } from './lib/marketing/marketingTrackingApi';
+import { TrackedApplication, TrackedConsultation, TrackedIntake, TrackedRevenueTransaction } from './lib/marketing/marketingTrackingApi';
 import { isLivePayment, isPaidOutRefund } from './finance';
 import { parseLeadDate } from './marketing';
 
@@ -112,7 +112,7 @@ export function trackMarketingLeads(
   intakes: TrackedIntake[],
   consultations: TrackedConsultation[],
   applications: TrackedApplication[],
-  transactions: FinTransaction[] | null,
+  transactions: TrackedRevenueTransaction[] | null,
   now = new Date(),
 ): LeadTrack[] {
   return leads.flatMap((lead): LeadTrack[] => {
