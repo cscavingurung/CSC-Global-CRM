@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Calendar, X } from 'lucide-react';
-import { clampDateInput } from '../dateTime';
 
 interface CompactDateRangeFilterProps {
   from: string;
@@ -96,10 +95,6 @@ export default function CompactDateRangeFilter({ from, to, onFromChange, onToCha
                     onFromChange(value);
                     if (value && to && value > to) onToChange('');
                   }}
-                  onBlur={(event) => {
-                    const c = clampDateInput(event.target.value, { min: MIN_DATE, max: to || MAX_DATE });
-                    if (c) onFromChange(c);
-                  }}
                   className="w-full rounded-lg border border-grey-border bg-white px-3 py-2 text-sm text-navy focus:border-navy-light focus:outline-none focus:ring-1 focus:ring-navy-light"
                 />
               </label>
@@ -115,10 +110,6 @@ export default function CompactDateRangeFilter({ from, to, onFromChange, onToCha
                     if (value === null) return;
                     onToChange(value);
                     if (value && from && value < from) onFromChange('');
-                  }}
-                  onBlur={(event) => {
-                    const c = clampDateInput(event.target.value, { min: from || MIN_DATE, max: MAX_DATE });
-                    if (c) onToChange(c);
                   }}
                   className="w-full rounded-lg border border-grey-border bg-white px-3 py-2 text-sm text-navy focus:border-navy-light focus:outline-none focus:ring-1 focus:ring-navy-light"
                 />

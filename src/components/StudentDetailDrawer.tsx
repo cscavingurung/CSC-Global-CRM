@@ -9,7 +9,6 @@ import { CounselorStudent, ConsultationStatus, ConsultationOutcome, EnrolmentCho
 import { LEAD_TEMPERATURES, LEAD_TEMPERATURE_HINTS, LEAD_TEMPERATURE_STYLES } from '../leadTemperature';
 import { isStudyCase, formatAcademic } from '../clientPipeline';
 import { clientIdFor } from '../clientId';
-import { clampDateInput } from '../dateTime';
 import { COUNTRIES, INTAKE_MONTHS, generateIntakeYears } from '../mockData';
 
 const INTAKE_YEARS = generateIntakeYears();
@@ -389,10 +388,6 @@ export default function StudentDetailDrawer({ student, onClose, onUpdate, handov
                   min={new Date().toISOString().split('T')[0]}
                   onChange={(e) => setInputDate(e.target.value)}
                   onClick={(e) => e.currentTarget.showPicker?.()}
-                  onBlur={(e) => {
-                    const c = clampDateInput(e.target.value, { min: new Date().toISOString().split('T')[0] });
-                    if (c) setInputDate(c);
-                  }}
                   className="w-full pl-10 pr-4 py-2.5 border border-grey-border rounded-lg text-sm focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light transition-colors"
                 />
               </div>
