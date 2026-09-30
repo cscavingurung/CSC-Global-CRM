@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { Branch, StaffMember, IntakeStudent, ApplicationRecord, NavIntent } from '../types';
 import { computeBranchLiveStats, type BranchLiveStats } from '../branchLiveStats';
+import { CITY_POOLS } from './marketing/mktUtils';
 
 interface AllBranchesProps {
   branches: Branch[];
@@ -26,7 +27,7 @@ export default function AllBranches({ branches, staff, students, applications, o
   const [deleteTarget, setDeleteTarget] = useState<Branch | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
-  const [newBranch, setNewBranch] = useState({ name: '', location: '' });
+  const [newBranch, setNewBranch] = useState({ name: '', location: CITY_POOLS[0] });
 
   const statsByBranch = useMemo(() => {
     const map = new Map<string, BranchLiveStats>();
@@ -53,7 +54,7 @@ export default function AllBranches({ branches, staff, students, applications, o
     setToastMessage(`Branch '${branch.name}' created`);
     setShowToast(true);
     setTimeout(() => setShowToast(false), 2500);
-    setNewBranch({ name: '', location: '' });
+    setNewBranch({ name: '', location: CITY_POOLS[0] });
     setShowAddForm(false);
   };
 
@@ -171,14 +172,17 @@ export default function AllBranches({ branches, staff, students, applications, o
               </div>
               <div>
                 <label className="block text-sm font-medium text-navy mb-1.5">Location / City</label>
-                <input
-                  type="text"
+                <select
                   required
                   value={newBranch.location}
                   onChange={(e) => setNewBranch({ ...newBranch, location: e.target.value })}
-                  placeholder="e.g. Lalitpur"
-                  className="w-full px-4 py-2.5 border border-grey-border rounded-lg text-sm focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light transition-colors"
-                />
+                  className="w-full px-4 py-2.5 border border-grey-border rounded-lg text-sm focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light transition-colors appearance-none bg-white"
+                >
+                  {CITY_POOLS.map((city) => <option key={city} value={city}>{city}</option>)}
+                </select>
+                <p className="text-xs text-gray-400 mt-1.5">
+                  Must match exactly for the City Lead Pool — a typo'd location silently drops a branch out of it.
+                </p>
               </div>
               <p className="text-xs text-gray-400 -mt-1">
                 New branches start unassigned — assign a manager by adding a Branch Manager to Staff for this branch.
