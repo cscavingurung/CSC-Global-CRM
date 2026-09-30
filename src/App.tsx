@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import Login from './components/Login';
 import DashboardShell from './components/DashboardShell';
 import { CurrentUserContext } from './currentUser';
@@ -181,6 +181,7 @@ export default function App() {
   const isIntakeForm = window.location.pathname === '/intake';
 
   const [user, setUser] = useState<MockUser | null>(null);
+  const loggingOutRef = useRef(false);
   const [activeKey, setActiveKey] = useState<string>('overview');
   // Bumped on every sidebar click so the page remounts — this closes any open client
   // profile instead of leaving it on top of the newly selected page.
@@ -830,7 +831,7 @@ export default function App() {
   // localStorage, so once the staff directory has loaded we just need to match it to whoever
   // is signed in — this is what makes a page refresh no longer sign people out.
   useEffect(() => {
-    if (!supabase || user || staff.length === 0) return;
+    if (!supabase || user || staff.length === 0 || loggingOutRef.current) return;
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) return;
       const match = staff.find((s) => s.authUserId === session.user.id);
@@ -871,9 +872,14 @@ export default function App() {
   }, [staff, user]);
 
   const handleLogout = () => {
+    // Block the rehydrate-on-load effect below from immediately re-signing us in with the
+    // still-valid Supabase session while signOut() is asynchronously clearing it.
+    loggingOutRef.current = true;
     setUser(null);
     setActiveKey('overview');
-    supabase?.auth.signOut().catch((err) => console.error('Failed to sign out of Supabase', err));
+    supabase?.auth.signOut()
+      .catch((err) => console.error('Failed to sign out of Supabase', err))
+      .finally(() => { loggingOutRef.current = false; });
   };
 
   const handleNavigate = (key: string, intent?: NavIntent) => {
