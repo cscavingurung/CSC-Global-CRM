@@ -368,7 +368,9 @@ export default function DashboardShell({
                 <span className="text-right hidden sm:block">
                   <span className="block text-sm font-bold text-navy leading-tight">{user.name}</span>
                   <span className="block text-xs leading-tight mt-0.5 whitespace-nowrap">
-                    <span className="font-medium text-navy-light">{ROLE_LABELS[user.role]}</span>
+                    <span className="font-medium text-navy-light">
+                      {user.role === 'marketing' && user.marketingRole ? `Marketing · ${user.marketingRole}` : ROLE_LABELS[user.role]}
+                    </span>
                     <span className="text-gray-300 mx-1">·</span>
                     <span className="text-gray-500">{user.branch}</span>
                   </span>
@@ -496,7 +498,10 @@ export default function DashboardShell({
               {[
                 { label: 'Name', value: user.name },
                 { label: 'Email', value: user.email },
-                { label: 'Role', value: ROLE_LABELS[user.role] },
+                {
+                  label: 'Role',
+                  value: user.role === 'marketing' && user.marketingRole ? `Marketing · ${user.marketingRole}` : ROLE_LABELS[user.role],
+                },
                 { label: 'Branch', value: user.branch },
                 { label: 'Theme Color', value: themeLabel(theme) },
               ].map((row) => (

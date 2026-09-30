@@ -258,7 +258,7 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
                 </td>
                 <td className="px-5 py-3.5">
                   <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${ROLE_STYLES[s.role]}`}>
-                    {s.role}
+                    {s.role === 'Marketing' && s.marketingRole ? `Marketing · ${s.marketingRole}` : s.role}
                   </span>
                 </td>
                 <td className="px-5 py-3.5 text-sm text-gray-600">{s.email}</td>
@@ -319,7 +319,7 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
                 <p className="text-xs text-gray-400">{s.email}</p>
               </div>
               <span className={`text-xs font-medium px-2.5 py-1 rounded-full flex-shrink-0 ml-2 ${ROLE_STYLES[s.role]}`}>
-                {s.role}
+                {s.role === 'Marketing' && s.marketingRole ? `Marketing · ${s.marketingRole}` : s.role}
               </span>
             </div>
             <div className="flex items-center justify-between pt-3 border-t border-grey-border">
@@ -605,7 +605,9 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
                 </div>
                 <p className="text-base font-semibold text-navy">{selectedStaff.name}</p>
                 <span className={`text-xs font-medium px-2.5 py-1 rounded-full mt-1.5 ${ROLE_STYLES[selectedStaff.role]}`}>
-                  {selectedStaff.role}
+                  {selectedStaff.role === 'Marketing' && selectedStaff.marketingRole
+                    ? `Marketing · ${selectedStaff.marketingRole}`
+                    : selectedStaff.role}
                 </span>
               </div>
 
