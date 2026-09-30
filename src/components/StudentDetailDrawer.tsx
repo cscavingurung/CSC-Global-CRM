@@ -9,7 +9,7 @@ import { CounselorStudent, ConsultationStatus, ConsultationOutcome, EnrolmentCho
 import { LEAD_TEMPERATURES, LEAD_TEMPERATURE_HINTS, LEAD_TEMPERATURE_STYLES } from '../leadTemperature';
 import { isStudyCase, formatAcademic } from '../clientPipeline';
 import { clientIdFor } from '../clientId';
-import DateInput from './DateInput';
+import { clampDateInput } from '../dateTime';
 import { COUNTRIES, INTAKE_MONTHS, generateIntakeYears } from '../mockData';
 
 const INTAKE_YEARS = generateIntakeYears();
@@ -381,12 +381,20 @@ export default function StudentDetailDrawer({ student, onClose, onUpdate, handov
           {status === 'Follow Up' && (
             <div className="bg-white rounded-2xl border border-grey-border p-6">
               <h3 className="text-sm font-semibold text-navy mb-4">Next Visit Date</h3>
-              <DateInput
-                value={inputDate}
-                min={new Date().toISOString().split('T')[0]}
-                onChange={setInputDate}
-                className="w-full"
-              />
+              <div className="relative">
+                <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                <input
+                  type="date"
+                  value={inputDate}
+                  min={new Date().toISOString().split('T')[0]}
+                  onChange={(e) => setInputDate(e.target.value)}
+                  onBlur={(e) => {
+                    const c = clampDateInput(e.target.value, { min: new Date().toISOString().split('T')[0] });
+                    if (c) setInputDate(c);
+                  }}
+                  className="w-full pl-10 pr-4 py-2.5 border border-grey-border rounded-lg text-sm focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light transition-colors"
+                />
+              </div>
               {inputDate && (
                 <p className="text-xs text-teal-700 mt-2">
                   Client returning on {new Date(inputDate + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}

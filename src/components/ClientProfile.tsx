@@ -25,7 +25,6 @@ import CommunicationLog from './CommunicationLog';
 import ClientFinancials from './ClientFinancials';
 import { ROLE_LABELS, ROLE_BADGE_STYLES, COUNTRIES, INTAKE_MONTHS, generateIntakeYears } from '../mockData';
 import { formatSubmittedAt } from '../dateTime';
-import DateInput from './DateInput';
 
 interface ClientProfileProps {
   application: ApplicationRecord;
@@ -373,7 +372,13 @@ function RefundFollowUpModal({
       <p className="text-xs text-gray-500">Choose when to follow up with the client about this refund. The reminder appears on the Status Tracker and on the counselor’s dashboard.</p>
       <div>
         <label className="block text-xs font-medium text-gray-500 mb-1.5">Follow-up date <span className="text-red-600">*</span></label>
-        <DateInput value={date} min={today()} onChange={setDate} className="w-full" />
+        <input
+          type="date"
+          value={date}
+          min={today()}
+          onChange={(e) => setDate(e.target.value)}
+          className="w-full border border-grey-border rounded-lg px-3 py-2.5 text-sm text-navy focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light"
+        />
         <div className="flex gap-1.5 mt-2">
           {[3, 7, 14, 30].map((d) => (
             <button

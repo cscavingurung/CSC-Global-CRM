@@ -1,12 +1,12 @@
 import { useState, useRef, useLayoutEffect } from 'react';
 import {
-  Mountain, CheckCircle, User, Phone, Mail, MapPin, Target,
+  Mountain, CheckCircle, User, Phone, Mail, MapPin, Target, Calendar,
   Users, Heart, GraduationCap, Languages, Briefcase, Share2, Megaphone, Plus, X, Building2, Send, Inbox,
 } from 'lucide-react';
 import { COUNTRIES, PURPOSES } from '../mockData';
 import { today } from '../clientPipeline';
+import { clampDateInput } from '../dateTime';
 import { AcademicEntry } from '../types';
-import DateInput from './DateInput';
 
 export interface IntakeFormData {
   name: string;
@@ -374,14 +374,22 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
           {/* Date of birth */}
           <div>
             <label className="block text-sm font-medium text-navy mb-1.5">Date of birth</label>
-            <DateInput
-              required
-              min="1900-01-01"
-              max={today()}
-              value={form.dob}
-              onChange={(dob) => setForm({ ...form, dob })}
-              className="w-full"
-            />
+            <div className="relative">
+              <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+              <input
+                type="date"
+                required
+                min="1900-01-01"
+                max={today()}
+                value={form.dob}
+                onChange={(e) => setForm({ ...form, dob: e.target.value })}
+                onBlur={(e) => {
+                  const clamped = clampDateInput(e.target.value, { min: '1900-01-01', max: today() });
+                  if (clamped) setForm((f) => ({ ...f, dob: clamped }));
+                }}
+                className={fieldClass}
+              />
+            </div>
           </div>
 
           {/* Country of interest */}

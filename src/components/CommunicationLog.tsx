@@ -6,7 +6,6 @@ import {
 import { CommunicationChannel, CommunicationDirection, CommunicationEntry } from '../types';
 import { useCommunications } from '../communications';
 import { useCurrentUser } from '../currentUser';
-import DateInput from './DateInput';
 import { ROLE_LABELS } from '../mockData';
 import { dateKey, formatActivityTime } from '../dateTime';
 
@@ -235,7 +234,7 @@ export default function CommunicationLog({ clientKey, clientName }: Communicatio
                     </div>
                     <div>
                       <label className={labelClass}>Due</label>
-                      <DateInput value={form.nextActionDate} disabled={!form.nextAction.trim()} onChange={(nextActionDate) => setForm({ ...form, nextActionDate })} className="w-full" />
+                      <input type="date" value={form.nextActionDate} disabled={!form.nextAction.trim()} onChange={(e) => setForm({ ...form, nextActionDate: e.target.value })} className={`${inputClass} disabled:opacity-40`} />
                     </div>
                   </div>
                   <button

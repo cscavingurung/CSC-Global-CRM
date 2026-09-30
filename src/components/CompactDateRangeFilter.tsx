@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Calendar, X } from 'lucide-react';
-import DateInput from './DateInput';
+import { clampDateInput } from '../dateTime';
 
 interface CompactDateRangeFilterProps {
   from: string;
@@ -11,6 +11,13 @@ interface CompactDateRangeFilterProps {
 
 const MIN_DATE = '1990-01-01';
 const MAX_DATE = '2099-12-31';
+
+function sanitizeDate(value: string): string | null {
+  if (value === '') return '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  if (value < MIN_DATE || value > MAX_DATE) return null;
+  return value;
+}
 
 function formatDateLabel(value: string): string {
   if (!value) return '';
@@ -78,28 +85,42 @@ export default function CompactDateRangeFilter({ from, to, onFromChange, onToCha
             <div className="space-y-3">
               <label className="block">
                 <span className="mb-1.5 block text-xs font-semibold text-gray-500">From</span>
-                <DateInput
+                <input
+                  type="date"
                   value={from}
                   min={MIN_DATE}
-                  max={to || MAX_DATE}
-                  onChange={(value) => {
+                  max={MAX_DATE}
+                  onChange={(event) => {
+                    const value = sanitizeDate(event.target.value);
+                    if (value === null) return;
                     onFromChange(value);
                     if (value && to && value > to) onToChange('');
                   }}
-                  className="w-full"
+                  onBlur={(event) => {
+                    const c = clampDateInput(event.target.value, { min: MIN_DATE, max: to || MAX_DATE });
+                    if (c) onFromChange(c);
+                  }}
+                  className="w-full rounded-lg border border-grey-border bg-white px-3 py-2 text-sm text-navy focus:border-navy-light focus:outline-none focus:ring-1 focus:ring-navy-light"
                 />
               </label>
               <label className="block">
                 <span className="mb-1.5 block text-xs font-semibold text-gray-500">To</span>
-                <DateInput
+                <input
+                  type="date"
                   value={to}
-                  min={from || MIN_DATE}
+                  min={MIN_DATE}
                   max={MAX_DATE}
-                  onChange={(value) => {
+                  onChange={(event) => {
+                    const value = sanitizeDate(event.target.value);
+                    if (value === null) return;
                     onToChange(value);
                     if (value && from && value < from) onFromChange('');
                   }}
-                  className="w-full"
+                  onBlur={(event) => {
+                    const c = clampDateInput(event.target.value, { min: from || MIN_DATE, max: MAX_DATE });
+                    if (c) onToChange(c);
+                  }}
+                  className="w-full rounded-lg border border-grey-border bg-white px-3 py-2 text-sm text-navy focus:border-navy-light focus:outline-none focus:ring-1 focus:ring-navy-light"
                 />
               </label>
               <div className="flex gap-2 border-t border-grey-border pt-3">

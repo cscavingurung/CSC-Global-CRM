@@ -5,7 +5,6 @@ import {
 } from '../types';
 import { MANUAL_COLUMNS, RUN_STATUS_STYLES, autoFor, basicOn, emptyManual, money, monthKey, monthLabel } from '../payroll';
 import { dateKey, formatSubmittedAt } from '../dateTime';
-import DateInput from './DateInput';
 
 // ─── HRM · Payroll Inputs ───────────────────────────────────────────────────
 // One page for Finance's monthly inputs. Auto columns come from Attendance / Leave (read-only);
@@ -344,7 +343,7 @@ function FixedInputsDrawer({ name, role, branch, profile, currentUserName, today
               <p className="text-[11px] text-gray-400">Adds a new entry from its effective date — earlier salaries stay on record.</p>
               <div className="grid grid-cols-2 gap-2">
                 <input type="number" min={0} step={500} value={change.amount} onChange={(e) => setChange({ ...change, amount: e.target.value })} placeholder="New basic (Rs)" aria-label="New basic salary" className={inputClass} />
-                <DateInput value={change.effectiveFrom} onChange={(effectiveFrom) => setChange({ ...change, effectiveFrom })} aria-label="Effective date" className="w-full" />
+                <input type="date" value={change.effectiveFrom} onChange={(e) => setChange({ ...change, effectiveFrom: e.target.value })} aria-label="Effective date" className={inputClass} />
               </div>
               <input value={change.note} onChange={(e) => setChange({ ...change, note: e.target.value })} placeholder="Reason, e.g. Annual increment" className={inputClass} />
               <button type="button" onClick={addChange} disabled={!Number(change.amount)} className="rounded-lg border border-navy px-3 py-1.5 text-xs font-semibold text-navy hover:bg-navy hover:text-white disabled:cursor-not-allowed disabled:border-grey-border disabled:text-gray-400 disabled:hover:bg-transparent">
