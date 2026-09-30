@@ -1,6 +1,6 @@
 import { ChevronDown, RotateCcw, Search } from 'lucide-react';
 import { DateRange, RANGE_PRESETS, RangePreset } from '../../managerWorkspace';
-import { clampDateInput } from '../../dateTime';
+import DateInput from '../DateInput';
 
 // Filter bar pieces and the responsive list used by every Branch Manager Workspace page — white
 // surfaces, thin grey borders, no shadows, soft-tinted pills.
@@ -69,10 +69,10 @@ export function DateRangeControl({ value, onChange, label = 'Date Range' }: { va
       {value.preset === 'Custom' && (
         <>
           <Labelled label="From">
-            <input type="date" value={value.from} max={value.to || undefined} onChange={(e) => onChange({ ...value, from: e.target.value })} onBlur={(e) => { const c = clampDateInput(e.target.value, { max: value.to || undefined }); if (c) onChange({ ...value, from: c }); }} className={`${controlCls} px-3`} />
+            <DateInput value={value.from} max={value.to || undefined} onChange={(from) => onChange({ ...value, from })} className={controlCls} />
           </Labelled>
           <Labelled label="To">
-            <input type="date" value={value.to} min={value.from || undefined} onChange={(e) => onChange({ ...value, to: e.target.value })} onBlur={(e) => { const c = clampDateInput(e.target.value, { min: value.from || undefined }); if (c) onChange({ ...value, to: c }); }} className={`${controlCls} px-3`} />
+            <DateInput value={value.to} min={value.from || undefined} onChange={(to) => onChange({ ...value, to })} className={controlCls} />
           </Labelled>
         </>
       )}

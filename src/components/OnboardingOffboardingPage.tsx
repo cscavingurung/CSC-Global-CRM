@@ -5,8 +5,9 @@ import {
   CASE_ROLES, nextCaseCode, offboardingProgress, offboardingStage, offboardingTasksFor, onboardingProgress, onboardingStage,
   onboardingTasksFor, WorkloadSources, workloadOf, workloadTotal,
 } from '../hrCases';
-import { clampDateInput, dateKey, formatSubmittedAt } from '../dateTime';
+import { dateKey, formatSubmittedAt } from '../dateTime';
 import { HandoverActions } from './HandoverEngine';
+import DateInput from './DateInput';
 import { ProgressBar } from './HrCaseParts';
 import OnboardingCaseView from './OnboardingCaseView';
 import OffboardingCaseView from './OffboardingCaseView';
@@ -335,7 +336,7 @@ export default function OnboardingOffboardingPage(props: OnboardingOffboardingPa
             </SelectField>
             <div>
               <label htmlFor="onb-start" className={labelClass}>Start date</label>
-              <input id="onb-start" type="date" value={onbDraft.startDate} onChange={(e) => setOnbDraft({ ...onbDraft, startDate: e.target.value })} className={inputClass} />
+              <DateInput id="onb-start" value={onbDraft.startDate} onChange={(startDate) => setOnbDraft({ ...onbDraft, startDate })} className="w-full" />
             </div>
           </div>
           <p className="text-xs text-gray-500">The checklist is loaded for the {onbDraft.role} role. Their login is created when IT ticks “Create CRM account”.</p>
@@ -368,11 +369,11 @@ export default function OnboardingOffboardingPage(props: OnboardingOffboardingPa
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="off-notice" className={labelClass}>Notice date</label>
-              <input id="off-notice" type="date" value={offDraft.noticeDate} onChange={(e) => setOffDraft({ ...offDraft, noticeDate: e.target.value })} className={inputClass} />
+              <DateInput id="off-notice" value={offDraft.noticeDate} onChange={(noticeDate) => setOffDraft({ ...offDraft, noticeDate })} className="w-full" />
             </div>
             <div>
               <label htmlFor="off-last" className={labelClass}>Last working day</label>
-              <input id="off-last" type="date" value={offDraft.lastWorkingDay} min={offDraft.noticeDate} onChange={(e) => setOffDraft({ ...offDraft, lastWorkingDay: e.target.value })} onBlur={(e) => { const c = clampDateInput(e.target.value, { min: offDraft.noticeDate }); if (c) setOffDraft({ ...offDraft, lastWorkingDay: c }); }} className={inputClass} />
+              <DateInput id="off-last" value={offDraft.lastWorkingDay} min={offDraft.noticeDate} onChange={(lastWorkingDay) => setOffDraft({ ...offDraft, lastWorkingDay })} className="w-full" />
             </div>
           </div>
           <p className="text-xs text-gray-500">The employee keeps working normally until the case is finalised. Their record is never deleted.</p>

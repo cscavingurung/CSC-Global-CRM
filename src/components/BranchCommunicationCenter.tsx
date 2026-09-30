@@ -7,7 +7,8 @@ import {
   AUDIENCE_LABELS, AUDIENCE_OPTIONS, NOTICE_TYPES, NOTICE_TYPE_STYLES, ReceiptStatus, audienceLabel, isExpired,
   noticeRecipients, receiptStatus,
 } from '../branchNotices';
-import { clampDateInput, dateKey, formatSubmittedAt } from '../dateTime';
+import { dateKey, formatSubmittedAt } from '../dateTime';
+import DateInput from './DateInput';
 
 // ─── Branch Communication Center ────────────────────────────────────────────
 // Official, one-way notices from the Branch Manager to branch staff. Deliberately not a chat:
@@ -207,12 +208,12 @@ function NewCommunicationModal({ recipientsFor, onClose, onPublish }: {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className={labelClass} htmlFor="notice-effective">Effective date</label>
-            <input id="notice-effective" type="date" value={draft.effectiveDate} onChange={(e) => set({ effectiveDate: e.target.value })} className={inputClass} />
+            <DateInput id="notice-effective" value={draft.effectiveDate} onChange={(effectiveDate) => set({ effectiveDate })} className="w-full" />
             <FieldError msg={errors.effectiveDate} />
           </div>
           <div>
             <label className={labelClass} htmlFor="notice-expiry">Expiry date <span className="font-normal text-gray-400">(optional)</span></label>
-            <input id="notice-expiry" type="date" value={draft.expiryDate} min={draft.effectiveDate} onChange={(e) => set({ expiryDate: e.target.value })} onBlur={(e) => { const c = clampDateInput(e.target.value, { min: draft.effectiveDate }); if (c) set({ expiryDate: c }); }} className={inputClass} />
+            <DateInput id="notice-expiry" value={draft.expiryDate} min={draft.effectiveDate} onChange={(expiryDate) => set({ expiryDate })} className="w-full" />
             <FieldError msg={errors.expiryDate} />
           </div>
         </div>
@@ -330,7 +331,7 @@ function CreateTaskModal({ notice, staff, onClose, onCreate }: {
         </div>
         <div>
           <label className={labelClass} htmlFor="task-date">Due date</label>
-          <input id="task-date" type="date" value={date} min={today} onChange={(e) => setDate(e.target.value)} onBlur={(e) => { const c = clampDateInput(e.target.value, { min: today }); if (c) setDate(c); }} className={inputClass} />
+          <DateInput id="task-date" value={date} min={today} onChange={setDate} className="w-full" />
         </div>
       </div>
       <div className="flex gap-3 border-t border-grey-border px-6 py-4">

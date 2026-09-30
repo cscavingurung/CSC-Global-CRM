@@ -7,9 +7,9 @@ import {
 } from './MktShared';
 import { LEAD_CHANNELS, MKT_CAN, ago, dayOf, isoToday, shortDay } from '../../marketingDept';
 import { parseLeadDate } from '../../marketing';
-import { clampDateInput } from '../../dateTime';
 import { LeadChannel, SeoTask, SocialPost } from '../../types';
 import { deadlineText, deadlineTone } from './mktUtils';
+import DateInput from '../DateInput';
 
 const when = (stamp: string) => {
   const d = parseLeadDate(stamp);
@@ -45,7 +45,7 @@ function NewPostModal({ onClose }: { onClose: () => void }) {
               {store.campaigns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </SelectInput>
           </Field>
-          <Field label="Date" required><TextInput type="date" min={isoToday()} value={date} onChange={(e) => setDate(e.target.value)} onBlur={(e) => { const c = clampDateInput(e.target.value, { min: isoToday() }); if (c) setDate(c); }} /></Field>
+          <Field label="Date" required><DateInput min={isoToday()} value={date} onChange={setDate} className="w-full" /></Field>
           <Field label="Time" required><TextInput type="time" value={time} onChange={(e) => setTime(e.target.value)} /></Field>
         </div>
         <Field label="Caption" required><TextArea value={caption} onChange={(e) => setCaption(e.target.value)} /></Field>
@@ -232,7 +232,7 @@ export function SeoTasks() {
             <Field label="Task" required><TextInput value={title} onChange={(e) => setTitle(e.target.value)} /></Field>
             <Field label="Type"><SelectInput value={type} onChange={(v) => setType(v as SeoTask['type'])} label="Type">{SEO_TYPES.map((t) => <option key={t}>{t}</option>)}</SelectInput></Field>
             <Field label="Keyword"><TextInput value={keyword} onChange={(e) => setKeyword(e.target.value)} /></Field>
-            <Field label="Due" required><TextInput type="date" value={due} onChange={(e) => setDue(e.target.value)} /></Field>
+            <Field label="Due" required><DateInput value={due} onChange={setDue} className="w-full" /></Field>
             <PrimaryButton type="submit" disabled={!title.trim() || !due}><Plus size={15} /> Add</PrimaryButton>
           </form>
         </Card>

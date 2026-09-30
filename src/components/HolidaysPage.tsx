@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { CalendarDays, CheckCircle, ChevronLeft, ChevronRight, Info, LayoutGrid, List, Pencil, Plus, Repeat, Trash2, X } from 'lucide-react';
 import { Holiday, HolidayType, MockUser } from '../types';
 import { HOLIDAY_TYPES, HOLIDAY_TYPE_STYLES, appliesToBranch, dayCount, occurrenceIn } from '../holidays';
-import { clampDateInput, dateKey } from '../dateTime';
+import { dateKey } from '../dateTime';
+import DateInput from './DateInput';
 
 // ─── HRM · Holidays ─────────────────────────────────────────────────────────
 // Two views only: a read-only Holiday Calendar (everyone) and Manage Holidays (manager).
@@ -387,8 +388,8 @@ export default function HolidaysPage({ currentUser, holidays, branches, mode, on
                   </label>
                 </div>
                 <div className={`grid gap-2 ${draft.multi ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                  <input type="date" value={draft.from} onChange={(e) => setDraft({ ...draft, from: e.target.value, to: draft.to < e.target.value ? e.target.value : draft.to })} className={inputClass} aria-label="From" />
-                  {draft.multi && <input type="date" value={draft.to} min={draft.from} onChange={(e) => setDraft({ ...draft, to: e.target.value })} onBlur={(e) => { const c = clampDateInput(e.target.value, { min: draft.from }); if (c) setDraft({ ...draft, to: c }); }} className={inputClass} aria-label="To" />}
+                  <DateInput value={draft.from} onChange={(from) => setDraft({ ...draft, from, to: draft.to < from ? from : draft.to })} className="w-full" aria-label="From" />
+                  {draft.multi && <DateInput value={draft.to} min={draft.from} onChange={(to) => setDraft({ ...draft, to })} className="w-full" aria-label="To" />}
                 </div>
               </div>
               <label className="flex cursor-pointer items-start gap-2">

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { METHODS, finDayLabel, methodText, methodTotals, rs, serviceLabel, stampMs, timeOnly, txStatus } from '../../finance';
-import { clampDateInput } from '../../dateTime';
 import { useFinance } from './financeContext';
+import DateInput from '../DateInput';
 import { Pill, TableBox, Td, Th, ViewHeader } from './FinanceShared';
 
 // 2 — Daily Collection Register: every payment on a day, with totals by payment method.
@@ -14,7 +14,7 @@ export default function DailyCollectionView() {
   return (
     <div className="space-y-4">
       <ViewHeader description={`${finDayLabel(date)}${date === today ? ' · today' : ''} · ${day.length} entries`}>
-        <input type="date" value={date} max={today} onChange={(e) => setDate(e.target.value || today)} onBlur={(e) => { const c = clampDateInput(e.target.value, { max: today }); if (c) setDate(c); }} aria-label="Date" className="rounded-lg border border-grey-border bg-white px-3 py-2 text-sm text-navy" />
+        <DateInput value={date} max={today} onChange={(v) => setDate(v || today)} aria-label="Date" />
       </ViewHeader>
       <TableBox min={1000}>
         <thead><tr className="bg-grey-bg"><Th>Date / Time</Th><Th>Client</Th><Th>Client ID</Th><Th>Service</Th><Th right>Amount</Th><Th>Payment Method</Th><Th>Received By</Th><Th>Receipt No.</Th><Th>Status</Th></tr></thead>

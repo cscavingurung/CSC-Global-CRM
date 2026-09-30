@@ -27,27 +27,6 @@ export function dateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-/**
- * A native `<input type="date">`'s year segment isn't capped at 4 digits by the browser
- * (Chrome allows up to 6) — `min`/`max` only affect validity, not how much you can type.
- * Pass this to `onBlur` (not `onChange` — clamping mid-keystroke fights the widget) to snap
- * back into range once the field is left. Returns the clamped value, or null if no clamp
- * is needed (value is empty, or already in range).
- */
-export function clampDateInput(value: string, bounds: { min?: string; max?: string }): string | null {
-  if (!value) return null;
-  const year = Number(value.slice(0, 4));
-  if (bounds.max) {
-    const maxYear = Number(bounds.max.slice(0, 4));
-    if (year > maxYear) return bounds.max;
-  }
-  if (bounds.min) {
-    const minYear = Number(bounds.min.slice(0, 4));
-    if (year < minYear) return bounds.min;
-  }
-  return null;
-}
-
 // Formats elapsed minutes as "12 min", "3h 5m", or "2d 4h" depending on magnitude.
 export function formatWait(minutes: number): string {
   if (minutes < 1) return 'just now';

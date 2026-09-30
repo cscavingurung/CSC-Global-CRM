@@ -19,8 +19,8 @@ import {
   CONTENT_PLATFORMS, CONTENT_STATUSES, CONTENT_STATUS_STYLES, REQUEST_STYLES, deadlineText, deadlineTone, requestState,
 } from './mktUtils';
 import { MKT_CAN, addDaysIso, ago, isoToday, shortDay, weekBounds, whenLabel } from '../../marketingDept';
-import { clampDateInput } from '../../dateTime';
 import GreetingBanner from '../GreetingBanner';
+import DateInput from '../DateInput';
 import PeriodFilter from '../PeriodFilter';
 import { PeriodKey, periodStart, periodSuffix } from '../../reportPeriod';
 import { ContentItem, ContentStatus, MarketingRole } from '../../types';
@@ -97,7 +97,7 @@ function ContentModal({ item, onClose }: { item?: ContentItem; onClose: () => vo
               {people.map((p) => <option key={p} value={p}>{p} · {roleOf(p)}</option>)}
             </SelectInput>
           </Field>
-          <Field label="Deadline" required><TextInput type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} /></Field>
+          <Field label="Deadline" required><DateInput value={deadline} onChange={setDeadline} className="w-full" /></Field>
           <Field label="Status" required>
             <SelectInput value={status} onChange={(v) => setStatus(v as ContentStatus)} label="Status">
               {CONTENT_STATUSES.map((s) => <option key={s}>{s}</option>)}
@@ -404,7 +404,7 @@ function RequestModal({ fromItem, onClose }: { fromItem?: ContentItem; onClose: 
             <datalist id="needed-suggestions">{NEEDED_SUGGESTIONS.map((n) => <option key={n} value={n} />)}</datalist>
           </Field>
           <Field label="Deadline" required>
-            <TextInput type="date" min={isoToday()} value={deadline} onChange={(e) => setDeadline(e.target.value)} onBlur={(e) => { const c = clampDateInput(e.target.value, { min: isoToday() }); if (c) setDeadline(c); }} />
+            <DateInput min={isoToday()} value={deadline} onChange={setDeadline} className="w-full" />
             <span className="mt-1 flex gap-1">
               {[2, 3, 7].map((d) => (
                 <button key={d} type="button" onClick={() => setDeadline(addDaysIso(isoToday(), d))} className="rounded-full border border-grey-border px-2 py-0.5 text-[11px] text-gray-600 transition-colors hover:border-navy-light hover:text-navy-light">+{d} days</button>
@@ -495,7 +495,7 @@ function RequestDrawer({ reqId, startAction, onClose }: { reqId: string; startAc
                     </SelectInput>
                   </Field>
                   <Field label="Platform" required><SelectInput value={platform} onChange={setPlatform} label="Platform">{CONTENT_PLATFORMS.map((p) => <option key={p}>{p}</option>)}</SelectInput></Field>
-                  <Field label="Design deadline" required><TextInput type="date" min={isoToday()} value={designDeadline} onChange={(e) => setDesignDeadline(e.target.value)} onBlur={(e) => { const c = clampDateInput(e.target.value, { min: isoToday() }); if (c) setDesignDeadline(c); }} /></Field>
+                  <Field label="Design deadline" required><DateInput min={isoToday()} value={designDeadline} onChange={setDesignDeadline} className="w-full" /></Field>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <PrimaryButton disabled={!designer || !designDeadline} onClick={() => { actions.sendToDesigner(req.id, designer, platform, designDeadline); setFlash(`Sent to ${designer}. It's on the Content Calendar as In Progress.`); }}><Palette size={14} /> Send to Designer</PrimaryButton>
@@ -558,7 +558,7 @@ function RequestDrawer({ reqId, startAction, onClose }: { reqId: string; startAc
                     {[...new Set([req.targetCounselor, ...(contributorsByBranch[req.targetBranch] ?? []).map((c) => c.name)])].map((c) => <option key={c}>{c}</option>)}
                   </SelectInput>
                 </Field>
-                <Field label="Deadline"><TextInput type="date" value={draft.deadline} onChange={(e) => setDraft({ ...draft, deadline: e.target.value })} /></Field>
+                <Field label="Deadline"><DateInput value={draft.deadline} onChange={(deadline) => setDraft({ ...draft, deadline })} className="w-full" /></Field>
               </div>
               <Field label="What is needed"><TextInput value={draft.needed} onChange={(e) => setDraft({ ...draft, needed: e.target.value })} /></Field>
               <Field label="Notes"><TextArea value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} /></Field>

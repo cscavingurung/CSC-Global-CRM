@@ -4,7 +4,8 @@ import { Holiday, LeaveRecord, LeaveType, MockUser, NavIntent, StaffMember } fro
 import {
   ALLOWANCE, BALANCE_TYPES, LEAVE_STATUS_STYLES, LEAVE_TYPES, balancesFor, countDays, leaveDays, overlapping,
 } from '../leave';
-import { clampDateInput, dateKey, formatSubmittedAt } from '../dateTime';
+import { dateKey, formatSubmittedAt } from '../dateTime';
+import DateInput from './DateInput';
 
 // ─── HRM · Leave Management ─────────────────────────────────────────────────
 // Request → approve/reject, nothing more. The Branch Manager gets all four views; staff (via
@@ -266,11 +267,11 @@ export default function LeaveManagementPage({ currentUser, staff, leave, holiday
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label htmlFor="lv-from" className="mb-1.5 block text-xs font-semibold text-navy">From</label>
-                  <input id="lv-from" type="date" value={form.from} onChange={(e) => setForm({ ...form, from: e.target.value, to: form.to < e.target.value ? e.target.value : form.to })} className={inputClass} />
+                  <DateInput id="lv-from" value={form.from} onChange={(from) => setForm({ ...form, from, to: form.to < from ? from : form.to })} className="w-full" />
                 </div>
                 <div>
                   <label htmlFor="lv-to" className="mb-1.5 block text-xs font-semibold text-navy">To</label>
-                  <input id="lv-to" type="date" value={form.to} min={form.from} onChange={(e) => setForm({ ...form, to: e.target.value })} onBlur={(e) => { const c = clampDateInput(e.target.value, { min: form.from }); if (c) setForm({ ...form, to: c }); }} className={inputClass} />
+                  <DateInput id="lv-to" value={form.to} min={form.from} onChange={(to) => setForm({ ...form, to })} className="w-full" />
                 </div>
               </div>
 
