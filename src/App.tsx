@@ -182,6 +182,15 @@ export default function App() {
 
   const [user, setUser] = useState<MockUser | null>(null);
   const loggingOutRef = useRef(false);
+  // A write to Supabase failed (e.g. blocked by RLS) — surfaced here so it's never silent:
+  // the optimistic local state still shows the change, but this tells the user it didn't
+  // actually save, instead of them finding out only after a refresh/relogin loses it.
+  const [saveError, setSaveError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!saveError) return undefined;
+    const t = setTimeout(() => setSaveError(null), 8000);
+    return () => clearTimeout(t);
+  }, [saveError]);
   const [activeKey, setActiveKey] = useState<string>('overview');
   // Bumped on every sidebar click so the page remounts — this closes any open client
   // profile instead of leaving it on top of the newly selected page.
@@ -813,6 +822,8 @@ export default function App() {
   }), [communications]);
 
   const handleLogin = (mockUser: MockUser) => {
+    // A fresh, explicit sign-in — re-arm the rehydrate effect for the next logout.
+    loggingOutRef.current = false;
     setUser(mockUser);
     // Branch Managers land on their Overall Dashboard; everyone else on their own dashboard.
     setActiveKey(mockUser.role === 'branch_manager' ? 'bm-dashboard' : 'overview');
@@ -872,14 +883,14 @@ export default function App() {
   }, [staff, user]);
 
   const handleLogout = () => {
-    // Block the rehydrate-on-load effect below from immediately re-signing us in with the
-    // still-valid Supabase session while signOut() is asynchronously clearing it.
+    // Block the rehydrate-on-load effect below from re-signing us in with the Supabase session —
+    // whether because it's still valid while signOut() is asynchronously clearing it, or because
+    // signOut() fails outright and never clears it at all. Only an explicit new sign-in (handleLogin)
+    // re-arms rehydration; a timed reset here would just reopen the same race it's meant to close.
     loggingOutRef.current = true;
     setUser(null);
     setActiveKey('overview');
-    supabase?.auth.signOut()
-      .catch((err) => console.error('Failed to sign out of Supabase', err))
-      .finally(() => { loggingOutRef.current = false; });
+    supabase?.auth.signOut().catch((err) => console.error('Failed to sign out of Supabase', err));
   };
 
   const handleNavigate = (key: string, intent?: NavIntent) => {
@@ -905,7 +916,10 @@ export default function App() {
       branch: user?.branch ?? '',
     };
     setStudents((prev) => [newStudent, ...prev]);
-    insertStudent(newStudent).catch((err) => console.error('Failed to insert student in Supabase', err));
+    insertStudent(newStudent).catch((err) => {
+      console.error('Failed to insert student in Supabase', err);
+      setSaveError(`Couldn't save ${newStudent.name} — it will disappear on refresh. Try again or check your connection.`);
+    });
 
     if (isCounselorAdding && user) {
       const newCounselorStudent: CounselorStudent = {
@@ -935,9 +949,10 @@ export default function App() {
         outcome: 'Pending',
       };
       setCounselorStudents((prev) => [newCounselorStudent, ...prev]);
-      upsertCounselorStudent(newCounselorStudent).catch((err) =>
-        console.error('Failed to upsert counselor_students in Supabase', err)
-      );
+      upsertCounselorStudent(newCounselorStudent).catch((err) => {
+        console.error('Failed to upsert counselor_students in Supabase', err);
+        setSaveError(`${newCounselorStudent.name} didn't save to your client list — it will disappear on refresh. Try again or check your connection.`);
+      });
       return;
     }
 
@@ -1156,6 +1171,28 @@ export default function App() {
     },
   };
 
+  /** Marketing Manager sent a design/video task to a team member → tell them to start work. */
+  const handleTaskAssigned = (kind: 'design' | 'video', title: string, assignee: string, deadline: string) => {
+    if (!staff.some((s) => s.name === assignee && s.status === 'Active')) return;
+    const ping: AppNotification = {
+      ...withActor(createBranchManagerNotification('status-update', title, `${user?.name ?? 'Marketing'} assigned you a ${kind} task — `, `, due ${deadline}.`, '', 'mkt-production')),
+      role: 'marketing', branch: undefined, recipientName: assignee,
+    };
+    setNotifications((prev) => [ping, ...prev]);
+    insertNotification(ping).catch((err) => console.error('Failed to insert notification in Supabase', err));
+  };
+
+  /** A design/video task was approved/marked complete → tell the assignee it's done. */
+  const handleTaskDone = (kind: 'design' | 'video', title: string, assignee: string) => {
+    if (!staff.some((s) => s.name === assignee && s.status === 'Active')) return;
+    const ping: AppNotification = {
+      ...withActor(createBranchManagerNotification('status-update', title, '', ` — your ${kind} was approved${user ? ` by ${user.name}` : ''}. Nice work!`, '', 'mkt-production')),
+      role: 'marketing', branch: undefined, recipientName: assignee,
+    };
+    setNotifications((prev) => [ping, ...prev]);
+    insertNotification(ping).catch((err) => console.error('Failed to insert notification in Supabase', err));
+  };
+
   /** Leads Specialist "Flag / Ping Branch" → alert that branch's Branch Manager. */
   const handleMarketingPing = (ping: BranchPing, message: string) => {
     const managerPing = withActor(createBranchManagerNotification(
@@ -1212,9 +1249,10 @@ export default function App() {
           : s
       )
     );
-    updateStudent(studentId, { status: 'Assigned', assignedCounselor: counselorName }).catch((err) =>
-      console.error('Failed to update student in Supabase', err)
-    );
+    updateStudent(studentId, { status: 'Assigned', assignedCounselor: counselorName }).catch((err) => {
+      console.error('Failed to update student in Supabase', err);
+      setSaveError(`Couldn't save the assignment to ${counselorName} — it will revert on refresh. Try again or check your connection.`);
+    });
     const student = students.find((s) => s.id === studentId);
     if (student) {
       const notification = withActor(createAssignmentNotification(student.name, student.country, student.purpose, counselorName));
@@ -1260,9 +1298,10 @@ export default function App() {
           ? prev.map((cs) => (cs.id === newCounselorStudent.id ? newCounselorStudent : cs))
           : [newCounselorStudent, ...prev]
       );
-      upsertCounselorStudent(newCounselorStudent).catch((err) =>
-        console.error('Failed to upsert counselor_students in Supabase', err)
-      );
+      upsertCounselorStudent(newCounselorStudent).catch((err) => {
+        console.error('Failed to upsert counselor_students in Supabase', err);
+        setSaveError(`${newCounselorStudent.name} didn't save to ${counselorName}'s client list — it will revert on refresh. Try again or check your connection.`);
+      });
 
       // activeAssignments is now derived live from counselor_students — no DB write needed.
     }
@@ -1295,9 +1334,10 @@ export default function App() {
     setCounselorStudents((prev) =>
       prev.map((s) => (s.id === id ? { ...s, ...updates } : s))
     );
-    updateCounselorStudent(id, updates).catch((err) =>
-      console.error('Failed to update counselor_students in Supabase', err)
-    );
+    updateCounselorStudent(id, updates).catch((err) => {
+      console.error('Failed to update counselor_students in Supabase', err);
+      setSaveError("Couldn't save that change — it will revert on refresh. Try again or check your connection.");
+    });
     if (updates.outcome === 'Proceeding') {
       const student = counselorStudents.find((s) => s.id === id);
       if (student) {
@@ -2007,6 +2047,8 @@ export default function App() {
           onPushToCityPool={handleMarketingPushToCityPool}
           onContentRequest={handleContentRequest}
           onPingBranch={handleMarketingPing}
+          onTaskAssigned={handleTaskAssigned}
+          onTaskDone={handleTaskDone}
           onNavigate={handleNavigate}
           preset={intent?.marketingPreset}
         />
@@ -2679,6 +2721,12 @@ export default function App() {
       >
         <div key={`${activeKey}-${navSeq}`} className="dissolve-in">{renderPage()}</div>
       </DashboardShell>
+      {saveError && (
+        <div className="dissolve-in fixed bottom-4 right-4 z-[100] flex max-w-sm items-start gap-2 rounded-lg bg-red-600 px-4 py-3 text-sm text-white shadow-lg">
+          <p className="flex-1">{saveError}</p>
+          <button type="button" onClick={() => setSaveError(null)} aria-label="Dismiss" className="-mr-1 -mt-0.5 text-white/80 hover:text-white">×</button>
+        </div>
+      )}
       </FinanceLedgerContext.Provider>
       </CommunicationsContext.Provider>
     </CurrentUserContext.Provider>

@@ -24,6 +24,10 @@ interface MarketingModuleProps {
   onContentRequest: (req: ContentRequest, kind?: 'new' | 'reminder' | 'reopened') => void;
   /** Sends a Leads Specialist's escalation to that branch's Branch Manager. */
   onPingBranch: (ping: BranchPing, message: string) => void;
+  /** A design/video task was just assigned to a team member — notify them to start work. */
+  onTaskAssigned?: (kind: 'design' | 'video', title: string, assignee: string, deadline: string) => void;
+  /** A design/video task was approved/marked complete — notify the assignee it's done. */
+  onTaskDone?: (kind: 'design' | 'video', title: string, assignee: string) => void;
   onNavigate: (key: string, intent?: NavIntent) => void;
   preset?: string;
 }
@@ -38,7 +42,7 @@ const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}${(seq++)
 
 export default function MarketingModule({
   activeKey, me, role = 'Marketing Manager', store, setStore, tracks, branches, contributorsByBranch, team,
-  onPushToBranch, onPushToCityPool, onContentRequest, onPingBranch, onNavigate, preset,
+  onPushToBranch, onPushToCityPool, onContentRequest, onPingBranch, onTaskAssigned, onTaskDone, onNavigate, preset,
 }: MarketingModuleProps) {
   const actions = useMemo<MarketingActions>(() => {
     const now = () => formatSubmittedAt(new Date());
@@ -138,41 +142,48 @@ export default function MarketingModule({
       updateContentRequest: (id, patch) => setStore((s) => ({
         ...s, contentRequests: s.contentRequests.map((r) => (r.id === id ? { ...r, ...patch } : r)),
       })),
-      sendToDesigner: (requestId, designer, platform, deadline) => setStore((s) => {
-        const req = s.contentRequests.find((r) => r.id === requestId);
-        if (!req || req.status !== 'Received') return s;
-        const existing = req.contentItemId ? s.contentItems.find((c) => c.id === req.contentItemId) : undefined;
-        const contentItemId = existing?.id ?? newId('ci');
-        const designTaskId = newId('dt');
-        const channel = (['Facebook', 'Instagram', 'TikTok', 'Website'].includes(platform) ? platform : 'Instagram') as DesignTask['platform'];
-        const isVideo = /video|reel|footage|clip/i.test(req.needed);
-        const itemPatch = { assignee: designer, deadline, platform, status: 'In Progress' as const, branch: req.targetBranch, person: req.targetCounselor, requestId };
-        return {
-          ...s,
-          contentRequests: s.contentRequests.map((r) => (r.id === requestId ? { ...r, status: 'Ready', contentItemId, designTaskId, sentToDesignerAt: now() } : r)),
-          // A request raised from a calendar idea moves that same piece forward; otherwise a new piece is added.
-          contentItems: existing
-            ? s.contentItems.map((c) => (c.id === existing.id ? { ...c, ...itemPatch } : c))
-            : [...s.contentItems, { id: contentItemId, title: req.topic, createdBy: me, ...itemPatch }],
-          // Footage goes to the designer's Video Editing queue; photos and everything else to the Design Queue.
-          ...(isVideo ? {
-            videoTasks: [...s.videoTasks, {
-              id: designTaskId, title: existing?.title ?? req.topic, status: 'To Edit' as const, priority: 'Medium' as const,
-              platform: platform === 'YouTube' ? 'YouTube' as const : channel, duration: durationOf(req.needed), deadline,
-              sourceLink: req.materialLink, requestedBy: me, assignee: designer, branch: req.targetBranch, person: req.targetCounselor,
-              requestId, contentItemId, instructions: [req.notes, req.receivedNote].filter(Boolean).join(' ') || `Edit the ${req.needed.toLowerCase()} for ${platform}.`,
-            }],
-          } : {
-            designTasks: [...s.designTasks, {
-              id: designTaskId, title: existing?.title ?? req.topic, platform: channel, type: 'Post' as const, priority: 'Medium' as const,
-              dimensions: channel === 'Website' ? '1920×600' : channel === 'TikTok' ? '1080×1920' : '1080×1350',
-              brief: `Design from ${req.needed.toLowerCase()} by ${req.targetCounselor} (${req.targetBranch}).${req.notes ? ` ${req.notes}` : ''}`,
-              assets: req.materialLink ? [{ name: `Material from ${req.targetCounselor}`, url: req.materialLink }] : undefined,
-              deadline, stage: 'Requested' as const, requestedBy: me, assignee: designer, campaignId: req.campaignId, contentItemId,
-            }],
-          }),
-        };
-      }),
+      sendToDesigner: (requestId, designer, platform, deadline) => {
+        setStore((s) => {
+          const req = s.contentRequests.find((r) => r.id === requestId);
+          if (!req || req.status !== 'Received') return s;
+          const existing = req.contentItemId ? s.contentItems.find((c) => c.id === req.contentItemId) : undefined;
+          const contentItemId = existing?.id ?? newId('ci');
+          const designTaskId = newId('dt');
+          const channel = (['Facebook', 'Instagram', 'TikTok', 'Website'].includes(platform) ? platform : 'Instagram') as DesignTask['platform'];
+          const isVideo = /video|reel|footage|clip/i.test(req.needed);
+          const itemPatch = { assignee: designer, deadline, platform, status: 'In Progress' as const, branch: req.targetBranch, person: req.targetCounselor, requestId };
+          return {
+            ...s,
+            contentRequests: s.contentRequests.map((r) => (r.id === requestId ? { ...r, status: 'Ready', contentItemId, designTaskId, sentToDesignerAt: now() } : r)),
+            // A request raised from a calendar idea moves that same piece forward; otherwise a new piece is added.
+            contentItems: existing
+              ? s.contentItems.map((c) => (c.id === existing.id ? { ...c, ...itemPatch } : c))
+              : [...s.contentItems, { id: contentItemId, title: req.topic, createdBy: me, ...itemPatch }],
+            // Footage goes to the designer's Video Editing queue; photos and everything else to the Design Queue.
+            ...(isVideo ? {
+              videoTasks: [...s.videoTasks, {
+                id: designTaskId, title: existing?.title ?? req.topic, status: 'To Edit' as const, priority: 'Medium' as const,
+                platform: platform === 'YouTube' ? 'YouTube' as const : channel, duration: durationOf(req.needed), deadline,
+                sourceLink: req.materialLink, requestedBy: me, assignee: designer, branch: req.targetBranch, person: req.targetCounselor,
+                requestId, contentItemId, instructions: [req.notes, req.receivedNote].filter(Boolean).join(' ') || `Edit the ${req.needed.toLowerCase()} for ${platform}.`,
+              }],
+            } : {
+              designTasks: [...s.designTasks, {
+                id: designTaskId, title: existing?.title ?? req.topic, platform: channel, type: 'Post' as const, priority: 'Medium' as const,
+                dimensions: channel === 'Website' ? '1920×600' : channel === 'TikTok' ? '1080×1920' : '1080×1350',
+                brief: `Design from ${req.needed.toLowerCase()} by ${req.targetCounselor} (${req.targetBranch}).${req.notes ? ` ${req.notes}` : ''}`,
+                assets: req.materialLink ? [{ name: `Material from ${req.targetCounselor}`, url: req.materialLink }] : undefined,
+                deadline, stage: 'Requested' as const, requestedBy: me, assignee: designer, campaignId: req.campaignId, contentItemId,
+              }],
+            }),
+          };
+        });
+        // Notify the designer/editor they've got new work — only when sent to someone other than self.
+        const req = store.contentRequests.find((r) => r.id === requestId);
+        if (req && req.status === 'Received' && designer !== me) {
+          onTaskAssigned?.(/video|reel|footage|clip/i.test(req.needed) ? 'video' : 'design', req.topic, designer, deadline);
+        }
+      },
       addContentItem: (item) => setStore((s) => ({ ...s, contentItems: [...s.contentItems, { ...item, id: newId('ci'), createdBy: me }] })),
       updateContentItem: (id, patch) => setStore((s) => ({
         ...s,
@@ -183,33 +194,46 @@ export default function MarketingModule({
         })),
       })),
       createDesignTask: (t) => setStore((s) => ({ ...s, designTasks: [...s.designTasks, { ...t, id: newId('dt'), requestedBy: me, stage: 'Requested' }] })),
-      moveDesign: (id, stage, note) => setStore((s) => {
-        const task = s.designTasks.find((t) => t.id === id);
-        return {
-          ...s,
-          designTasks: s.designTasks.map((t) => (t.id !== id ? t : {
-            ...t, stage,
-            reviewNote: note ?? (stage === 'In Progress' ? t.reviewNote : undefined),
-          })),
-          // Approving the design makes its Content Calendar piece Ready to schedule.
-          contentItems: !task?.contentItemId ? s.contentItems
-            : stage === 'Approved' ? readyItem(s.contentItems, task.contentItemId)
-              // Scheduling the design schedules the piece too.
-              : stage === 'Scheduled' ? s.contentItems.map((c) => (c.id === task.contentItemId && c.status !== 'Published' ? { ...c, status: 'Scheduled' as const } : c))
-                : s.contentItems,
-        };
-      }),
-      moveVideo: (id, status, note) => setStore((s) => {
-        const task = s.videoTasks.find((t) => t.id === id);
-        return {
-          ...s,
-          videoTasks: s.videoTasks.map((t) => (t.id !== id ? t : {
-            ...t, status, reviewNote: note ?? (status === 'In Progress' ? t.reviewNote : undefined),
-            completedAt: status === 'Completed' ? now() : t.completedAt,
-          })),
-          contentItems: status === 'Completed' && task?.contentItemId ? readyItem(s.contentItems, task.contentItemId) : s.contentItems,
-        };
-      }),
+      moveDesign: (id, stage, note) => {
+        setStore((s) => {
+          const task = s.designTasks.find((t) => t.id === id);
+          return {
+            ...s,
+            designTasks: s.designTasks.map((t) => (t.id !== id ? t : {
+              ...t, stage,
+              reviewNote: note ?? (stage === 'In Progress' ? t.reviewNote : undefined),
+            })),
+            // Approving the design makes its Content Calendar piece Ready to schedule.
+            contentItems: !task?.contentItemId ? s.contentItems
+              : stage === 'Approved' ? readyItem(s.contentItems, task.contentItemId)
+                // Scheduling the design schedules the piece too.
+                : stage === 'Scheduled' ? s.contentItems.map((c) => (c.id === task.contentItemId && c.status !== 'Published' ? { ...c, status: 'Scheduled' as const } : c))
+                  : s.contentItems,
+          };
+        });
+        // Approval is the finish line for the designer's part of the work — let them know it landed.
+        if (stage === 'Approved') {
+          const task = store.designTasks.find((t) => t.id === id);
+          if (task?.assignee && task.assignee !== me) onTaskDone?.('design', task.title, task.assignee);
+        }
+      },
+      moveVideo: (id, status, note) => {
+        setStore((s) => {
+          const task = s.videoTasks.find((t) => t.id === id);
+          return {
+            ...s,
+            videoTasks: s.videoTasks.map((t) => (t.id !== id ? t : {
+              ...t, status, reviewNote: note ?? (status === 'In Progress' ? t.reviewNote : undefined),
+              completedAt: status === 'Completed' ? now() : t.completedAt,
+            })),
+            contentItems: status === 'Completed' && task?.contentItemId ? readyItem(s.contentItems, task.contentItemId) : s.contentItems,
+          };
+        });
+        if (status === 'Completed') {
+          const task = store.videoTasks.find((t) => t.id === id);
+          if (task?.assignee && task.assignee !== me) onTaskDone?.('video', task.title, task.assignee);
+        }
+      },
       schedulePost: (p) => setStore((s) => ({ ...s, posts: [...s.posts, { ...p, id: newId('p'), createdBy: me, status: 'Scheduled' }] })),
       publishPost: (id, metrics) => setStore((s) => ({
         ...s, posts: s.posts.map((p) => (p.id === id ? { ...p, ...metrics, status: 'Published', publishedAt: now() } : p)),
@@ -217,7 +241,10 @@ export default function MarketingModule({
       addSeoTask: (t) => setStore((s) => ({ ...s, seoTasks: [...s.seoTasks, { ...t, id: newId('seo') }] })),
       setSeoStatus: (id, status) => setStore((s) => ({ ...s, seoTasks: s.seoTasks.map((t) => (t.id === id ? { ...t, status } : t)) })),
     };
-  }, [store.leads, store.contentRequests, setStore, me, onPushToBranch, onPushToCityPool, onContentRequest, onPingBranch]);
+  }, [
+    store.leads, store.contentRequests, store.designTasks, store.videoTasks, setStore, me,
+    onPushToBranch, onPushToCityPool, onContentRequest, onPingBranch, onTaskAssigned, onTaskDone,
+  ]);
 
   const value: MarketingContextValue = {
     me, role, store, tracks, branches, contributorsByBranch, team, actions, preset,
