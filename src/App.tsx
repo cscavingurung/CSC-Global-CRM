@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import Login from './components/Login';
 import DashboardShell from './components/DashboardShell';
 import { CurrentUserContext } from './currentUser';
@@ -181,7 +181,6 @@ export default function App() {
   const isIntakeForm = window.location.pathname === '/intake';
 
   const [user, setUser] = useState<MockUser | null>(null);
-  const loggingOutRef = useRef(false);
   // A write to Supabase failed (e.g. blocked by RLS) — surfaced here so it's never silent:
   // the optimistic local state still shows the change, but this tells the user it didn't
   // actually save, instead of them finding out only after a refresh/relogin loses it.
@@ -822,8 +821,6 @@ export default function App() {
   }), [communications]);
 
   const handleLogin = (mockUser: MockUser) => {
-    // A fresh, explicit sign-in — re-arm the rehydrate effect for the next logout.
-    loggingOutRef.current = false;
     setUser(mockUser);
     // Branch Managers land on their Overall Dashboard; everyone else on their own dashboard.
     setActiveKey(mockUser.role === 'branch_manager' ? 'bm-dashboard' : 'overview');
@@ -838,26 +835,9 @@ export default function App() {
     }
   };
 
-  // Rehydrate the session on load/refresh. Supabase persists its own Auth session in
-  // localStorage, so once the staff directory has loaded we just need to match it to whoever
-  // is signed in — this is what makes a page refresh no longer sign people out.
-  useEffect(() => {
-    if (!supabase || user || staff.length === 0 || loggingOutRef.current) return;
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) return;
-      const match = staff.find((s) => s.authUserId === session.user.id);
-      if (!match || match.status !== 'Active') return;
-      handleLogin({
-        name: match.name,
-        role: STAFF_ROLE_TO_ROLE[match.role],
-        branch: match.branch,
-        email: match.email,
-        authUserId: session.user.id,
-        ...(match.role === 'Marketing' ? { marketingRole: match.marketingRole ?? 'Marketing Manager' } : {}),
-      });
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [staff, user]);
+  // No session rehydration on load/refresh by design — the Supabase client is created with
+  // persistSession: false (src/lib/supabaseClient.ts), so nothing about a login is cached in
+  // the browser. A refresh or a reopened tab always lands back on the Login screen.
 
   // External sign-out (token expiry, another tab) clears the local session too.
   useEffect(() => {
@@ -883,11 +863,6 @@ export default function App() {
   }, [staff, user]);
 
   const handleLogout = () => {
-    // Block the rehydrate-on-load effect below from re-signing us in with the Supabase session —
-    // whether because it's still valid while signOut() is asynchronously clearing it, or because
-    // signOut() fails outright and never clears it at all. Only an explicit new sign-in (handleLogin)
-    // re-arms rehydration; a timed reset here would just reopen the same race it's meant to close.
-    loggingOutRef.current = true;
     setUser(null);
     setActiveKey('overview');
     supabase?.auth.signOut().catch((err) => console.error('Failed to sign out of Supabase', err));
