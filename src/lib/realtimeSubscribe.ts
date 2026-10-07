@@ -9,6 +9,8 @@ export interface RealtimeChange<Row> {
   old: (Partial<Row> & { id: string }) | null;
 }
 
+let channelSeq = 0;
+
 // Subscribes to every INSERT/UPDATE/DELETE on a table and calls `onChange` with the
 // changed row — including changes made by other browser sessions, not just this one.
 // Returns an unsubscribe function for cleanup.
@@ -18,8 +20,11 @@ export function subscribeToTable<Row = Record<string, unknown>>(
 ): () => void {
   if (!supabase) return () => {};
   const client = supabase;
+  // A unique topic per subscription: re-subscribing (e.g. on login) while the previous channel
+  // for this table is still leaving would otherwise get that same leaving channel back from
+  // client.channel(), and its subscribe() is a no-op — leaving the table with no live updates.
   const channel = client
-    .channel(`realtime:${table}`)
+    .channel(`realtime:${table}:${++channelSeq}`)
     .on('postgres_changes', { event: '*', schema: 'public', table }, (payload) => {
       onChange({
         eventType: payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE',

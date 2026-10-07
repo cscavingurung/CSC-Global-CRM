@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import Login from './components/Login';
+import { resolveStaffUser } from './lib/sessionUser';
 import DashboardShell from './components/DashboardShell';
 import { CurrentUserContext } from './currentUser';
 import OverviewPage from './components/OverviewPage';
@@ -181,6 +182,9 @@ export default function App() {
   const isIntakeForm = window.location.pathname === '/intake';
 
   const [user, setUser] = useState<MockUser | null>(null);
+  // True while a session kept from before a refresh is being checked — holds off the Login
+  // screen so it doesn't flash before the user is restored.
+  const [restoringSession, setRestoringSession] = useState(true);
   // A write to Supabase failed (e.g. blocked by RLS) — surfaced here so it's never silent:
   // the optimistic local state still shows the change, but this tells the user it didn't
   // actually save, instead of them finding out only after a refresh/relogin loses it.
@@ -835,9 +839,26 @@ export default function App() {
     }
   };
 
-  // No session rehydration on load/refresh by design — the Supabase client is created with
-  // persistSession: false (src/lib/supabaseClient.ts), so nothing about a login is cached in
-  // the browser. A refresh or a reopened tab always lands back on the Login screen.
+  // Session rehydration on refresh: the Supabase session lives in this tab's sessionStorage
+  // (src/lib/supabaseClient.ts). Role/branch are re-read from the staff table, never trusted
+  // from the browser, and an inactive or unlinked account is signed out.
+  useEffect(() => {
+    if (!supabase) { setRestoringSession(false); return; }
+    const client = supabase;
+    client.auth.getSession().then(async ({ data }) => {
+      const authUserId = data.session?.user.id;
+      if (authUserId) {
+        const result = await resolveStaffUser(authUserId);
+        if ('user' in result) {
+          setUser(result.user);
+          setActiveKey(result.user.role === 'branch_manager' ? 'bm-dashboard' : 'overview');
+        } else {
+          await client.auth.signOut();
+        }
+      }
+      setRestoringSession(false);
+    });
+  }, []);
 
   // External sign-out (token expiry, another tab) clears the local session too.
   useEffect(() => {
@@ -1966,6 +1987,7 @@ export default function App() {
     return <NewIntakeForm />;
   }
 
+  if (!user && restoringSession) return null;
   if (!user) {
     return <Login onLogin={handleLogin} />;
   }

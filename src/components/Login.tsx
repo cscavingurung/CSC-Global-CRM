@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { Lock, Mail } from 'lucide-react';
 import { MockUser } from '../types';
-import { STAFF_ROLE_TO_ROLE } from '../mockData';
 import { supabase } from '../lib/supabaseClient';
-import { fromRow, StaffRow } from '../lib/staffApi';
+import { resolveStaffUser } from '../lib/sessionUser';
 import cscLogo from './images/Logo.png';
 
 interface LoginProps {
@@ -54,34 +53,14 @@ function PasswordSignIn({ onLogin }: { onLogin: (user: MockUser) => void }) {
       setSubmitting(false);
       return;
     }
-    // Fetch this user's own staff row now that we're authenticated — RLS allows a self-read
-    // (auth_user_id = auth.uid()) even though the pre-login page couldn't see any staff rows.
-    const { data: staffRow, error: staffError } = await supabase
-      .from('staff')
-      .select('*')
-      .eq('auth_user_id', data.user.id)
-      .maybeSingle<StaffRow>();
-    if (staffError) {
+    const result = await resolveStaffUser(data.user.id);
+    if ('error' in result) {
       await supabase.auth.signOut();
-      setError('Could not load your staff record. Try again, or contact the Super Admin.');
+      setError(result.error);
       setSubmitting(false);
       return;
     }
-    const match = staffRow ? fromRow(staffRow) : undefined;
-    if (!match || match.status !== 'Active') {
-      await supabase.auth.signOut();
-      setError(match ? 'This account is inactive. Contact your manager or the Super Admin.' : 'No staff record is linked to this account. Contact the Super Admin.');
-      setSubmitting(false);
-      return;
-    }
-    onLogin({
-      name: match.name,
-      role: STAFF_ROLE_TO_ROLE[match.role],
-      branch: match.branch,
-      email: match.email,
-      authUserId: data.user.id,
-      ...(match.role === 'Marketing' ? { marketingRole: match.marketingRole ?? 'Marketing Manager' } : {}),
-    });
+    onLogin(result.user);
     setSubmitting(false);
   };
 

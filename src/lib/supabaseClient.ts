@@ -7,9 +7,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('Supabase env vars are missing — set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env. Counselor student data will not load.');
 }
 
-// persistSession: false — the session lives in memory for this tab only, never written to
-// localStorage. Closing the tab or refreshing the page signs the user out; nothing about their
-// login is cached in the browser.
+// The session is kept in sessionStorage: it survives a refresh of this tab, but closing the tab
+// or browser signs the user out. Nothing about a login is written to localStorage.
 export const supabase = supabaseUrl && supabaseAnonKey
-  ? createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } })
+  ? createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: true, storage: window.sessionStorage } })
   : null;
