@@ -2870,3 +2870,44 @@ $$;
 grant execute on function public.marketing_tracked_revenue() to authenticated;
 
 
+
+
+-- ============================================================================
+-- Fix: a client a counselor adds ("Add Client") can vanish from their Clients
+-- list after a refresh.
+--
+-- Root cause: the next Client ID (CSC-<year>-<n>) was computed in the browser
+-- as max+1 over the counselor_students/applications rows the caller can SEE —
+-- and RLS limits those to the caller's own branch. Another branch may already
+-- hold that number, so the counselor_students insert hits the unique index on
+-- client_id and fails; the intake row is saved as 'Assigned' to the counselor
+-- but their client-list row never is. Same for a Receptionist/Branch Manager
+-- assigning a new client.
+--
+-- Fix: issue the number here, across ALL branches. Returns only the next ID
+-- string — no client data is exposed.
+--
+-- Safe to re-run.
+-- ============================================================================
+
+create or replace function public.next_client_id(p_year int) returns text
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_prefix text := 'CSC-' || p_year || '-';
+  v_max int;
+begin
+  if not public.is_active_staff() then
+    raise exception 'Not allowed' using errcode = '42501';
+  end if;
+  select coalesce(max(substring(ids.client_id from length(v_prefix) + 1)::int), 1000) into v_max
+  from (
+    select client_id from public.counselor_students
+    union all
+    select client_id from public.applications
+  ) ids
+  where ids.client_id ~ ('^' || v_prefix || '[0-9]+$');
+  return v_prefix || (v_max + 1);
+end;
+$$;
+
+grant execute on function public.next_client_id(int) to authenticated;

@@ -81,7 +81,7 @@ import { STAFF_ROLE_TO_ROLE, NAV_CONFIG, LEADS_SPECIALIST_NAV, CONTENT_PLANNER_N
 import { createIntakeNotification, createAssignmentNotification, createConsultationReadyNotification, createBranchManagerNotification, createLeadBroadcastNotification, createCityLeadBroadcastNotification, createStatusUpdateNotification } from './notifications';
 import { dateKey, formatSubmittedAt } from './dateTime';
 import { fetchNotifications, insertNotification, markNotificationRead, markNotificationsRead, fromRow as notificationFromRow, NotificationRow } from './lib/notificationsApi';
-import { fetchCounselorStudents, updateCounselorStudent, upsertCounselorStudent, fromRow as counselorStudentFromRow, CounselorStudentRow } from './lib/counselorStudentsApi';
+import { fetchCounselorStudents, updateCounselorStudent, upsertCounselorStudent, insertNewCounselorStudent, fromRow as counselorStudentFromRow, CounselorStudentRow } from './lib/counselorStudentsApi';
 import { fetchStudents, insertStudent, updateStudent, claimStudent, fromRow as studentFromRow, StudentRow } from './lib/studentsApi';
 import { fetchCounselors, insertCounselor, deleteCounselor, fromRow as counselorFromRow, CounselorRow } from './lib/counselorsApi';
 import { fetchApplications, updateApplication, insertApplication, fromRow as applicationFromRow, ApplicationRow } from './lib/applicationsApi';
@@ -895,6 +895,10 @@ export default function App() {
     setNavSeq((seq) => seq + 1);
   };
 
+  /** The database may issue a different Client ID than the optimistic local one — show the saved one. */
+  const syncIssuedClientId = (saved: CounselorStudent) =>
+    setCounselorStudents((prev) => prev.map((cs) => (cs.id === saved.id ? { ...cs, clientId: saved.clientId } : cs)));
+
   const handleAddStudent = (data: IntakeFormData) => {
     // A counselor adding their own client (Counselor's "Add Client") is already that
     // client's counselor — self-assign immediately instead of dropping them into the
@@ -945,7 +949,7 @@ export default function App() {
         outcome: 'Pending',
       };
       setCounselorStudents((prev) => [newCounselorStudent, ...prev]);
-      upsertCounselorStudent(newCounselorStudent).catch((err) => {
+      insertNewCounselorStudent(newCounselorStudent).then(syncIssuedClientId).catch((err) => {
         console.error('Failed to upsert counselor_students in Supabase', err);
         setSaveError(`${newCounselorStudent.name} didn't save to your client list — it will disappear on refresh. Try again or check your connection.`);
       });
@@ -1294,7 +1298,7 @@ export default function App() {
           ? prev.map((cs) => (cs.id === newCounselorStudent.id ? newCounselorStudent : cs))
           : [newCounselorStudent, ...prev]
       );
-      upsertCounselorStudent(newCounselorStudent).catch((err) => {
+      (existingCs ? upsertCounselorStudent(newCounselorStudent) : insertNewCounselorStudent(newCounselorStudent).then(syncIssuedClientId)).catch((err) => {
         console.error('Failed to upsert counselor_students in Supabase', err);
         setSaveError(`${newCounselorStudent.name} didn't save to ${counselorName}'s client list — it will revert on refresh. Try again or check your connection.`);
       });

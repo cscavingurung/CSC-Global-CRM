@@ -153,6 +153,26 @@ function toRow(cs: CounselorStudent): CounselorStudentRow {
   };
 }
 
+/** Next Client ID across every branch (RLS hides other branches' rows from the browser, so a
+ * locally computed max+1 can collide). Falls back to `fallback` if the call fails. */
+export async function fetchNextClientId(fallback: string): Promise<string> {
+  if (!supabase) return fallback;
+  const { data, error } = await supabase.rpc('next_client_id', { p_year: new Date().getFullYear() });
+  if (error || typeof data !== 'string') {
+    console.error('Failed to fetch next client id from Supabase', error);
+    return fallback;
+  }
+  return data;
+}
+
+/** Saves a brand-new client-list row, swapping in a Client ID issued by the database first. */
+export async function insertNewCounselorStudent(counselorStudent: CounselorStudent): Promise<CounselorStudent> {
+  const clientId = await fetchNextClientId(counselorStudent.clientId ?? '');
+  const saved = clientId ? { ...counselorStudent, clientId } : counselorStudent;
+  await upsertCounselorStudent(saved);
+  return saved;
+}
+
 export async function upsertCounselorStudent(counselorStudent: CounselorStudent): Promise<void> {
   if (!supabase) return;
   const { error } = await supabase
