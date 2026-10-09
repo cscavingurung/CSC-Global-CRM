@@ -1,7 +1,7 @@
 import { useState, useRef, useLayoutEffect } from 'react';
 import {
   Mountain, CheckCircle, User, Phone, Mail, MapPin, Target, Calendar,
-  Users, Heart, GraduationCap, Languages, Briefcase, Share2, Megaphone, Plus, X, Building2, Send, Inbox,
+  Users, Heart, GraduationCap, Languages, Briefcase, Share2, Megaphone, Plus, X, Building2, Send, Inbox, AlertTriangle,
 } from 'lucide-react';
 import { COUNTRIES, PURPOSES } from '../mockData';
 import { today } from '../clientPipeline';
@@ -114,6 +114,25 @@ interface NewIntakeFormProps {
   onSubmit?: (data: IntakeFormData, action?: MarketingSubmitAction) => void;
   /** Marketing mode: the Front Desk form plus Preferred Branch, Lead Source and an optional Campaign. */
   marketing?: MarketingFieldOptions;
+  /** Returns the existing client/lead this phone or email already belongs to in the branch, if
+   * any — the form then shows a popup and doesn't submit. */
+  findDuplicate?: (phone: string, email: string) => DuplicateClient | null;
+  /** Server-side lookup of every branch holding a client with this phone or email (staff can't
+   * read other branches' clients directly). `null` means the lookup failed — the form then
+   * submits as usual rather than blocking intake. */
+  findClientBranches?: (phone: string, email: string) => Promise<string[] | null>;
+  /** The branch this form adds clients to: a match there blocks the save, a match in any other
+   * branch only warns. Omit (Marketing) to warn for every branch. */
+  ownBranch?: string;
+}
+
+export interface DuplicateClient {
+  name: string;
+  branch: string;
+  phone: string;
+  email: string;
+  /** e.g. Client ID and assigned counselor, when known. */
+  details?: string[];
 }
 
 const EMPTY_FORM: IntakeFormData = {
@@ -135,8 +154,11 @@ const EMPTY_FORM: IntakeFormData = {
   campaignId: '',
 };
 
-export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit, marketing }: NewIntakeFormProps) {
+export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit, marketing, findDuplicate, findClientBranches, ownBranch }: NewIntakeFormProps) {
   const [submitted, setSubmitted] = useState(false);
+  const [duplicate, setDuplicate] = useState<DuplicateClient | null>(null);
+  const [otherBranches, setOtherBranches] = useState<{ branches: string[]; action: MarketingSubmitAction } | null>(null);
+  const [checking, setChecking] = useState(false);
   const [marketingAction, setMarketingAction] = useState<MarketingSubmitAction>('assign');
   const [form, setForm] = useState<IntakeFormData>(
     marketing ? { ...EMPTY_FORM, referredThrough: 'Marketing' } : EMPTY_FORM
@@ -155,8 +177,9 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
     phoneCaretRef.current = null;
   }, [form.phone]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (checking) return;
 
     if (!isValidPhone(form.phone)) {
       setPhoneError('Enter a valid number, e.g. +1 416 272 4274 or +977 98XXXXXXXX');
@@ -168,6 +191,35 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
       return;
     }
 
+    // Which marketing button submitted the form — "Save to Inbox" or "Assign to Branch".
+    const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const action: MarketingSubmitAction = submitter?.value === 'inbox' ? 'inbox' : 'assign';
+
+    const existing = findDuplicate?.(form.phone, form.email) ?? null;
+    if (existing) {
+      setDuplicate(existing);
+      return;
+    }
+
+    if (findClientBranches) {
+      setChecking(true);
+      const branches = await findClientBranches(form.phone, form.email);
+      setChecking(false);
+      if (branches && ownBranch && branches.includes(ownBranch)) {
+        setDuplicate({ name: '', branch: ownBranch, phone: '', email: '' });
+        return;
+      }
+      const elsewhere = (branches ?? []).filter((b) => b !== ownBranch);
+      if (elsewhere.length > 0) {
+        setOtherBranches({ branches: elsewhere, action });
+        return;
+      }
+    }
+
+    submitIntake(action);
+  };
+
+  const submitIntake = (action: MarketingSubmitAction) => {
     // "Others"/"Referred By" keep the typed name so reporting shows the real source.
     const academics = form.academics.map((entry, i) => ({
       ...entry,
@@ -175,9 +227,6 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
     }));
     const referredThrough =
       form.referredThrough === 'Referred By' ? `Referred By: ${referredByName.trim()}` : form.referredThrough;
-    // Which marketing button submitted the form — "Save to Inbox" or "Assign to Branch".
-    const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
-    const action: MarketingSubmitAction = submitter?.value === 'inbox' ? 'inbox' : 'assign';
     setMarketingAction(action);
     if (marketing) onSubmit?.({ ...form, academics, campaignId: form.campaignId || undefined }, action);
     else onSubmit?.({ ...form, academics, referredThrough });
@@ -708,6 +757,7 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
               <button
                 type="submit"
                 value="inbox"
+                disabled={checking}
                 className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-grey-border py-2.5 text-sm font-semibold text-navy transition-colors hover:border-navy-light hover:text-navy-light active:scale-[0.98]"
               >
                 <Inbox size={15} /> Save to Inbox
@@ -715,6 +765,7 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
               <button
                 type="submit"
                 value="assign"
+                disabled={checking}
                 className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-navy py-2.5 text-sm font-semibold text-white transition-colors hover:bg-navy-light active:scale-[0.98]"
               >
                 <Send size={15} /> {form.preferredBranch ? `Assign to ${form.preferredBranch}` : 'Assign to Branch'}
@@ -724,9 +775,10 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
           <div className={embedded ? 'col-span-2' : ''}>
             <button
               type="submit"
-              className="w-full bg-navy text-white font-semibold py-2.5 rounded-lg text-sm hover:bg-navy-light transition-colors active:scale-[0.98] mt-2"
+              disabled={checking}
+              className="w-full bg-navy text-white font-semibold py-2.5 rounded-lg text-sm hover:bg-navy-light transition-colors active:scale-[0.98] mt-2 disabled:opacity-60"
             >
-              {embedded ? 'Add Client' : 'Submit'}
+              {checking ? 'Checking…' : embedded ? 'Add Client' : 'Submit'}
             </button>
           </div>
           )}
@@ -735,8 +787,81 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
     </div>
   );
 
+  const duplicatePopup = duplicate && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="alertdialog" aria-modal="true" aria-labelledby="duplicate-client-title">
+      <div className="absolute inset-0 bg-navy-dark/50 backdrop-blur-sm" onClick={() => setDuplicate(null)} />
+      <div className="relative w-full max-w-sm bg-white rounded-2xl border border-grey-border p-6 shadow-xl">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 shrink-0 rounded-full bg-amber-50 flex items-center justify-center">
+            <AlertTriangle className="text-amber-600" size={20} />
+          </div>
+          <div className="min-w-0">
+            <h3 id="duplicate-client-title" className="text-base font-semibold text-navy">Already exists in this branch</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              A client with this phone number or email is already in {duplicate.branch}. It wasn't added again.
+            </p>
+          </div>
+        </div>
+        {duplicate.name && (
+          <dl className="mt-4 space-y-1 rounded-xl bg-grey-bg p-3 text-sm">
+            <div className="font-medium text-navy">{duplicate.name}</div>
+            {duplicate.phone && <div className="text-gray-600">{duplicate.phone}</div>}
+            {duplicate.email && <div className="text-gray-600 break-all">{duplicate.email}</div>}
+            {duplicate.details?.map((d) => <div key={d} className="text-gray-500">{d}</div>)}
+          </dl>
+        )}
+        <button
+          type="button"
+          autoFocus
+          onClick={() => setDuplicate(null)}
+          className="mt-5 w-full rounded-lg bg-navy py-2.5 text-sm font-semibold text-white transition-colors hover:bg-navy-light"
+        >
+          OK
+        </button>
+      </div>
+    </div>
+  );
+
+  const otherBranchesPopup = otherBranches && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="alertdialog" aria-modal="true" aria-labelledby="other-branch-client-title">
+      <div className="absolute inset-0 bg-navy-dark/50 backdrop-blur-sm" onClick={() => setOtherBranches(null)} />
+      <div className="relative w-full max-w-sm bg-white rounded-2xl border border-grey-border p-6 shadow-xl">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 shrink-0 rounded-full bg-amber-50 flex items-center justify-center">
+            <AlertTriangle className="text-amber-600" size={20} />
+          </div>
+          <div className="min-w-0">
+            <h3 id="other-branch-client-title" className="text-base font-semibold text-navy">
+              Already exists in {otherBranches.branches.join(', ')} {otherBranches.branches.length > 1 ? 'branches' : 'branch'}
+            </h3>
+            <p className="mt-1 text-sm text-gray-500">
+              A client with this phone number or email is already registered there. Add them anyway?
+            </p>
+          </div>
+        </div>
+        <div className="mt-5 flex gap-2">
+          <button
+            type="button"
+            autoFocus
+            onClick={() => setOtherBranches(null)}
+            className="flex-1 rounded-lg border border-grey-border py-2.5 text-sm font-semibold text-navy transition-colors hover:border-navy-light hover:text-navy-light"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => { const { action } = otherBranches; setOtherBranches(null); submitIntake(action); }}
+            className="flex-1 rounded-lg bg-navy py-2.5 text-sm font-semibold text-white transition-colors hover:bg-navy-light"
+          >
+            Add anyway
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   if (embedded) {
-    return <div className="p-2">{formCard}</div>;
+    return <div className="p-2">{formCard}{duplicatePopup}{otherBranchesPopup}</div>;
   }
 
   return (
@@ -754,6 +879,8 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
 
       {/* Form */}
       <div className="flex-1 flex items-center justify-center p-5">{formCard}</div>
+      {duplicatePopup}
+      {otherBranchesPopup}
 
       <footer className="bg-white border-t border-grey-border px-5 py-3 text-center">
         <p className="text-xs text-gray-400">CSC Global</p>

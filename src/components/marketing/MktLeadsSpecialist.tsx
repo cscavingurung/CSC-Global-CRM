@@ -20,6 +20,7 @@ import {
 import { BranchPing, LeadChannel, MarketingLead } from '../../types';
 import { CITY_POOLS, COUNTRIES, needsAttention } from './mktUtils';
 import NewIntakeForm, { IntakeFormData, MarketingSubmitAction } from '../NewIntakeForm';
+import { findClientBranches } from '../../lib/studentsApi';
 import { ExcelSheet, ViewToggle } from './MktSheet';
 import { AlertRow, alertColumns, trackColumns, trackTone } from './mktSheetColumns';
 import { useViewMode } from './mktUtils';
@@ -226,6 +227,7 @@ export function AddLeadPage() {
         embedded
         marketing={{ branches, sources: LEAD_CHANNELS, campaigns: store.campaigns.map((c) => ({ id: c.id, name: c.name })) }}
         onSubmit={submit}
+        findClientBranches={findClientBranches}
       />
       <Card title="Your recent leads" className="h-fit xl:mt-2">
         <ul className="divide-y divide-grey-border">

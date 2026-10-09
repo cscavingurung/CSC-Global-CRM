@@ -12,7 +12,8 @@ import AllBranches from './components/AllBranches';
 import PartnersPage from './components/PartnersPage';
 import CommissionsPage from './components/CommissionsPage';
 import ComingSoon from './components/ComingSoon';
-import NewIntakeForm, { IntakeFormData } from './components/NewIntakeForm';
+import NewIntakeForm, { IntakeFormData, DuplicateClient } from './components/NewIntakeForm';
+import { findBranchDuplicate } from './clientDuplicates';
 import StudentList from './components/StudentList';
 import AssignCounselorPage from './components/AssignCounselorPage';
 import AssignedClientsPage from './components/AssignedClientsPage';
@@ -82,7 +83,7 @@ import { createIntakeNotification, createAssignmentNotification, createConsultat
 import { dateKey, formatSubmittedAt } from './dateTime';
 import { fetchNotifications, insertNotification, markNotificationRead, markNotificationsRead, fromRow as notificationFromRow, NotificationRow } from './lib/notificationsApi';
 import { fetchCounselorStudents, updateCounselorStudent, upsertCounselorStudent, insertNewCounselorStudent, fromRow as counselorStudentFromRow, CounselorStudentRow } from './lib/counselorStudentsApi';
-import { fetchStudents, insertStudent, updateStudent, claimStudent, fromRow as studentFromRow, StudentRow } from './lib/studentsApi';
+import { fetchStudents, findClientBranches, insertStudent, updateStudent, claimStudent, fromRow as studentFromRow, StudentRow } from './lib/studentsApi';
 import { fetchCounselors, insertCounselor, deleteCounselor, fromRow as counselorFromRow, CounselorRow } from './lib/counselorsApi';
 import { fetchApplications, updateApplication, insertApplication, fromRow as applicationFromRow, ApplicationRow } from './lib/applicationsApi';
 import { fetchStaff, insertStaff, updateStaff, deleteStaff, fromRow as staffFromRow, StaffRow } from './lib/staffApi';
@@ -898,6 +899,21 @@ export default function App() {
   /** The database may issue a different Client ID than the optimistic local one — show the saved one. */
   const syncIssuedClientId = (saved: CounselorStudent) =>
     setCounselorStudents((prev) => prev.map((cs) => (cs.id === saved.id ? { ...cs, clientId: saved.clientId } : cs)));
+
+  /** Same phone or email already logged in the current user's branch (see NewIntakeForm). */
+  const findBranchClient = (phone: string, email: string): DuplicateClient | null => {
+    const match = findBranchDuplicate(students, user?.branch ?? '', phone, email);
+    if (!match) return null;
+    const cs = counselorStudents.find((c) => c.id === match.id);
+    const counselor = cs?.assignedCounselor ?? match.assignedCounselor;
+    return {
+      name: match.name,
+      branch: match.branch,
+      phone: match.phone,
+      email: match.email,
+      details: [cs?.clientId && `Client ID: ${cs.clientId}`, counselor && `Counselor: ${counselor}`].filter((d): d is string => !!d),
+    };
+  };
 
   const handleAddStudent = (data: IntakeFormData) => {
     // A counselor adding their own client (Counselor's "Add Client") is already that
@@ -2129,7 +2145,7 @@ export default function App() {
         />
       );
     if (activeKey === 'new-intake')
-      return <NewIntakeForm embedded onSubmit={handleAddStudent} />;
+      return <NewIntakeForm embedded onSubmit={handleAddStudent} findDuplicate={findBranchClient} findClientBranches={findClientBranches} ownBranch={user.branch} />;
     if (activeKey === 'students' && user.role === 'branch_manager')
       return (
         <LeadVisitorManagement
@@ -2144,7 +2160,7 @@ export default function App() {
             />
           }
           visitors={<VisitorsPage students={branchStudents} counselorStudents={counselorStudents} onLogRevisit={handleLogRevisit} />}
-          addLead={<NewIntakeForm embedded onSubmit={handleAddStudent} />}
+          addLead={<NewIntakeForm embedded onSubmit={handleAddStudent} findDuplicate={findBranchClient} findClientBranches={findClientBranches} ownBranch={user.branch} />}
         />
       );
     if (activeKey === 'visa-approved')

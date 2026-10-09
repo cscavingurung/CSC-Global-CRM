@@ -141,6 +141,18 @@ export async function fetchStudents(): Promise<IntakeStudent[]> {
   return (data as StudentRow[]).map(fromRow);
 }
 
+/** Branches that already hold a client with this phone or email (see find_client_branches in
+ * schema.sql). Returns null if the lookup fails, so callers can fall back to saving as usual. */
+export async function findClientBranches(phone: string, email: string): Promise<string[] | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.rpc('find_client_branches', { p_phone: phone, p_email: email });
+  if (error) {
+    console.error('Failed to check other branches for this client', error);
+    return null;
+  }
+  return (data as string[] | null) ?? [];
+}
+
 export async function insertStudent(student: IntakeStudent): Promise<void> {
   if (!supabase) return;
   const { error } = await supabase.from('students').insert(toRow(student));

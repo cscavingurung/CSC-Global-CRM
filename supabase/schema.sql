@@ -2911,3 +2911,33 @@ end;
 $$;
 
 grant execute on function public.next_client_id(int) to authenticated;
+
+-- ----------------------------------------------------------------------------
+-- Duplicate client check across branches. RLS limits staff to their own branch's
+-- students, so the Add Client / Add Lead forms can't see another branch's clients.
+-- This returns only the branch names where a client with the same phone (last 10
+-- digits) or email already exists — never the client's details.
+-- ----------------------------------------------------------------------------
+create or replace function public.find_client_branches(p_phone text, p_email text)
+returns setof text
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_phone text := right(regexp_replace(coalesce(p_phone, ''), '\D', '', 'g'), 10);
+  v_email text := lower(trim(coalesce(p_email, '')));
+begin
+  if not public.is_active_staff() then
+    raise exception 'Not allowed' using errcode = '42501';
+  end if;
+  return query
+  select distinct s.branch
+  from public.students s
+  where coalesce(s.branch, '') <> ''
+    and (
+      (length(v_phone) >= 7 and right(regexp_replace(coalesce(s.phone, ''), '\D', '', 'g'), 10) = v_phone)
+      or (v_email <> '' and lower(trim(coalesce(s.email, ''))) = v_email)
+    );
+end;
+$$;
+
+revoke execute on function public.find_client_branches(text, text) from public, anon;
+grant execute on function public.find_client_branches(text, text) to authenticated;
