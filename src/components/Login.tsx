@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Lock, Mail } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail } from 'lucide-react';
 import { MockUser } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { resolveStaffUser } from '../lib/sessionUser';
@@ -38,6 +38,7 @@ export default function Login({ onLogin }: LoginProps) {
 function PasswordSignIn({ onLogin }: { onLogin: (user: MockUser) => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -78,7 +79,10 @@ function PasswordSignIn({ onLogin }: { onLogin: (user: MockUser) => void }) {
         <span className="mb-1.5 block text-sm font-medium text-navy">Password</span>
         <span className="relative block">
           <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input type="password" autoComplete="current-password" required placeholder="Enter your password" value={password} onChange={(e) => { setPassword(e.target.value); setError(''); }} className={field} />
+          <input type={showPassword ? 'text' : 'password'} autoComplete="current-password" required placeholder="Enter your password" value={password} onChange={(e) => { setPassword(e.target.value); setError(''); }} className={field.replace('pr-4', 'pr-10')} />
+          <button type="button" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-navy">
+            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
         </span>
       </label>
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
