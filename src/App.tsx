@@ -1493,8 +1493,10 @@ export default function App() {
   const handleAddStaff = async (member: StaffMember, password: string, counselorCountries?: string[]) => {
     const authUserId = await createStaffAccount(member.email, password, member.branch);
     const withAuth: StaffMember = { ...member, authUserId };
+    // Awaited so a failed save shows in the form instead of a login with no staff row; retrying
+    // the same email then reuses that login (see the admin-staff function).
+    await insertStaff(withAuth);
     setStaff((prev) => [...prev, withAuth]);
-    insertStaff(withAuth).catch((err) => console.error('Failed to insert staff in Supabase', err));
     if (member.role === 'Branch Manager') {
       setBranches((prev) =>
         prev.map((b) => (b.name === member.branch ? { ...b, manager: member.name } : b))
@@ -1532,10 +1534,14 @@ export default function App() {
   const handleRemoveStaff = (id: string) => {
     const target = staff.find((s) => s.id === id);
     setStaff((prev) => prev.filter((s) => s.id !== id));
-    deleteStaff(id).catch((err) => console.error('Failed to delete staff in Supabase', err));
-    if (target?.authUserId) {
-      deleteStaffAccount(target.authUserId).catch((err) => console.error('Failed to delete staff Auth account', err));
-    }
+    // The login goes first: the admin-staff function checks the staff row's branch before
+    // deleting it, so removing the row first left the login behind.
+    const deleteLogin = target?.authUserId
+      ? deleteStaffAccount(target.authUserId).catch((err) => console.error('Failed to delete staff Auth account', err))
+      : Promise.resolve();
+    deleteLogin
+      .then(() => deleteStaff(id))
+      .catch((err) => console.error('Failed to delete staff in Supabase', err));
     if (target?.role === 'Branch Manager') {
       setBranches((prev) =>
         prev.map((b) => (b.manager === target.name ? { ...b, manager: null } : b))
