@@ -149,7 +149,7 @@ export default function MarketingModule({
           const existing = req.contentItemId ? s.contentItems.find((c) => c.id === req.contentItemId) : undefined;
           const contentItemId = existing?.id ?? newId('ci');
           const designTaskId = newId('dt');
-          const channel = (['Facebook', 'Instagram', 'TikTok', 'Website'].includes(platform) ? platform : 'Instagram') as DesignTask['platform'];
+          const channel = (['Facebook', 'Instagram', 'LinkedIn', 'TikTok', 'Website'].includes(platform) ? platform : 'Instagram') as DesignTask['platform'];
           const isVideo = /video|reel|footage|clip/i.test(req.needed);
           const itemPatch = { assignee: designer, deadline, platform, status: 'In Progress' as const, branch: req.targetBranch, person: req.targetCounselor, requestId };
           return {

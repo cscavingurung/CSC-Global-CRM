@@ -2,17 +2,19 @@ import { useMemo, useState } from 'react';
 import { ArrowRight, Check, Paperclip, ChevronLeft, ChevronRight, Clock, Plus, RotateCcw } from 'lucide-react';
 import { useMarketing } from './mktContext';
 import {
-  CampaignTag, Chips, Field, GhostButton, Modal, PageIntro, Pill, PrimaryButton, SelectInput,
+  CampaignTag, Chips, Field, GhostButton, Modal, PageIntro, Pill, PlatformCheckboxes, PrimaryButton, SelectInput,
   SourceTag, TextArea, TextInput,
 } from './MktShared';
-import { DESIGN_STAGES, LEAD_CHANNELS, MKT_CAN, dayOf, isoToday, shortDay } from '../../marketingDept';
+import { DESIGN_STAGES, MKT_CAN, SOCIAL_PLATFORMS, dayOf, isoToday, shortDay } from '../../marketingDept';
 import { parseLeadDate } from '../../marketing';
-import { DeliveredFile, DesignStage, DesignTask, LeadChannel, VideoStatus, VideoTask } from '../../types';
+import { DeliveredFile, DesignStage, DesignTask, SocialPlatform, VideoStatus, VideoTask } from '../../types';
 import { DESIGN_STYLES, deadlineText, deadlineTone } from './mktUtils';
 
-const DIMENSIONS: Record<LeadChannel, string[]> = {
+const DESIGN_PLATFORMS: SocialPlatform[] = [...SOCIAL_PLATFORMS, 'Website'];
+const DIMENSIONS: Record<SocialPlatform, string[]> = {
   Facebook: ['1080×1080', '1200×630', '1080×1350'],
   Instagram: ['1080×1080', '1080×1350', '1080×1920'],
+  LinkedIn: ['1200×627', '1080×1080', '1080×1350'],
   TikTok: ['1080×1920'],
   Website: ['1920×600', '1200×630', '800×800'],
 };
@@ -22,27 +24,34 @@ function NewDesignModal({ onClose }: { onClose: () => void }) {
   const { store, actions } = useMarketing();
   const [title, setTitle] = useState('');
   const [brief, setBrief] = useState('');
-  const [platform, setPlatform] = useState<LeadChannel>('Instagram');
-  const [dimensions, setDimensions] = useState(DIMENSIONS.Instagram[0]);
+  const [platforms, setPlatforms] = useState<SocialPlatform[]>(['Instagram']);
+  const [sizes, setSizes] = useState<Partial<Record<SocialPlatform, string>>>({});
+  const sizeOf = (p: SocialPlatform) => sizes[p] ?? DIMENSIONS[p][0];
   const [deadline, setDeadline] = useState('');
   const [campaignId, setCampaignId] = useState('');
-  const valid = title.trim() && brief.trim() && deadline && dimensions;
+  const valid = title.trim() && brief.trim() && deadline && platforms.length > 0;
   return (
     <Modal title="New design request" onClose={onClose}>
-      <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); if (valid) { actions.createDesignTask({ title: title.trim(), brief: brief.trim(), platform, dimensions, deadline, campaignId: campaignId || undefined }); onClose(); } }}>
+      <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); if (valid) {
+        // One queue card per platform — each needs its own size.
+        platforms.forEach((platform) => actions.createDesignTask({ title: title.trim(), brief: brief.trim(), platform, dimensions: sizeOf(platform), deadline, campaignId: campaignId || undefined }));
+        onClose();
+      } }}>
         <Field label="Title" required><TextInput value={title} onChange={(e) => setTitle(e.target.value)} /></Field>
         <Field label="Brief" required><TextArea value={brief} placeholder="Message, must-haves, references" onChange={(e) => setBrief(e.target.value)} /></Field>
+        <PlatformCheckboxes options={DESIGN_PLATFORMS} value={platforms} onChange={setPlatforms} />
+        {platforms.length > 0 && (
+          <div className="grid grid-cols-2 gap-3">
+            {platforms.map((p) => (
+              <Field key={p} label={platforms.length > 1 ? `${p} size` : 'Dimensions'} required>
+                <SelectInput value={sizeOf(p)} onChange={(v) => setSizes((cur) => ({ ...cur, [p]: v }))} label={`${p} size`}>
+                  {DIMENSIONS[p].map((d) => <option key={d}>{d}</option>)}
+                </SelectInput>
+              </Field>
+            ))}
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Platform" required>
-            <SelectInput value={platform} onChange={(v) => { setPlatform(v as LeadChannel); setDimensions(DIMENSIONS[v as LeadChannel][0]); }} label="Platform">
-              {LEAD_CHANNELS.map((c) => <option key={c}>{c}</option>)}
-            </SelectInput>
-          </Field>
-          <Field label="Dimensions" required>
-            <SelectInput value={dimensions} onChange={setDimensions} label="Dimensions">
-              {DIMENSIONS[platform].map((d) => <option key={d}>{d}</option>)}
-            </SelectInput>
-          </Field>
           <Field label="Deadline" required><TextInput type="date" min={isoToday()} value={deadline} onChange={(e) => setDeadline(e.target.value)} /></Field>
           <Field label="Campaign">
             <SelectInput value={campaignId} onChange={setCampaignId} label="Campaign">
@@ -53,7 +62,7 @@ function NewDesignModal({ onClose }: { onClose: () => void }) {
         </div>
         <div className="flex justify-end gap-2 pt-1">
           <GhostButton onClick={onClose}>Cancel</GhostButton>
-          <PrimaryButton type="submit" disabled={!valid}>Add to queue</PrimaryButton>
+          <PrimaryButton type="submit" disabled={!valid}>{platforms.length > 1 ? `Add ${platforms.length} to queue` : 'Add to queue'}</PrimaryButton>
         </div>
       </form>
     </Modal>
@@ -151,14 +160,14 @@ export function DesignCard({ t, compact }: { t: DesignTask; compact?: boolean })
 export function ProductionQueue() {
   const { store, role } = useMarketing();
   const [adding, setAdding] = useState(false);
-  const [platform, setPlatform] = useState<'All' | LeadChannel>('All');
+  const [platform, setPlatform] = useState<'All' | SocialPlatform>('All');
   const tasks = store.designTasks.filter((t) => platform === 'All' || t.platform === platform);
   return (
     <div className="space-y-4">
       <PageIntro text="Design work from request to scheduled post. Cards show the brief, platform, dimensions and deadline.">
         {MKT_CAN.requestContent(role) && <PrimaryButton onClick={() => setAdding(true)}><Plus size={15} /> New design request</PrimaryButton>}
       </PageIntro>
-      <Chips options={['All', ...LEAD_CHANNELS] as const} value={platform} onChange={setPlatform} />
+      <Chips options={['All', ...DESIGN_PLATFORMS] as const} value={platform} onChange={setPlatform} />
       <div className="overflow-x-auto pb-2">
         <div className="grid min-w-[1000px] grid-cols-5 gap-3">
           {DESIGN_STAGES.map((stage) => {

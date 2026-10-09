@@ -18,7 +18,7 @@ export const CONTENT_STATUS_STYLES: Record<ContentStatus, string> = {
   Scheduled: 'bg-navy/10 text-navy',
   Published: 'bg-emerald-50 text-emerald-700',
 };
-export const CONTENT_PLATFORMS = ['Facebook', 'Instagram', 'TikTok', 'YouTube', 'Website'];
+export const CONTENT_PLATFORMS = ['Facebook', 'Instagram', 'LinkedIn', 'TikTok', 'YouTube', 'Website'];
 export const DESIGN_STYLES: Record<DesignStage, string> = {
   Requested: 'bg-amber-50 text-amber-700',
   'In Progress': 'bg-blue-50 text-blue-700',

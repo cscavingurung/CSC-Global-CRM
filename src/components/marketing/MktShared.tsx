@@ -14,6 +14,27 @@ export function SourceTag({ source }: { source: string }) {
   return <Pill text={source} cls={CHANNEL_STYLES[source] ?? 'bg-gray-100 text-gray-600'} />;
 }
 
+/** Tick-one-or-more platform picker. Not wrapped in <label>, so the heading doesn't toggle the first box. */
+export function PlatformCheckboxes<T extends string>({ options, value, onChange }: {
+  options: readonly T[]; value: T[]; onChange: (v: T[]) => void;
+}) {
+  const toggle = (p: T) => onChange(value.includes(p) ? value.filter((x) => x !== p) : options.filter((o) => o === p || value.includes(o)));
+  return (
+    <div role="group" aria-label="Platforms">
+      <span className="mb-1 block text-xs font-medium text-gray-600">Platforms<span className="text-red-500"> *</span></span>
+      <div className="flex flex-wrap gap-x-4 gap-y-2">
+        {options.map((p) => (
+          <label key={p} className="flex cursor-pointer items-center gap-2 text-sm text-navy">
+            <input type="checkbox" checked={value.includes(p)} onChange={() => toggle(p)} className="rounded border-grey-border text-navy focus:ring-navy-light" />
+            {p}
+          </label>
+        ))}
+      </div>
+      {value.length === 0 && <p className="mt-1 text-xs text-amber-700">Pick at least one platform.</p>}
+    </div>
+  );
+}
+
 export function CampaignTag({ campaigns, id }: { campaigns: Campaign[]; id?: string }) {
   if (!id) return <span className="text-xs text-gray-400">—</span>;
   return <span className="inline-block max-w-[180px] truncate whitespace-nowrap rounded-full bg-violet-50 px-2.5 py-0.5 text-xs font-medium text-violet-700" title={campaignName(campaigns, id)}>{campaignName(campaigns, id)}</span>;

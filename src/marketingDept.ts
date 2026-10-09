@@ -10,18 +10,20 @@
 // table stay on the App side of this function.
 import {
   Campaign, DesignStage,
-  LeadChannel, MarketingLead, MarketingRole, MarketingStore,
+  LeadChannel, MarketingLead, MarketingRole, MarketingStore, SocialPlatform,
 } from './types';
 import { TrackedApplication, TrackedConsultation, TrackedIntake, TrackedRevenueTransaction } from './lib/marketing/marketingTrackingApi';
 import { isLivePayment, isPaidOutRefund } from './finance';
 import { parseLeadDate } from './marketing';
 
 export const LEAD_CHANNELS: LeadChannel[] = ['Facebook', 'Instagram', 'TikTok', 'Website'];
+export const SOCIAL_PLATFORMS: SocialPlatform[] = ['Facebook', 'Instagram', 'LinkedIn', 'TikTok'];
 
 export const CHANNEL_STYLES: Record<string, string> = {
   Facebook: 'bg-blue-50 text-blue-700',
   Instagram: 'bg-pink-50 text-pink-700',
   TikTok: 'bg-teal-50 text-teal-700',
+  LinkedIn: 'bg-indigo-50 text-indigo-700',
   Website: 'bg-navy/10 text-navy',
   'Multi-platform': 'bg-violet-50 text-violet-700',
 };

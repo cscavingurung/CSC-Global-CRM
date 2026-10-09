@@ -1058,6 +1058,8 @@ export interface CommunicationEntry {
 // marketing-attributed revenue across every branch — nothing else (see marketingDept.ts).
 export type MarketingRole = 'Marketing Manager' | 'Leads Specialist' | 'Content Planner' | 'Graphics Designer';
 export type LeadChannel = 'Facebook' | 'Instagram' | 'TikTok' | 'Website';
+/** Where a social post can go — the lead channels plus LinkedIn, which posts but doesn't source leads. */
+export type SocialPlatform = LeadChannel | 'LinkedIn';
 /** Raw (just arrived) → Qualified → Assigned (pushed to a branch). Disqualified leaves the funnel. */
 export type MarketingLeadStage = 'Raw' | 'Qualified' | 'Assigned' | 'Disqualified';
 
@@ -1221,7 +1223,7 @@ export interface DesignTask {
   references?: string[];
   /** Assets supplied with the request (logo pack, photos, footage). */
   assets?: { name: string; url?: string }[];
-  platform: LeadChannel;
+  platform: SocialPlatform;
   /** Required size. */
   dimensions: string;
   deadline: string;
@@ -1244,7 +1246,7 @@ export interface VideoTask {
   /** Link to the raw footage (usually the branch counselor's upload). */
   sourceLink?: string;
   instructions: string;
-  platform: LeadChannel | 'YouTube';
+  platform: SocialPlatform | 'YouTube';
   /** e.g. "60 sec", "15–30 sec" */
   duration: string;
   deadline: string;
@@ -1264,7 +1266,7 @@ export interface VideoTask {
 
 export interface SocialPost {
   id: string;
-  platform: LeadChannel;
+  platform: SocialPlatform;
   caption: string;
   /** "YYYY-MM-DD HH:mm" */
   scheduledAt: string;

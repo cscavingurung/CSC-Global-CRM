@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { useMarketing } from './mktContext';
 import {
-  Card, Chips, Drawer, EmptyRow, Field, GhostButton, Kpi, Modal, Pill, PrimaryButton, SelectInput, SourceTag, TableBox, Td,
+  Card, Chips, Drawer, EmptyRow, Field, GhostButton, Kpi, Modal, Pill, PlatformCheckboxes, PrimaryButton, SelectInput, SourceTag, TableBox, Td,
   TextArea, TextInput, Th,
 } from './MktShared';
 import {
@@ -64,33 +64,32 @@ function PeriodHeader({ period, onChange, what }: { period: PeriodKey; onChange:
 function ContentModal({ item, onClose }: { item?: ContentItem; onClose: () => void }) {
   const { team, me, role, store, actions, navigate } = useMarketing();
   const [title, setTitle] = useState(item?.title ?? '');
-  const [platform, setPlatform] = useState(item?.platform ?? '');
+  const [platforms, setPlatforms] = useState<string[]>(item?.platform ? [item.platform] : []);
   const [assignee, setAssignee] = useState(item?.assignee ?? me);
   const [deadline, setDeadline] = useState(item?.deadline ?? '');
   const [status, setStatus] = useState<ContentStatus>(item?.status ?? 'Idea');
   const [link, setLink] = useState(item?.publishedLink ?? '');
   const people = [...new Set([...team.map((t) => t.name), ...(item?.person ? [item.person] : []), assignee].filter(Boolean))];
   const roleOf = (n: string) => team.find((t) => t.name === n)?.role ?? 'Branch';
-  const valid = title.trim() && platform && assignee && deadline;
+  const platformOptions = item?.platform && !CONTENT_PLATFORMS.includes(item.platform) ? [...CONTENT_PLATFORMS, item.platform] : CONTENT_PLATFORMS;
+  const valid = title.trim() && platforms.length > 0 && assignee && deadline;
   const request = item?.requestId ? store.contentRequests.find((r) => r.id === item.requestId) : undefined;
   const save = () => {
     if (!valid) return;
-    const data = { title: title.trim(), platform, assignee, deadline, status, publishedLink: status === 'Published' ? link.trim() || undefined : item?.publishedLink };
-    if (item) actions.updateContentItem(item.id, data);
-    else actions.addContentItem(data);
+    const data = { title: title.trim(), assignee, deadline, status, publishedLink: status === 'Published' ? link.trim() || undefined : item?.publishedLink };
+    // One calendar entry per platform; when editing, the entry keeps the first and extra ticks become new entries.
+    const [first, ...rest] = platforms;
+    if (item) actions.updateContentItem(item.id, { ...data, platform: first });
+    else actions.addContentItem({ ...data, platform: first });
+    rest.forEach((platform) => actions.addContentItem({ ...data, platform }));
     onClose();
   };
   return (
     <Modal title={item ? 'Edit content' : 'Add content'} onClose={onClose}>
       <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); save(); }}>
         <Field label="Title" required><TextInput value={title} placeholder="e.g. Why choose Canada for January 2027?" onChange={(e) => setTitle(e.target.value)} /></Field>
+        <PlatformCheckboxes options={platformOptions} value={platforms} onChange={setPlatforms} />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="Platform" required>
-            <SelectInput value={platform} onChange={setPlatform} label="Platform">
-              <option value="">Select</option>
-              {CONTENT_PLATFORMS.map((p) => <option key={p}>{p}</option>)}
-            </SelectInput>
-          </Field>
           <Field label="Assignee" required>
             <SelectInput value={assignee} onChange={setAssignee} label="Assignee">
               {people.map((p) => <option key={p} value={p}>{p} · {roleOf(p)}</option>)}
@@ -120,7 +119,7 @@ function ContentModal({ item, onClose }: { item?: ContentItem; onClose: () => vo
         )}
         <div className="flex justify-end gap-2 pt-1">
           <GhostButton onClick={onClose}>Cancel</GhostButton>
-          <PrimaryButton type="submit" disabled={!valid}>{item ? 'Save changes' : 'Add content'}</PrimaryButton>
+          <PrimaryButton type="submit" disabled={!valid}>{item ? 'Save changes' : platforms.length > 1 ? `Add for ${platforms.length} platforms` : 'Add content'}</PrimaryButton>
         </div>
       </form>
     </Modal>

@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { ArrowDown, ArrowUp, Minus, Plus } from 'lucide-react';
 import { useMarketing } from './mktContext';
 import {
-  CampaignTag, Card, Chips, EmptyRow, Field, GhostButton, Kpi, Modal, PageIntro, Pill, PrimaryButton, SelectInput,
+  CampaignTag, Card, Chips, EmptyRow, Field, GhostButton, Kpi, Modal, PageIntro, Pill, PlatformCheckboxes, PrimaryButton, SelectInput,
   SourceTag, TableBox, Td, TextArea, TextInput, Th,
 } from './MktShared';
-import { LEAD_CHANNELS, MKT_CAN, ago, dayOf, isoToday, shortDay } from '../../marketingDept';
+import { MKT_CAN, SOCIAL_PLATFORMS, ago, dayOf, isoToday, shortDay } from '../../marketingDept';
 import { parseLeadDate } from '../../marketing';
-import { LeadChannel, SeoTask, SocialPost } from '../../types';
+import { SeoTask, SocialPlatform, SocialPost } from '../../types';
 import { deadlineText, deadlineTone } from './mktUtils';
 
 const when = (stamp: string) => {
@@ -15,42 +15,45 @@ const when = (stamp: string) => {
   return d ? d.toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : stamp;
 };
 
+// Posts scheduled from a Website design still need a filter.
+const POST_FILTERS = ['All', ...SOCIAL_PLATFORMS, 'Website'] as const;
+
 function NewPostModal({ onClose }: { onClose: () => void }) {
   const { store, actions } = useMarketing();
-  const [platform, setPlatform] = useState<LeadChannel>('Facebook');
+  const [platforms, setPlatforms] = useState<SocialPlatform[]>(['Facebook', 'Instagram', 'LinkedIn']);
   const [caption, setCaption] = useState('');
   const [date, setDate] = useState(isoToday());
   const [time, setTime] = useState('10:00');
   const [campaignId, setCampaignId] = useState('');
-  const valid = caption.trim() && date && time;
+  const valid = platforms.length > 0 && caption.trim() && date && time;
   return (
     <Modal title="Schedule a post" onClose={onClose}>
       <form className="space-y-3" onSubmit={(e) => {
         e.preventDefault();
         if (!valid) return;
         const [h, m] = time.split(':').map(Number);
-        actions.schedulePost({ platform, caption: caption.trim(), scheduledAt: `${date} ${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`, campaignId: campaignId || undefined });
+        const scheduledAt = `${date} ${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+        // One post per platform, so each can be marked published with its own numbers.
+        platforms.forEach((platform) => {
+          actions.schedulePost({ platform, caption: caption.trim(), scheduledAt, campaignId: campaignId || undefined });
+        });
         onClose();
       }}>
+        <PlatformCheckboxes options={SOCIAL_PLATFORMS} value={platforms} onChange={setPlatforms} />
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Platform" required>
-            <SelectInput value={platform} onChange={(v) => setPlatform(v as LeadChannel)} label="Platform">
-              {LEAD_CHANNELS.map((c) => <option key={c}>{c}</option>)}
-            </SelectInput>
-          </Field>
-          <Field label="Campaign">
-            <SelectInput value={campaignId} onChange={setCampaignId} label="Campaign">
-              <option value="">None</option>
-              {store.campaigns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </SelectInput>
-          </Field>
           <Field label="Date" required><TextInput type="date" min={isoToday()} value={date} onChange={(e) => setDate(e.target.value)} /></Field>
           <Field label="Time" required><TextInput type="time" value={time} onChange={(e) => setTime(e.target.value)} /></Field>
         </div>
+        <Field label="Campaign">
+          <SelectInput value={campaignId} onChange={setCampaignId} label="Campaign">
+            <option value="">None</option>
+            {store.campaigns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </SelectInput>
+        </Field>
         <Field label="Caption" required><TextArea value={caption} onChange={(e) => setCaption(e.target.value)} /></Field>
         <div className="flex justify-end gap-2 pt-1">
           <GhostButton onClick={onClose}>Cancel</GhostButton>
-          <PrimaryButton type="submit" disabled={!valid}>Schedule</PrimaryButton>
+          <PrimaryButton type="submit" disabled={!valid}>{platforms.length > 1 ? `Schedule on ${platforms.length} platforms` : 'Schedule'}</PrimaryButton>
         </div>
       </form>
     </Modal>
@@ -86,7 +89,7 @@ export function ScheduledPosts() {
   const { store, role } = useMarketing();
   const [adding, setAdding] = useState(false);
   const [publishing, setPublishing] = useState<SocialPost | null>(null);
-  const [platform, setPlatform] = useState<'All' | LeadChannel>('All');
+  const [platform, setPlatform] = useState<'All' | SocialPlatform>('All');
   const can = MKT_CAN.schedulePosts(role);
   const now = Date.now();
   const rows = store.posts
@@ -98,7 +101,7 @@ export function ScheduledPosts() {
       <PageIntro text="The posting queue, soonest first. Overdue posts are highlighted — publish them or reschedule.">
         {can && <PrimaryButton onClick={() => setAdding(true)}><Plus size={15} /> Schedule post</PrimaryButton>}
       </PageIntro>
-      <Chips options={['All', ...LEAD_CHANNELS] as const} value={platform} onChange={setPlatform} />
+      <Chips options={POST_FILTERS} value={platform} onChange={setPlatform} />
       <TableBox min={760}>
         <thead className="border-b border-grey-border bg-grey-bg/50"><tr><Th>When</Th><Th>Platform</Th><Th>Caption</Th><Th>Campaign</Th><Th right /></tr></thead>
         <tbody className="divide-y divide-grey-border">
@@ -125,7 +128,7 @@ export function ScheduledPosts() {
 
 export function PublishedPosts() {
   const { store } = useMarketing();
-  const [platform, setPlatform] = useState<'All' | LeadChannel>('All');
+  const [platform, setPlatform] = useState<'All' | SocialPlatform>('All');
   const all = store.posts.filter((p) => p.status === 'Published');
   const rows = all.filter((p) => platform === 'All' || p.platform === platform)
     .sort((a, b) => (parseLeadDate(b.publishedAt)?.getTime() ?? 0) - (parseLeadDate(a.publishedAt)?.getTime() ?? 0));
@@ -134,7 +137,7 @@ export function PublishedPosts() {
 
   return (
     <div className="space-y-4">
-      <Chips options={['All', ...LEAD_CHANNELS] as const} value={platform} onChange={setPlatform} />
+      <Chips options={POST_FILTERS} value={platform} onChange={setPlatform} />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi label="Posts" value={rows.length} />
         <Kpi label="Reach" value={reach.toLocaleString('en-IN')} />
