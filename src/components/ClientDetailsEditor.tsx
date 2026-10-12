@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AlertTriangle, Pencil, Plus, X } from 'lucide-react';
 import { AcademicEntry, CounselorStudent } from '../types';
 import { COUNTRIES, PURPOSES } from '../mockData';
@@ -91,6 +91,18 @@ export default function ClientDetailsEditor({ client, onSave, onClose }: {
     phoneInputRef.current.setSelectionRange(phoneCaretRef.current, phoneCaretRef.current);
     phoneCaretRef.current = null;
   }, [f.phone]);
+
+  // Esc closes just this form — caught in the capture phase so the profile behind it, which
+  // also closes on Esc, doesn't close too and lose what was typed.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      onClose();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [onClose]);
 
   const countries = f.country ? f.country.split(',').map((c) => c.trim()).filter(Boolean) : [];
   const toggleCountry = (c: string) =>
