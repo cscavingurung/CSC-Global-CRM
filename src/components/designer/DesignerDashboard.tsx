@@ -1,11 +1,11 @@
 import { AlertTriangle, ArrowRight, Film, Hourglass, PenTool, RotateCcw } from 'lucide-react';
 import { useDesigner, PRIORITY_STYLES, TYPE_STYLES, VIDEO_STYLES, priorityRank } from './designerContext';
-import { Card, Kpi, Pill, SourceTag } from '../marketing/MktShared';
-import { DESIGN_STYLES, deadlineText, deadlineTone } from '../marketing/mktUtils';
+import { Card, Kpi, Pill, PlatformTags } from '../marketing/MktShared';
+import { DESIGN_STYLES, deadlineKey, deadlineText, deadlineTone } from '../marketing/mktUtils';
 import { isoToday, shortDay, weekBounds } from '../../marketingDept';
 import GreetingBanner from '../GreetingBanner';
 
-interface Job { id: string; kind: 'design' | 'video'; title: string; type: string; platform: string; deadline: string; priority?: string; status: string; note?: string; noFootage?: boolean }
+interface Job { id: string; kind: 'design' | 'video'; title: string; type: string; platforms: string[]; deadline: string; deadlineTime?: string; priority?: string; status: string; note?: string; noFootage?: boolean }
 
 /** "What do I need to do?" — the queues at a glance. */
 export default function DesignerDashboard() {
@@ -18,12 +18,12 @@ export default function DesignerDashboard() {
   const openVideos = videos.filter((v) => v.status === 'To Edit' || v.status === 'In Progress');
 
   const jobs: Job[] = [
-    ...openDesigns.map((d): Job => ({ id: d.id, kind: 'design', title: d.title, type: d.type ?? 'Post', platform: d.platform, deadline: d.deadline, priority: d.priority, status: d.stage, note: d.reviewNote })),
-    ...openVideos.map((v): Job => ({ id: v.id, kind: 'video', title: v.title, type: 'Video', platform: v.platform, deadline: v.deadline, priority: v.priority, status: v.status, note: v.reviewNote, noFootage: !v.sourceLink })),
+    ...openDesigns.map((d): Job => ({ id: d.id, kind: 'design', title: d.title, type: d.type ?? 'Post', platforms: d.platforms, deadline: d.deadline, deadlineTime: d.deadlineTime, priority: d.priority, status: d.stage, note: d.reviewNote })),
+    ...openVideos.map((v): Job => ({ id: v.id, kind: 'video', title: v.title, type: 'Video', platforms: v.platforms, deadline: v.deadline, deadlineTime: v.deadlineTime, priority: v.priority, status: v.status, note: v.reviewNote, noFootage: !v.sourceLink })),
   ];
   // Overdue first, then priority, then deadline. Jobs still waiting on footage go last — nothing to edit yet.
   const doNext = jobs.filter((j) => !j.noFootage).sort((a, b) =>
-    Number(b.deadline < today) - Number(a.deadline < today) || priorityRank(a.priority) - priorityRank(b.priority) || a.deadline.localeCompare(b.deadline));
+    Number(b.deadline < today) - Number(a.deadline < today) || priorityRank(a.priority) - priorityRank(b.priority) || deadlineKey(a).localeCompare(deadlineKey(b)));
   const sentBack = jobs.filter((j) => j.note && j.status === 'In Progress');
   const inReview = [
     ...designs.filter((d) => d.stage === 'Ready for Review').map((d) => ({ id: d.id, kind: 'design' as const, title: d.title })),
@@ -65,12 +65,12 @@ export default function DesignerDashboard() {
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium text-navy">{j.title}</span>
                     <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px]">
-                      <Pill text={j.type} cls={TYPE_STYLES[j.type]} /><SourceTag source={j.platform} />
+                      <Pill text={j.type} cls={TYPE_STYLES[j.type]} /><PlatformTags platforms={j.platforms} />
                       {j.priority && <Pill text={j.priority} cls={PRIORITY_STYLES[j.priority]} />}
                     </span>
                   </span>
                   <span className="shrink-0 text-right">
-                    <span className={`block text-xs ${deadlineTone(j.deadline)}`}>{deadlineText(j.deadline)}</span>
+                    <span className={`block text-xs ${deadlineTone(j.deadline, false, j.deadlineTime)}`}>{deadlineText(j.deadline, j.deadlineTime)}</span>
                     <span className="mt-0.5 inline-block"><Pill text={j.status} cls={j.kind === 'video' ? VIDEO_STYLES[j.status as keyof typeof VIDEO_STYLES] : DESIGN_STYLES[j.status as keyof typeof DESIGN_STYLES]} /></span>
                   </span>
                 </button>

@@ -3,7 +3,7 @@ import { CheckCircle, ChevronDown, FileDown, FileSpreadsheet, Info, X } from 'lu
 import {
   AttendanceRecord, Holiday, LeaveRecord, MockUser, OnboardingCase, PayProfile, PayrollRun, StaffMember,
 } from '../types';
-import { DEPARTMENTS, attendanceSummary, departmentOf } from '../attendance';
+import { DEPARTMENTS, attendanceSummary, departmentOf, tracksAttendance } from '../attendance';
 import { LEAVE_STATUS_STYLES, LEAVE_TYPES, leaveDays } from '../leave';
 import { MANUAL_COLUMNS, RUN_STATUS_STYLES, autoFor, emptyManual, money, monthKey, monthLabel } from '../payroll';
 import { dateKey } from '../dateTime';
@@ -102,9 +102,9 @@ export default function HrReportsPage({ currentUser, staff, joinDates, onboardin
       const from = `${af.month}-01`;
       const to = dateKey(new Date(y, m, 0));
       const list = people
-        .filter((s) => s.status === 'Active')
+        .filter((s) => s.status === 'Active' && tracksAttendance(s))
         .filter((s) => (!af.employee || s.name === af.employee) && (!af.dept || departmentOf(s.role) === af.dept) && (!af.branch || s.branch === af.branch))
-        .map((s) => ({ s, sum: attendanceSummary(s.name, from, to, attendance, leave, holidays, now) }))
+        .map((s) => ({ s, sum: attendanceSummary(s.name, from, to, attendance, leave, holidays, now, s.joinDate) }))
         .filter((x) => x.sum.workingDays > 0)
         .sort((a, b) => a.s.name.localeCompare(b.s.name));
       const num = (n: number, warn?: string) => <span className={`tabular-nums ${n === 0 ? 'text-gray-300' : warn ?? 'text-gray-700'}`}>{n}</span>;

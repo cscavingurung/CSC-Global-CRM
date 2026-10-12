@@ -44,7 +44,7 @@ export default function AttendanceDashboard({ staff, attendance, corrections, le
   const names = new Set(people.map((p) => p.name));
 
   // Today
-  const todayViews = people.map((p) => ({ member: p, day: dayView(p.name, today, attendance, leave, now, holidays) }));
+  const todayViews = people.map((p) => ({ member: p, day: dayView(p.name, today, attendance, leave, now, holidays, p.joinDate) }));
   const present = todayViews.filter((x) => x.day.record?.checkIn);
   const late = todayViews.filter((x) => x.day.status === 'Late' || x.day.status === 'Very Late');
   const absent = todayViews.filter((x) => x.day.status === 'Absent');
@@ -54,7 +54,7 @@ export default function AttendanceDashboard({ staff, attendance, corrections, le
   const dates = monthDates(month, today);
   const monthRows = useMemo(() => people.map((p) => {
     const start = firstDayOf(attendance, p.name);
-    const views: DayView[] = dates.filter((d) => !start || d >= start).map((d) => dayView(p.name, d, attendance, leave, now, holidays));
+    const views: DayView[] = dates.filter((d) => !start || d >= start).map((d) => dayView(p.name, d, attendance, leave, now, holidays, p.joinDate));
     const count = (f: (v: DayView) => boolean) => views.filter(f).length;
     const worked = count((v) => !!v.record?.checkIn);
     const absences = views.filter((v) => v.status === 'Absent' && v.date !== today);

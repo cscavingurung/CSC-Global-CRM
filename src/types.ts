@@ -1223,10 +1223,13 @@ export interface DesignTask {
   references?: string[];
   /** Assets supplied with the request (logo pack, photos, footage). */
   assets?: { name: string; url?: string }[];
-  platform: SocialPlatform;
-  /** Required size. */
-  dimensions: string;
+  /** Every platform this design is for — one card, resized per platform. */
+  platforms: SocialPlatform[];
+  /** Required size for each platform in `platforms`. */
+  sizes: Partial<Record<SocialPlatform, string>>;
   deadline: string;
+  /** "HH:mm" on the deadline day; none means end of day. */
+  deadlineTime?: string;
   stage: DesignStage;
   requestedBy: string;
   assignee?: string;
@@ -1246,10 +1249,13 @@ export interface VideoTask {
   /** Link to the raw footage (usually the branch counselor's upload). */
   sourceLink?: string;
   instructions: string;
-  platform: SocialPlatform | 'YouTube';
+  /** Every platform the edit is for — one task, labelled per platform. */
+  platforms: (SocialPlatform | 'YouTube')[];
   /** e.g. "60 sec", "15–30 sec" */
   duration: string;
   deadline: string;
+  /** "HH:mm" on the deadline day; none means end of day. */
+  deadlineTime?: string;
   status: VideoStatus;
   priority?: TaskPriority2;
   requestedBy: string;

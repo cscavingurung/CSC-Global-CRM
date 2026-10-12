@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { AlertTriangle, Clock, ExternalLink, Film, Paperclip, Play, RotateCcw, Send } from 'lucide-react';
 import { useDesigner, PRIORITY_STYLES, VIDEO_STATUSES, VIDEO_STYLES, priorityRank } from './designerContext';
 import { BriefBlock, UploadZone } from './DesignerShared';
-import { GhostButton, Modal, Pill, PrimaryButton, SourceTag } from '../marketing/MktShared';
-import { deadlineText, deadlineTone } from '../marketing/mktUtils';
+import { GhostButton, Modal, Pill, PlatformTags, PrimaryButton } from '../marketing/MktShared';
+import { clockTime, deadlineKey, deadlineText, deadlineTone } from '../marketing/mktUtils';
 import { shortDay, whenLabel } from '../../marketingDept';
 import { VideoTask } from '../../types';
 
@@ -16,9 +16,9 @@ function VideoDetail({ task, onClose }: { task: VideoTask; onClose: () => void }
       <div className="space-y-5">
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <Pill text={task.status} cls={VIDEO_STYLES[task.status]} />
-          <SourceTag source={task.platform} />
+          <PlatformTags platforms={task.platforms} />
           {task.priority && <Pill text={`${task.priority} priority`} cls={PRIORITY_STYLES[task.priority]} />}
-          <span className={deadlineTone(task.deadline, !editable)}>{task.status === 'Completed' ? `Completed ${whenLabel(task.completedAt)}` : deadlineText(task.deadline)}</span>
+          <span className={deadlineTone(task.deadline, !editable, task.deadlineTime)}>{task.status === 'Completed' ? `Completed ${whenLabel(task.completedAt)}` : deadlineText(task.deadline, task.deadlineTime)}</span>
           <span className="text-gray-400">· requested by {task.requestedBy}</span>
         </div>
         {task.reviewNote && task.status === 'In Progress' && (
@@ -36,7 +36,7 @@ function VideoDetail({ task, onClose }: { task: VideoTask; onClose: () => void }
           </div>
           <div className="space-y-4">
             <dl className="divide-y divide-grey-border rounded-lg border border-grey-border text-sm">
-              {([['Platform', task.platform], ['Duration', task.duration], ['Deadline', whenLabel(task.deadline)]] as const).map(([k, v]) => (
+              {([[task.platforms.length > 1 ? 'Platforms' : 'Platform', task.platforms.join(', ')], ['Duration', task.duration], ['Deadline', `${whenLabel(task.deadline)}${task.deadlineTime ? ` · ${clockTime(task.deadlineTime)}` : ''}`]] as const).map(([k, v]) => (
                 <div key={k} className="flex justify-between px-3 py-2"><dt className="text-gray-500">{k}</dt><dd className="font-medium text-navy">{v}</dd></div>
               ))}
             </dl>
@@ -84,7 +84,7 @@ export default function VideoQueue() {
         <div className="grid min-w-[920px] grid-cols-4 gap-3">
           {VIDEO_STATUSES.map((s) => {
             const col = data.videoTasks.filter((v) => v.status === s)
-              .sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority) || a.deadline.localeCompare(b.deadline));
+              .sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority) || deadlineKey(a).localeCompare(deadlineKey(b)));
             return (
               <div key={s} className="rounded-xl border border-grey-border bg-grey-bg/50 p-2">
                 <div className="mb-2 flex items-center justify-between px-1"><Pill text={s} cls={VIDEO_STYLES[s]} /><span className="text-xs font-semibold text-gray-500">{col.length}</span></div>
@@ -95,11 +95,11 @@ export default function VideoQueue() {
                       <button key={v.id} type="button" onClick={() => setOpenTask(v.id)} className="dissolve-in block w-full rounded-lg border border-grey-border bg-white p-3 text-left transition-colors hover:border-navy-light">
                         <p className="text-sm font-semibold leading-snug text-navy">{v.title}</p>
                         <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
-                          <SourceTag source={v.platform} />
+                          <PlatformTags platforms={v.platforms} />
                           <span className="rounded bg-grey-bg px-1.5 py-0.5 font-medium text-gray-600">{v.duration}</span>
                           {v.priority && !done && <Pill text={v.priority} cls={PRIORITY_STYLES[v.priority]} />}
                         </div>
-                        <p className={`mt-2 inline-flex items-center gap-1 text-[11px] ${deadlineTone(v.deadline, done)}`}><Clock size={11} /> {done ? `Done ${shortDay(v.deadline)}` : deadlineText(v.deadline)}</p>
+                        <p className={`mt-2 inline-flex items-center gap-1 text-[11px] ${deadlineTone(v.deadline, done, v.deadlineTime)}`}><Clock size={11} /> {done ? `Done ${shortDay(v.deadline)}` : deadlineText(v.deadline, v.deadlineTime)}</p>
                         {!v.sourceLink && !done && <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-amber-700"><AlertTriangle size={11} /> Waiting for footage</p>}
                         {v.reviewNote && v.status === 'In Progress' && <p className="mt-1 line-clamp-2 rounded bg-amber-50 px-2 py-1 text-[11px] text-amber-800">↩ {v.reviewNote}</p>}
                         {!!v.finalFiles?.length && <p className="mt-1 flex items-center gap-1 truncate text-[11px] text-gray-500"><Paperclip size={10} /> {v.finalFiles[v.finalFiles.length - 1].name}</p>}

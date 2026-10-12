@@ -7,6 +7,7 @@ import {
 import { ApplicationRecord, CounselorStudent, ConsultationStatus, ConsultationOutcome, EnrolmentChoice } from '../types';
 import { OFFER_STATUS_STYLES, VISA_STATUS_STYLES, isVisaUnlocked, isClosedAfterRefund, ENROLMENT_CHECKLIST_ITEMS, enrolmentChecklistCounts, checklistCompleteCount, checklistTotalCount, formatAcademic, isStudyCase } from '../clientPipeline';
 import { EnrolmentModal } from './StudentDetailDrawer';
+import ClientDetailsEditor, { EditDetailsButton, MissingDetailsNotice, missingDetails } from './ClientDetailsEditor';
 import CommunicationLog from './CommunicationLog';
 import { clientIdFor } from '../clientId';
 
@@ -32,6 +33,8 @@ export default function StudentProfile({ student, applications, onClose, onUpdat
   const [status, setStatus] = useState<ConsultationStatus>(student.consultationStatus);
   const [outcome, setOutcome] = useState<ConsultationOutcome>(student.outcome);
   const [showEnrolmentModal, setShowEnrolmentModal] = useState(false);
+  const [editingDetails, setEditingDetails] = useState(false);
+  const missing = missingDetails(student);
   const [pendingStatus, setPendingStatus] = useState<ConsultationStatus | null>(null);
   const app = applications?.find((a) => a.email.trim().toLowerCase() === student.email.trim().toLowerCase());
 
@@ -84,6 +87,11 @@ export default function StudentProfile({ student, applications, onClose, onUpdat
     // only forward into Proceeding, never back-and-forth.
     if (outcome === 'Proceeding') return;
     if (outcome === 'Not Proceeding' && newOutcome !== 'Proceeding') return;
+    // Marketing leads arrive with only the basics — the profile must be complete first.
+    if (newOutcome === 'Proceeding' && missing.length) {
+      setEditingDetails(true);
+      return;
+    }
     // Study cases collect their university/program/intake choices first.
     if (newOutcome === 'Proceeding' && isStudyCase(student.purpose)) {
       setShowEnrolmentModal(true);
@@ -177,7 +185,9 @@ export default function StudentProfile({ student, applications, onClose, onUpdat
               <div className="flex items-center gap-2 mb-4">
                 <User className="text-navy" size={17} />
                 <h3 className="text-sm font-semibold text-navy">Contact & Application Details</h3>
+                {outcome !== 'Proceeding' && <EditDetailsButton onClick={() => setEditingDetails(true)} />}
               </div>
+              {outcome !== 'Proceeding' && <MissingDetailsNotice missing={missing} onEdit={() => setEditingDetails(true)} />}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {detailRows.map((row) => {
                   const Icon = row.icon;
@@ -373,6 +383,10 @@ export default function StudentProfile({ student, applications, onClose, onUpdat
 
       {showEnrolmentModal && (
         <EnrolmentModal onConfirm={handleConfirmEnrolment} onClose={() => setShowEnrolmentModal(false)} />
+      )}
+
+      {editingDetails && (
+        <ClientDetailsEditor client={student} onSave={onUpdate} onClose={() => setEditingDetails(false)} />
       )}
 
       {pendingStatus && (

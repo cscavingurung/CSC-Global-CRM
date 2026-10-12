@@ -1,7 +1,7 @@
 // HRM · Payroll Inputs — the read-only figures Finance needs, pulled from Attendance and Leave,
 // plus helpers for the manual columns. Deliberately no net-pay, tax or deduction formulas.
 import { AttendanceRecord, Holiday, LeaveRecord, PayProfile, PayrollAuto, PayrollManual, PayrollRun, StaffMember } from './types';
-import { datesBetween, dayView } from './attendance';
+import { datesBetween, dayView, tracksAttendance } from './attendance';
 import { dateKey } from './dateTime';
 
 export const MANUAL_COLUMNS: { key: Exclude<keyof PayrollManual, 'remarks'>; label: string; negative?: boolean }[] = [
@@ -53,9 +53,15 @@ export function autoFor(
   const out: PayrollAuto = { basic: basicOn(profile, last), workingDays: 0, daysWorked: 0, leaveDays: 0, late: 0, absent: 0 };
   datesBetween(`${month}-01`, last < today ? last : today).forEach((date) => {
     if (first && date < first) return;
-    const v = dayView(member.name, date, attendance, leave, now, holidays);
+    const v = dayView(member.name, date, attendance, leave, now, holidays, member.joinDate);
     if (v.status === 'Off' || v.status === 'Holiday' || v.status === 'Not in yet') return;
     out.workingDays += 1;
+    // No check-in page for this role — every working day off leave counts as worked.
+    if (!tracksAttendance(member)) {
+      if (v.status === 'On Leave') out.leaveDays += 1;
+      else out.daysWorked += 1;
+      return;
+    }
     if (v.record?.checkIn) out.daysWorked += 1;
     if (v.status === 'On Leave') out.leaveDays += 1;
     if (v.status === 'Late' || v.status === 'Very Late') out.late += 1;

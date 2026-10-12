@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { forwardRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, X } from 'lucide-react';
 import { CHANNEL_STYLES, STAGE_STYLES, campaignName } from '../../marketingDept';
 import { Campaign } from '../../types';
@@ -12,6 +13,11 @@ export function Pill({ text, cls }: { text: string; cls?: string }) {
 
 export function SourceTag({ source }: { source: string }) {
   return <Pill text={source} cls={CHANNEL_STYLES[source] ?? 'bg-gray-100 text-gray-600'} />;
+}
+
+/** One tag per platform, for work that goes to several at once. */
+export function PlatformTags({ platforms }: { platforms: readonly string[] }) {
+  return <span className="inline-flex flex-wrap gap-1">{platforms.map((p) => <SourceTag key={p} source={p} />)}</span>;
 }
 
 /** Tick-one-or-more platform picker. Not wrapped in <label>, so the heading doesn't toggle the first box. */
@@ -127,7 +133,8 @@ export function Modal({ title, onClose, children, wide }: { title: string; onClo
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
-  return (
+  // Portalled to <body> so a dialog opened from a draggable card isn't part of the card's drag.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-navy-dark/50 backdrop-blur-sm" onClick={onClose} />
       <div role="dialog" aria-modal="true" aria-label={title} className={`dissolve-in relative max-h-[92vh] w-full overflow-y-auto rounded-2xl border border-grey-border bg-white ${wide ? 'max-w-2xl' : 'max-w-lg'}`}>
@@ -137,7 +144,8 @@ export function Modal({ title, onClose, children, wide }: { title: string; onClo
         </div>
         <div className="px-6 py-5">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -153,9 +161,11 @@ export function Field({ label, required, children, hint }: { label: string; requ
   );
 }
 
-export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={inputCls} />;
-}
+export const TextInput = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
+  function TextInput(props, ref) {
+    return <input ref={ref} {...props} className={inputCls} />;
+  },
+);
 
 export function TextArea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea rows={3} {...props} className={`${inputCls} resize-y`} />;

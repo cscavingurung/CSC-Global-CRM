@@ -49,9 +49,11 @@ export interface DayView {
  * Saturday is the weekly day off — unless the branch operated that day (anyone in `records`
  * checked in), in which case a missing check-in is an absence like any other day.
  * A holiday (already filtered to this branch) is never an absence and outranks leave, so leave
- * that overlaps it isn't counted as leave either. */
+ * that overlaps it isn't counted as leave either.
+ * `joinDate` (YYYY-MM-DD): days before it read as Off, and the join day itself is never an absence —
+ * someone added mid-afternoon hasn't missed a shift. */
 export function dayView(
-  staffName: string, date: string, records: AttendanceRecord[], leave: LeaveRecord[], now: Date, holidays: Holiday[] = [],
+  staffName: string, date: string, records: AttendanceRecord[], leave: LeaveRecord[], now: Date, holidays: Holiday[] = [], joinDate?: string,
 ): DayView {
   const today = dateKey(now);
   const record = records.find((r) => r.staffName === staffName && r.date === date);
@@ -63,6 +65,8 @@ export function dayView(
     status = s === 'On Time' || !s ? 'Present' : s;
   } else if (hol) status = 'Holiday';
   else if (lv) status = 'On Leave';
+  else if (joinDate && date < joinDate) status = 'Off';
+  else if (joinDate && date === joinDate) status = date === today ? 'Not in yet' : 'Off';
   else if (!isWorkingDay(new Date(`${date}T00:00:00`)) && !records.some((r) => r.date === date && r.checkIn)) status = 'Off';
   else if (date === today && minutesOfDay(now) <= SHIFT_START_MINUTES + LATE_LIMIT) status = 'Not in yet';
   else status = 'Absent';
@@ -87,14 +91,14 @@ export interface AttendanceSummary {
  * Attendance view — Saturdays and holidays aren't working days; days before their first
  * record don't count. */
 export function attendanceSummary(
-  name: string, from: string, to: string, records: AttendanceRecord[], leave: LeaveRecord[], holidays: Holiday[], now: Date,
+  name: string, from: string, to: string, records: AttendanceRecord[], leave: LeaveRecord[], holidays: Holiday[], now: Date, joinDate?: string,
 ): AttendanceSummary {
   const today = dateKey(now);
   const first = firstDayOf(records, name);
   const out: AttendanceSummary = { workingDays: 0, present: 0, late: 0, absent: 0, leave: 0, halfDay: 0, missing: 0 };
   datesBetween(from, to < today ? to : today).forEach((date) => {
     if (!first || date < first) return;
-    const v = dayView(name, date, records, leave, now, holidays);
+    const v = dayView(name, date, records, leave, now, holidays, joinDate);
     if (v.status === 'Off' || v.status === 'Holiday' || v.status === 'Not in yet') return;
     out.workingDays += 1;
     if (v.record?.checkIn) out.present += 1;
@@ -173,7 +177,11 @@ export function applyCorrection(
   };
 }
 
-export const activeStaff = (staff: StaffMember[]) => staff.filter((s) => s.status === 'Active' && s.role !== 'Super Admin');
+/** Branch Managers and Super Admins have no check-in page, so attendance never counts them —
+ * otherwise every working day would read as an absence. */
+export const tracksAttendance = (s: Pick<StaffMember, 'role'>) => s.role !== 'Super Admin' && s.role !== 'Branch Manager';
+
+export const activeStaff = (staff: StaffMember[]) => staff.filter((s) => s.status === 'Active' && tracksAttendance(s));
 
 /** Month key "2026-09" → every date of that month up to today. */
 export function monthDates(month: string, today: string): string[] {

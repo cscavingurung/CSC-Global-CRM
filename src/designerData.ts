@@ -11,7 +11,7 @@ import { toDate } from './marketingDept';
 export interface ScheduledItem {
   id: string;
   title: string;
-  platform: string;
+  platforms: string[];
   type: string;
   /** "YYYY-MM-DD" or a "YYYY-MM-DD h:mm AM/PM" stamp. */
   date: string;
@@ -22,7 +22,7 @@ export interface HistoryItem {
   id: string;
   title: string;
   date: string;
-  platform: string;
+  platforms: string[];
   type: string;
   designer: string;
   status: 'Published' | 'Approved' | 'Completed' | 'Scheduled';
@@ -59,16 +59,16 @@ export function designerView(store: MarketingStore): DesignerData {
   const push = (s: ScheduledItem) => { if (!seen.has(key(s.title))) { seen.add(key(s.title)); schedule.push(s); } };
   store.posts.filter((p) => p.status === 'Scheduled').forEach((p) => {
     const d = p.designTaskId ? designById.get(p.designTaskId) : undefined;
-    push({ id: p.id, title: d?.title ?? p.caption, platform: p.platform, type: d?.type ?? typeFor(p.platform), date: p.scheduledAt, status: 'Scheduled' });
+    push({ id: p.id, title: d?.title ?? p.caption, platforms: [p.platform], type: d?.type ?? typeFor(p.platform), date: p.scheduledAt, status: 'Scheduled' });
   });
   store.contentItems.filter((c) => c.status === 'Scheduled').forEach((c) => {
-    push({ id: c.id, title: c.title, platform: c.platform, type: typeFor(c.platform), date: c.deadline, status: 'Scheduled' });
+    push({ id: c.id, title: c.title, platforms: [c.platform], type: typeFor(c.platform), date: c.deadline, status: 'Scheduled' });
   });
   store.designTasks.filter((d) => d.stage === 'Scheduled').forEach((d) => {
-    push({ id: d.id, title: d.title, platform: d.platform, type: d.type ?? 'Post', date: d.deadline, status: 'Scheduled' });
+    push({ id: d.id, title: d.title, platforms: d.platforms, type: d.type ?? 'Post', date: d.deadline, status: 'Scheduled' });
   });
   store.designTasks.filter((d) => d.stage === 'Approved').forEach((d) => {
-    push({ id: d.id, title: d.title, platform: d.platform, type: d.type ?? 'Post', date: d.deadline, status: 'Approved' });
+    push({ id: d.id, title: d.title, platforms: d.platforms, type: d.type ?? 'Post', date: d.deadline, status: 'Approved' });
   });
   schedule.sort((a, b) => (toDate(a.date)?.getTime() ?? 0) - (toDate(b.date)?.getTime() ?? 0));
 
@@ -80,19 +80,19 @@ export function designerView(store: MarketingStore): DesignerData {
   store.videoTasks.filter((v) => v.status === 'Completed').forEach((v) => {
     const item = v.contentItemId ? itemById.get(v.contentItemId) : undefined;
     addHistory({
-      id: v.id, title: v.title, date: item?.publishedAt ?? v.completedAt ?? v.deadline, platform: v.platform, type: 'Video',
+      id: v.id, title: v.title, date: item?.publishedAt ?? v.completedAt ?? v.deadline, platforms: v.platforms, type: 'Video',
       designer: v.assignee ?? '—', status: item?.status === 'Published' ? 'Published' : 'Completed', link: item?.publishedLink,
     });
   });
   store.designTasks.filter((d) => d.stage === 'Approved' || d.stage === 'Scheduled').forEach((d) => {
     const item = d.contentItemId ? itemById.get(d.contentItemId) : undefined;
     addHistory({
-      id: d.id, title: d.title, date: item?.publishedAt ?? lastFile(d.finalFiles) ?? d.deadline, platform: d.platform, type: d.type ?? 'Post',
+      id: d.id, title: d.title, date: item?.publishedAt ?? lastFile(d.finalFiles) ?? d.deadline, platforms: d.platforms, type: d.type ?? 'Post',
       designer: d.assignee ?? '—', status: item?.status === 'Published' ? 'Published' : d.stage as 'Approved' | 'Scheduled', link: item?.publishedLink,
     });
   });
   store.contentItems.filter((c) => c.status === 'Published').forEach((c) => {
-    addHistory({ id: c.id, title: c.title, date: c.publishedAt ?? c.deadline, platform: c.platform, type: typeFor(c.platform), designer: c.assignee, status: 'Published', link: c.publishedLink });
+    addHistory({ id: c.id, title: c.title, date: c.publishedAt ?? c.deadline, platforms: [c.platform], type: typeFor(c.platform), designer: c.assignee, status: 'Published', link: c.publishedLink });
   });
   history.sort((a, b) => (toDate(b.date)?.getTime() ?? 0) - (toDate(a.date)?.getTime() ?? 0));
 

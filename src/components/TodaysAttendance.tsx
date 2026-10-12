@@ -24,7 +24,7 @@ export default function TodaysAttendance({ currentUser, staff, attendance, corre
   const rows = useMemo(
     () => activeStaff(staff)
       .filter((s) => !dept || departmentOf(s.role) === dept)
-      .map((member) => ({ member, day: dayView(member.name, today, attendance, leave, now, holidays) }))
+      .map((member) => ({ member, day: dayView(member.name, today, attendance, leave, now, holidays, member.joinDate) }))
       // Exceptions first, then by check-in time.
       .sort((a, b) => {
         const rank = (s: string) => ['Absent', 'Very Late', 'Late', 'Not in yet', 'On Leave', 'Present', 'Off'].indexOf(s);

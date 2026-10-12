@@ -6,9 +6,12 @@ export interface VideoTaskRow {
   title: string;
   source_link: string | null;
   instructions: string;
-  platform: VideoTask['platform'];
+  /** Legacy single-platform column — still filled with the first platform. */
+  platform: string;
+  platforms: VideoTask['platforms'] | null;
   duration: string;
   deadline: string;
+  deadline_time: string | null;
   status: VideoTask['status'];
   priority: VideoTask['priority'] | null;
   requested_by: string;
@@ -28,9 +31,11 @@ export function fromRow(row: VideoTaskRow): VideoTask {
     title: row.title,
     sourceLink: row.source_link ?? undefined,
     instructions: row.instructions,
-    platform: row.platform,
+    // Rows from before multi-platform tasks only have the single platform.
+    platforms: row.platforms?.length ? row.platforms : [row.platform as VideoTask['platforms'][number]],
     duration: row.duration,
     deadline: row.deadline,
+    deadlineTime: row.deadline_time ?? undefined,
     status: row.status,
     priority: row.priority ?? undefined,
     requestedBy: row.requested_by,
@@ -51,9 +56,11 @@ function toRow(task: VideoTask): VideoTaskRow {
     title: task.title,
     source_link: task.sourceLink ?? null,
     instructions: task.instructions,
-    platform: task.platform,
+    platform: task.platforms[0],
+    platforms: task.platforms,
     duration: task.duration,
     deadline: task.deadline,
+    deadline_time: task.deadlineTime ?? null,
     status: task.status,
     priority: task.priority ?? null,
     requested_by: task.requestedBy,

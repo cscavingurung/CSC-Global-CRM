@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useDesigner, TYPE_STYLES } from './designerContext';
-import { Chips, EmptyRow, Pill, ReadOnlyNote, SourceTag, TableBox, Td, Th } from '../marketing/MktShared';
+import { Chips, EmptyRow, Pill, PlatformTags, ReadOnlyNote, TableBox, Td, Th } from '../marketing/MktShared';
 import { toDate } from '../../marketingDept';
 
 const when = (v: string) => {
@@ -33,7 +33,7 @@ export default function ScheduledPostsView() {
               <tr key={s.id}>
                 <Td className={`whitespace-nowrap ${past ? 'text-gray-400' : 'text-navy'}`}>{when(s.date)}</Td>
                 <Td className="font-medium text-navy">{s.title}</Td>
-                <Td><SourceTag source={s.platform} /></Td>
+                <Td><PlatformTags platforms={s.platforms} /></Td>
                 <Td><Pill text={s.type} cls={TYPE_STYLES[s.type]} /></Td>
                 <Td><Pill text={s.status === 'Approved' ? 'Approved · awaiting date' : 'Scheduled'} cls={s.status === 'Approved' ? 'bg-blue-50 text-blue-700' : 'bg-navy/10 text-navy'} /></Td>
               </tr>

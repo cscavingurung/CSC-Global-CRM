@@ -6,6 +6,8 @@ import {
 import { COUNTRIES, PURPOSES } from '../mockData';
 import { today } from '../clientPipeline';
 import { AcademicEntry } from '../types';
+import { caretPositionForDigitCount, dialedDigitsBeforeCaret, formatPhoneInput, isValidPhone } from '../lib/phone';
+import { isValidEmail } from '../validation';
 
 export interface IntakeFormData {
   name: string;
@@ -41,69 +43,11 @@ export interface MarketingFieldOptions {
   campaigns: { id: string; name: string }[];
 }
 
-const GENDERS = ['Male', 'Female', 'Other'];
-const MARITAL_STATUSES = ['Single', 'Married', 'Divorced', 'Widowed'];
-const ACADEMIC_LEVELS = ['SEE', '+2/A Level', "Bachelor's", "Master's", 'PhD', 'Others'];
+export const GENDERS = ['Male', 'Female', 'Other'];
+export const MARITAL_STATUSES = ['Single', 'Married', 'Divorced', 'Widowed'];
+export const ACADEMIC_LEVELS = ['SEE', '+2/A Level', "Bachelor's", "Master's", 'PhD', 'Others'];
 const EMPTY_ACADEMIC_ENTRY: AcademicEntry = { level: '', stream: '', gpa: '', completionYear: '' };
 export const REFERRAL_SOURCES = ['Walk Ins', 'Marketing', 'Referred By', 'Others'];
-
-// +1 (Canada/US, 10-digit NANP number) or +977 (Nepal, 10-digit mobile starting with 9).
-const PHONE_REGEX = /^(?:\+1[\s-]?\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{4}|\+977[\s-]?9\d{9})$/;
-
-function isValidPhone(phone: string): boolean {
-  return PHONE_REGEX.test(phone.trim());
-}
-
-// The "+1"/"+977" country code we prepend is synthetic, not typed by the user — since the
-// input is controlled, our own formatted output becomes next keystroke's raw value, so the
-// digit(s) inside that prefix ("1", or "977") must never be re-counted as dialed digits.
-function staticPrefixLength(value: string): number {
-  if (value.startsWith('+977')) return 4;
-  if (value.startsWith('+1')) return 2;
-  return 0;
-}
-
-// Live-formats digits as they're typed — a 9-leading number becomes a Nepal +977 mobile
-// number, anything else is treated as a NANP +1 number, matching the input on
-// cscglobalcanada.ca/contact so staff never have to type the country code or punctuation.
-function formatPhoneInput(raw: string): string {
-  const digits = raw.slice(staticPrefixLength(raw)).replace(/\D/g, '').slice(0, 10);
-  if (!digits) return '';
-  if (digits[0] === '9') return `+977 ${digits}`;
-
-  const area = digits.slice(0, 3);
-  const mid = digits.slice(3, 6);
-  const last = digits.slice(6, 10);
-  let out = `+1 (${area}`;
-  if (area.length === 3) out += ')';
-  if (mid) out += ` ${mid}`;
-  if (last) out += `-${last}`;
-  return out;
-}
-
-// How many real (dialed) digits sit before the caret in the raw, pre-format input value.
-function dialedDigitsBeforeCaret(raw: string, caretIndex: number): number {
-  const prefixLen = staticPrefixLength(raw);
-  if (caretIndex <= prefixLen) return 0;
-  return raw.slice(prefixLen, caretIndex).replace(/\D/g, '').length;
-}
-
-// Re-formatting on every keystroke changes the string length (adding "(", ")", "-", "+977 "),
-// which resets the browser's cursor to the wrong spot unless we restore it ourselves — this
-// finds where the caret belongs in the new formatted string by counting real dialed digits,
-// skipping the synthetic country-code prefix so its digit(s) don't throw the count off.
-function caretPositionForDigitCount(formatted: string, digitCount: number): number {
-  const prefixLen = staticPrefixLength(formatted);
-  if (digitCount <= 0) return prefixLen;
-  let seen = 0;
-  for (let i = prefixLen; i < formatted.length; i++) {
-    if (/\d/.test(formatted[i])) {
-      seen++;
-      if (seen === digitCount) return i + 1;
-    }
-  }
-  return formatted.length;
-}
 
 interface NewIntakeFormProps {
   onSubmitted?: () => void;
@@ -167,6 +111,7 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
   const [academicLevelOthers, setAcademicLevelOthers] = useState<string[]>(['']);
   const [referredByName, setReferredByName] = useState('');
   const [phoneError, setPhoneError] = useState('');
+  const [emailError, setEmailError] = useState('');
   const [countryError, setCountryError] = useState('');
   const phoneInputRef = useRef<HTMLInputElement>(null);
   const phoneCaretRef = useRef<number | null>(null);
@@ -183,6 +128,11 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
 
     if (!isValidPhone(form.phone)) {
       setPhoneError('Enter a valid number, e.g. +1 416 272 4274 or +977 98XXXXXXXX');
+      return;
+    }
+
+    if (!isValidEmail(form.email.trim())) {
+      setEmailError('Enter a valid email, e.g. name@example.com');
       return;
     }
 
@@ -396,11 +346,18 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
                 type="email"
                 required
                 value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                onChange={(e) => {
+                  setForm({ ...form, email: e.target.value });
+                  if (emailError) setEmailError('');
+                }}
+                onBlur={() => {
+                  if (form.email.trim() && !isValidEmail(form.email.trim())) setEmailError('Enter a valid email, e.g. name@example.com');
+                }}
                 placeholder="client@email.com"
-                className={fieldClass}
+                className={`${fieldClass} ${emailError ? 'border-red-400 focus:border-red-400 focus:ring-red-300' : ''}`}
               />
             </div>
+            {emailError && <p className="mt-1 text-xs text-red-500">{emailError}</p>}
           </div>
 
           {/* Address */}

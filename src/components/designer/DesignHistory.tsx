@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ExternalLink, Search, X } from 'lucide-react';
 import { useDesigner, HISTORY_STYLES, TYPE_STYLES } from './designerContext';
-import { Chips, EmptyRow, Pill, SourceTag, TableBox, Td, Th } from '../marketing/MktShared';
+import { Chips, EmptyRow, Pill, PlatformTags, TableBox, Td, Th } from '../marketing/MktShared';
 import { whenLabel } from '../../marketingDept';
 
 const TYPES = ['All', 'Post', 'Story', 'Reel', 'Poster', 'Video'] as const;
@@ -14,7 +14,7 @@ export default function DesignHistory() {
   const [mine, setMine] = useState(false);
   const needle = q.trim().toLowerCase();
   const rows = data.history.filter((h) => (type === 'All' || h.type === type) && (!mine || h.designer === me)
-    && (!needle || [h.title, h.platform, h.designer].some((v) => v.toLowerCase().includes(needle))));
+    && (!needle || [h.title, ...h.platforms, h.designer].some((v) => v.toLowerCase().includes(needle))));
 
   return (
     <div className="space-y-4">
@@ -39,7 +39,7 @@ export default function DesignHistory() {
             <tr key={h.id}>
               <Td className="font-medium text-navy">{h.title}</Td>
               <Td className="whitespace-nowrap text-gray-500">{whenLabel(h.date)}</Td>
-              <Td><SourceTag source={h.platform} /></Td>
+              <Td><PlatformTags platforms={h.platforms} /></Td>
               <Td><Pill text={h.type} cls={TYPE_STYLES[h.type]} /></Td>
               <Td className="text-gray-600">{h.designer}</Td>
               <Td><Pill text={h.status} cls={HISTORY_STYLES[h.status]} /></Td>

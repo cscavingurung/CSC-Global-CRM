@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react';
 import {
   AdSpend, BranchPing, Campaign, ContentItem, ContentRequest, DesignStage, DesignTask, MarketingLead, MarketingRole, MarketingStore,
-  SeoTask, SocialPost, VideoStatus,
+  SeoTask, SocialPost, VideoStatus, VideoTask,
 } from '../../types';
 import { LeadTrack } from '../../marketingDept';
 
@@ -40,7 +40,17 @@ export interface MarketingActions {
   addContentItem: (item: Omit<ContentItem, 'id' | 'createdBy'>) => void;
   updateContentItem: (id: string, patch: Partial<Omit<ContentItem, 'id'>>) => void;
   createDesignTask: (t: Omit<DesignTask, 'id' | 'requestedBy' | 'stage'>) => void;
+  /** Edit a request's brief — only while it's still Requested or In Progress. */
+  updateDesignTask: (id: string, patch: Partial<Pick<DesignTask, 'title' | 'brief' | 'platforms' | 'sizes' | 'deadline' | 'campaignId'>>) => void;
   moveDesign: (id: string, stage: DesignStage, note?: string) => void;
+  /** Undo a schedule: cancel its posts that haven't gone out; with none published, the card goes back to Approved. */
+  unscheduleDesign: (id: string) => void;
+  /** Remove a design request — not once it's Scheduled, since posts point at it. */
+  deleteDesignTask: (id: string) => void;
+  /** Remove a video request — not once it's Completed. */
+  deleteVideoTask: (id: string) => void;
+  /** Video editing asked of the designer directly — marketing already has the footage. */
+  createVideoTask: (t: Omit<VideoTask, 'id' | 'requestedBy' | 'status'>) => void;
   /** Review a video edit: approve (Completed) or send back (In Progress, with a note). */
   moveVideo: (id: string, status: VideoStatus, note?: string) => void;
   schedulePost: (p: Omit<SocialPost, 'id' | 'createdBy' | 'status'>) => void;

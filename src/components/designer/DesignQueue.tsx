@@ -2,8 +2,8 @@ import { useMemo, useState } from 'react';
 import { Check, Copy, ExternalLink, Paperclip, Play, RotateCcw, Search, Send } from 'lucide-react';
 import { useDesigner, DESIGN_STATUSES, PRIORITY_STYLES, TYPE_STYLES, priorityRank } from './designerContext';
 import { BriefBlock, UploadZone } from './DesignerShared';
-import { Chips, EmptyRow, GhostButton, Modal, Pill, PrimaryButton, SelectInput, SourceTag, TableBox, Td, Th } from '../marketing/MktShared';
-import { DESIGN_STYLES, deadlineText, deadlineTone } from '../marketing/mktUtils';
+import { Chips, EmptyRow, GhostButton, Modal, Pill, PrimaryButton, SelectInput, PlatformTags, TableBox, Td, Th } from '../marketing/MktShared';
+import { DESIGN_STYLES, deadlineKey, deadlineText, deadlineTone } from '../marketing/mktUtils';
 import { isoToday, shortDay } from '../../marketingDept';
 import { DesignStage, DesignTask } from '../../types';
 
@@ -26,9 +26,9 @@ function DesignDetail({ task, onClose }: { task: DesignTask; onClose: () => void
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <Pill text={task.stage} cls={DESIGN_STYLES[task.stage]} />
           <Pill text={task.type ?? 'Post'} cls={TYPE_STYLES[task.type ?? 'Post']} />
-          <SourceTag source={task.platform} />
+          <PlatformTags platforms={task.platforms} />
           {task.priority && <Pill text={`${task.priority} priority`} cls={PRIORITY_STYLES[task.priority]} />}
-          <span className={deadlineTone(task.deadline, !editable)}>{deadlineText(task.deadline)}</span>
+          <span className={deadlineTone(task.deadline, !editable, task.deadlineTime)}>{deadlineText(task.deadline, task.deadlineTime)}</span>
           <span className="text-gray-400">· requested by {task.requestedBy}</span>
         </div>
         {task.reviewNote && task.stage === 'In Progress' && (
@@ -46,7 +46,11 @@ function DesignDetail({ task, onClose }: { task: DesignTask; onClose: () => void
               ) : <p className="text-sm text-gray-400">No caption — design only.</p>}
             </BriefBlock>
             <BriefBlock title="Instructions"><p className="whitespace-pre-line text-sm text-gray-700">{task.brief}</p></BriefBlock>
-            <BriefBlock title="Required size"><p className="inline-block rounded bg-grey-bg px-2 py-1 text-sm font-medium text-navy">{task.dimensions}</p></BriefBlock>
+            <BriefBlock title={task.platforms.length > 1 ? 'Required sizes' : 'Required size'}>
+              <div className="flex flex-wrap gap-1.5">{task.platforms.map((p) => (
+                <p key={p} className="rounded bg-grey-bg px-2 py-1 text-sm font-medium text-navy">{task.platforms.length > 1 && <span className="font-normal text-gray-500">{p} </span>}{task.sizes[p]}</p>
+              ))}</div>
+            </BriefBlock>
           </div>
           <div className="space-y-4">
             <BriefBlock title="Reference material">
@@ -113,7 +117,7 @@ export default function DesignQueue() {
       && (type === 'All types' || (d.type ?? 'Post') === type)
       && (!needle || [d.title, d.brief, d.caption ?? '', d.requestedBy].some((v) => v.toLowerCase().includes(needle))))
     .sort((a, b) => Number(b.deadline < today && b.stage !== 'Approved' && b.stage !== 'Scheduled') - Number(a.deadline < today && a.stage !== 'Approved' && a.stage !== 'Scheduled')
-      || priorityRank(a.priority) - priorityRank(b.priority) || a.deadline.localeCompare(b.deadline));
+      || priorityRank(a.priority) - priorityRank(b.priority) || deadlineKey(a).localeCompare(deadlineKey(b)));
   const task = data.designTasks.find((d) => d.id === openTask);
 
   return (
@@ -140,9 +144,9 @@ export default function DesignQueue() {
                   <span className="line-clamp-1 block max-w-[320px] text-[11px] text-gray-400">{d.reviewNote && d.stage === 'In Progress' ? `↩ ${d.reviewNote}` : d.caption ?? d.brief}</span>
                 </Td>
                 <Td><Pill text={d.type ?? 'Post'} cls={TYPE_STYLES[d.type ?? 'Post']} /></Td>
-                <Td><SourceTag source={d.platform} /><span className="mt-0.5 block text-[11px] text-gray-400">{d.dimensions}</span></Td>
+                <Td><PlatformTags platforms={d.platforms} /><span className="mt-0.5 block text-[11px] text-gray-400">{d.platforms.map((p) => d.sizes[p]).join(' · ')}</span></Td>
                 <Td className="text-gray-600">{d.requestedBy}</Td>
-                <Td className={`whitespace-nowrap text-xs ${deadlineTone(d.deadline, done)}`}>{done ? shortDay(d.deadline) : deadlineText(d.deadline)}</Td>
+                <Td className={`whitespace-nowrap text-xs ${deadlineTone(d.deadline, done, d.deadlineTime)}`}>{done ? shortDay(d.deadline) : deadlineText(d.deadline, d.deadlineTime)}</Td>
                 <Td>{d.priority ? <Pill text={d.priority} cls={PRIORITY_STYLES[d.priority]} /> : <span className="text-gray-300">—</span>}</Td>
                 <Td><Pill text={d.stage} cls={DESIGN_STYLES[d.stage]} />{!!d.finalFiles?.length && <span className="mt-1 flex items-center gap-1 text-[11px] text-gray-400"><Paperclip size={10} /> {d.finalFiles.length} file{d.finalFiles.length === 1 ? '' : 's'}</span>}</Td>
               </tr>

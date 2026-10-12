@@ -38,6 +38,17 @@ const durationOf = (needed: string) => needed.match(/(\d+)\s*-?\s*second/i)?.[1]
 /** A calendar piece whose design/edit was approved becomes Ready (unless it already moved on). */
 const readyItem = (items: ContentItem[], id: string) =>
   items.map((c) => (c.id === id && (c.status === 'Idea' || c.status === 'In Progress') ? { ...c, status: 'Ready' as const } : c));
+/** Delete a design/video task and unhook what pointed at it: the branch request's link, and its calendar piece goes back to Idea. */
+function dropTask<K extends 'designTasks' | 'videoTasks'>(s: MarketingStore, key: K, id: string, allowed: (t: MarketingStore[K][number]) => boolean): MarketingStore {
+  const task = (s[key] as MarketingStore[K][number][]).find((t) => t.id === id);
+  if (!task || !allowed(task)) return s;
+  return {
+    ...s,
+    [key]: (s[key] as { id: string }[]).filter((t) => t.id !== id),
+    contentRequests: s.contentRequests.map((r) => (r.designTaskId === id ? { ...r, designTaskId: undefined } : r)),
+    contentItems: s.contentItems.map((c) => (c.id === task.contentItemId && c.status === 'In Progress' ? { ...c, status: 'Idea' as const } : c)),
+  };
+}
 const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}${(seq++).toString(36)}`;
 
 export default function MarketingModule({
@@ -149,7 +160,7 @@ export default function MarketingModule({
           const existing = req.contentItemId ? s.contentItems.find((c) => c.id === req.contentItemId) : undefined;
           const contentItemId = existing?.id ?? newId('ci');
           const designTaskId = newId('dt');
-          const channel = (['Facebook', 'Instagram', 'LinkedIn', 'TikTok', 'Website'].includes(platform) ? platform : 'Instagram') as DesignTask['platform'];
+          const channel = (['Facebook', 'Instagram', 'LinkedIn', 'TikTok', 'Website'].includes(platform) ? platform : 'Instagram') as DesignTask['platforms'][number];
           const isVideo = /video|reel|footage|clip/i.test(req.needed);
           const itemPatch = { assignee: designer, deadline, platform, status: 'In Progress' as const, branch: req.targetBranch, person: req.targetCounselor, requestId };
           return {
@@ -163,14 +174,14 @@ export default function MarketingModule({
             ...(isVideo ? {
               videoTasks: [...s.videoTasks, {
                 id: designTaskId, title: existing?.title ?? req.topic, status: 'To Edit' as const, priority: 'Medium' as const,
-                platform: platform === 'YouTube' ? 'YouTube' as const : channel, duration: durationOf(req.needed), deadline,
+                platforms: [platform === 'YouTube' ? 'YouTube' as const : channel], duration: durationOf(req.needed), deadline,
                 sourceLink: req.materialLink, requestedBy: me, assignee: designer, branch: req.targetBranch, person: req.targetCounselor,
                 requestId, contentItemId, instructions: [req.notes, req.receivedNote].filter(Boolean).join(' ') || `Edit the ${req.needed.toLowerCase()} for ${platform}.`,
               }],
             } : {
               designTasks: [...s.designTasks, {
-                id: designTaskId, title: existing?.title ?? req.topic, platform: channel, type: 'Post' as const, priority: 'Medium' as const,
-                dimensions: channel === 'Website' ? '1920×600' : channel === 'TikTok' ? '1080×1920' : '1080×1350',
+                id: designTaskId, title: existing?.title ?? req.topic, platforms: [channel], type: 'Post' as const, priority: 'Medium' as const,
+                sizes: { [channel]: channel === 'Website' ? '1920×600' : channel === 'TikTok' ? '1080×1920' : '1080×1350' },
                 brief: `Design from ${req.needed.toLowerCase()} by ${req.targetCounselor} (${req.targetBranch}).${req.notes ? ` ${req.notes}` : ''}`,
                 assets: req.materialLink ? [{ name: `Material from ${req.targetCounselor}`, url: req.materialLink }] : undefined,
                 deadline, stage: 'Requested' as const, requestedBy: me, assignee: designer, campaignId: req.campaignId, contentItemId,
@@ -194,6 +205,25 @@ export default function MarketingModule({
         })),
       })),
       createDesignTask: (t) => setStore((s) => ({ ...s, designTasks: [...s.designTasks, { ...t, id: newId('dt'), requestedBy: me, stage: 'Requested' }] })),
+      updateDesignTask: (id, patch) => setStore((s) => ({
+        ...s,
+        designTasks: s.designTasks.map((t) => (t.id !== id || (t.stage !== 'Requested' && t.stage !== 'In Progress') ? t : { ...t, ...patch })),
+      })),
+      unscheduleDesign: (id) => setStore((s) => {
+        const task = s.designTasks.find((t) => t.id === id);
+        if (!task || task.stage !== 'Scheduled') return s;
+        const posts = s.posts.filter((p) => !(p.designTaskId === id && p.status === 'Scheduled'));
+        // Anything already published stays published — then the card stays Scheduled too.
+        if (posts.some((p) => p.designTaskId === id)) return { ...s, posts };
+        return {
+          ...s,
+          posts,
+          designTasks: s.designTasks.map((t) => (t.id === id ? { ...t, stage: 'Approved' as const } : t)),
+          contentItems: s.contentItems.map((c) => (c.id === task.contentItemId && c.status === 'Scheduled' ? { ...c, status: 'Ready' as const } : c)),
+        };
+      }),
+      deleteDesignTask: (id) => setStore((s) => dropTask(s, 'designTasks', id, (t) => t.stage !== 'Scheduled')),
+      deleteVideoTask: (id) => setStore((s) => dropTask(s, 'videoTasks', id, (t) => t.status !== 'Completed')),
       moveDesign: (id, stage, note) => {
         setStore((s) => {
           const task = s.designTasks.find((t) => t.id === id);
@@ -208,7 +238,8 @@ export default function MarketingModule({
               : stage === 'Approved' ? readyItem(s.contentItems, task.contentItemId)
                 // Scheduling the design schedules the piece too.
                 : stage === 'Scheduled' ? s.contentItems.map((c) => (c.id === task.contentItemId && c.status !== 'Published' ? { ...c, status: 'Scheduled' as const } : c))
-                  : s.contentItems,
+                  // Moved back before approval: the piece is being worked on again, not Ready.
+                  : s.contentItems.map((c) => (c.id === task.contentItemId && c.status === 'Ready' ? { ...c, status: 'In Progress' as const } : c)),
           };
         });
         // Approval is the finish line for the designer's part of the work — let them know it landed.
@@ -217,6 +248,7 @@ export default function MarketingModule({
           if (task?.assignee && task.assignee !== me) onTaskDone?.('design', task.title, task.assignee);
         }
       },
+      createVideoTask: (t) => setStore((s) => ({ ...s, videoTasks: [...s.videoTasks, { ...t, id: newId('vt'), requestedBy: me, status: 'To Edit' }] })),
       moveVideo: (id, status, note) => {
         setStore((s) => {
           const task = s.videoTasks.find((t) => t.id === id);

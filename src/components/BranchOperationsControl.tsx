@@ -11,7 +11,7 @@ import {
   SHIFT_START_MINUTES, attendanceStatus, manualItems, minutesOfDay, timeOf,
 } from '../branchOps';
 import { NewIssueInput, buildIssue, isActive } from '../branchIssues';
-import { applyCorrection, onLeave } from '../attendance';
+import { applyCorrection, onLeave, tracksAttendance } from '../attendance';
 import { holidayOn } from '../holidays';
 import { ROLE_LABELS } from '../mockData';
 import { dateKey, formatSubmittedAt } from '../dateTime';
@@ -188,10 +188,11 @@ export default function BranchOperationsControl({
   const isManager = currentUser.role === 'branch_manager';
 
   const team = useMemo(() => staff.filter((s) => s.status === 'Active' && s.role !== 'Super Admin'), [staff]);
+  const tracked = useMemo(() => team.filter(tracksAttendance), [team]);
   const recordFor = (name: string, date: string) => attendance.find((r) => r.staffName === name && r.date === date);
 
   // ── Attendance facts ─────────────────────────────────────────────────────
-  const todayRecords = team.map((s) => ({ member: s, record: recordFor(s.name, today) }));
+  const todayRecords = tracked.map((s) => ({ member: s, record: recordFor(s.name, today) }));
   const present = todayRecords.filter((x) => x.record?.checkIn);
   const lateOnes = present.filter((x) => {
     const st = attendanceStatus(x.record!.checkIn!);
@@ -233,7 +234,7 @@ export default function BranchOperationsControl({
         return it ? { ok: false, text: `Connected · ${it} critical IT issue${it === 1 ? '' : 's'} open` } : { ok: true, text: 'Connected' };
       }
       case 'staff-present':
-        return { ok: present.length >= Math.ceil(team.length * 0.75), text: `${present.length}/${team.length}` };
+        return { ok: present.length >= Math.ceil(tracked.length * 0.75), text: `${present.length}/${tracked.length}` };
       case 'tasks-assigned':
         return todayTasks.length ? { ok: true, text: `${todayTasks.length} on the Daily Task Board` } : { ok: false, text: 'Nothing on today’s board' };
       case 'tasks-reviewed':
@@ -464,7 +465,7 @@ export default function BranchOperationsControl({
           <dl className="flex flex-wrap gap-x-6 gap-y-2 sm:ml-auto">
             <div>
               <dt className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Staff present</dt>
-              <dd className="text-base font-semibold tabular-nums text-navy">{present.length}/{team.length}</dd>
+              <dd className="text-base font-semibold tabular-nums text-navy">{present.length}/{tracked.length}</dd>
             </div>
             <div>
               <dt className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Critical issues</dt>
@@ -564,7 +565,7 @@ export default function BranchOperationsControl({
           <div className="px-5 py-4">
             <div className="flex flex-wrap gap-2">
               {[
-                { label: 'Present', value: `${present.length}/${team.length}`, tone: 'bg-navy/5 text-navy' },
+                { label: 'Present', value: `${present.length}/${tracked.length}`, tone: 'bg-navy/5 text-navy' },
                 { label: 'On time', value: present.length - lateOnes.length, tone: 'bg-emerald-50 text-emerald-700' },
                 { label: 'Late', value: lateOnes.length, tone: lateOnes.length ? 'bg-amber-50 text-amber-700' : 'bg-gray-100 text-gray-500' },
                 { label: pastCutoff ? 'Absent' : 'Not in yet', value: notIn.length, tone: notIn.length && pastCutoff ? 'bg-red-50 text-red-700' : 'bg-gray-100 text-gray-500' },

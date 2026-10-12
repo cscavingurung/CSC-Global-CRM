@@ -10,9 +10,13 @@ export interface DesignTaskRow {
   caption: string | null;
   reference_links: string[] | null;
   assets: DesignTask['assets'] | null;
-  platform: DesignTask['platform'];
+  /** Legacy single-platform columns — still filled with the first platform and its size. */
+  platform: string;
   dimensions: string;
+  platforms: DesignTask['platforms'] | null;
+  sizes: DesignTask['sizes'] | null;
   deadline: string;
+  deadline_time: string | null;
   stage: DesignTask['stage'];
   requested_by: string;
   assignee: string | null;
@@ -32,9 +36,11 @@ export function fromRow(row: DesignTaskRow): DesignTask {
     caption: row.caption ?? undefined,
     references: row.reference_links ?? undefined,
     assets: row.assets ?? undefined,
-    platform: row.platform,
-    dimensions: row.dimensions,
+    // Rows from before multi-platform cards only have the single platform/dimensions pair.
+    platforms: row.platforms?.length ? row.platforms : [row.platform as DesignTask['platforms'][number]],
+    sizes: row.sizes ?? { [row.platform]: row.dimensions },
     deadline: row.deadline,
+    deadlineTime: row.deadline_time ?? undefined,
     stage: row.stage,
     requestedBy: row.requested_by,
     assignee: row.assignee ?? undefined,
@@ -55,9 +61,12 @@ function toRow(task: DesignTask): DesignTaskRow {
     caption: task.caption ?? null,
     reference_links: task.references ?? null,
     assets: task.assets ?? null,
-    platform: task.platform,
-    dimensions: task.dimensions,
+    platform: task.platforms[0],
+    dimensions: task.sizes[task.platforms[0]] ?? '',
+    platforms: task.platforms,
+    sizes: task.sizes,
     deadline: task.deadline,
+    deadline_time: task.deadlineTime ?? null,
     stage: task.stage,
     requested_by: task.requestedBy,
     assignee: task.assignee ?? null,

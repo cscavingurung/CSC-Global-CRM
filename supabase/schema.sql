@@ -2941,3 +2941,95 @@ $$;
 
 revoke execute on function public.find_client_branches(text, text) from public, anon;
 grant execute on function public.find_client_branches(text, text) to authenticated;
+
+-- ----------------------------------------------------------------------------
+-- One design card for several platforms. A design request used to create one
+-- card per platform; now a single card lists every platform it's for and the
+-- size needed on each. `platform` / `dimensions` stay, filled with the first
+-- platform, so older rows and readers still work.
+-- ----------------------------------------------------------------------------
+alter table public.marketing_design_tasks add column if not exists platforms text[];
+alter table public.marketing_design_tasks add column if not exists sizes jsonb;
+
+update public.marketing_design_tasks
+set platforms = array[platform]
+where platforms is null and platform is not null;
+
+update public.marketing_design_tasks
+set sizes = jsonb_build_object(platform, dimensions)
+where sizes is null and platform is not null;
+
+-- ----------------------------------------------------------------------------
+-- One video task for several platforms, same as design cards. `platform` stays,
+-- filled with the first platform, so older rows and readers still work.
+-- ----------------------------------------------------------------------------
+alter table public.marketing_video_tasks add column if not exists platforms text[];
+
+update public.marketing_video_tasks
+set platforms = array[platform]
+where platforms is null and platform is not null;
+
+-- ----------------------------------------------------------------------------
+-- Deadline time ("HH:mm") for design and video requests. Kept separate from the
+-- `deadline` date so date filters, sorting and the calendar are unchanged.
+-- ----------------------------------------------------------------------------
+alter table public.marketing_design_tasks add column if not exists deadline_time text;
+alter table public.marketing_video_tasks add column if not exists deadline_time text;
+
+-- ----------------------------------------------------------------------------
+-- At most one active Branch Manager per branch. Inactive managers don't count,
+-- so a replacement can be added once the old one is set Inactive.
+-- ----------------------------------------------------------------------------
+create unique index if not exists staff_one_active_manager_per_branch
+  on public.staff (branch)
+  where role = 'Branch Manager' and status = 'Active';
+
+-- ----------------------------------------------------------------------------
+-- Absences only count from the day someone was hired. Attendance treats days
+-- before staff.join_date as Off, but staff added before the app started
+-- setting it have none, so they showed Absent for days before they existed.
+-- Backfill it from the earliest of when their staff row was created and their
+-- first check-in (today if neither is known), and fill it in on every new row.
+-- Written against information_schema so it works whether join_date and
+-- attendance.date are text or date, and whether staff has created_at. Safe to
+-- re-run: only rows with no join_date are touched.
+-- ----------------------------------------------------------------------------
+do $$
+declare
+  join_type text;
+  created_expr text := 'null::date';
+begin
+  select data_type into join_type from information_schema.columns
+  where table_schema = 'public' and table_name = 'staff' and column_name = 'join_date';
+
+  if exists (select 1 from information_schema.columns
+             where table_schema = 'public' and table_name = 'staff' and column_name = 'created_at') then
+    created_expr := 's.created_at::date';
+  end if;
+
+  execute format($sql$
+    update public.staff s
+    set join_date = coalesce(
+      least(%s, (select min(a.date::text)::date from public.attendance a where a.staff_name = s.name)),
+      current_date
+    )::text::%s
+    where s.join_date is null
+  $sql$, created_expr, join_type);
+end $$;
+
+create or replace function public.staff_default_join_date()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.join_date is null then
+    new.join_date := current_date;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists staff_default_join_date on public.staff;
+create trigger staff_default_join_date
+  before insert on public.staff
+  for each row execute function public.staff_default_join_date();

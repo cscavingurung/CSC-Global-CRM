@@ -4,7 +4,7 @@ import {
   AttendanceCorrection, AttendanceExplanation, AttendanceRecord, Holiday, LeaveRecord, NavIntent, OffboardingCase, OnboardingCase, PayrollRun,
   StaffMember,
 } from '../types';
-import { DAY_STATUS_STYLES, DayStatus, dayView } from '../attendance';
+import { DAY_STATUS_STYLES, DayStatus, activeStaff, dayView } from '../attendance';
 import { CLEARANCE_DEPTS, WorkloadSources, overdueOnboardingTasks, workloadOf, workloadTotal } from '../hrCases';
 import { monthKey, monthLabel } from '../payroll';
 import { dateKey } from '../dateTime';
@@ -76,10 +76,10 @@ export default function HrDashboardPage({
   const now = useMemo(() => new Date(), []);
   const today = dateKey(now);
   const in7 = dateKey(new Date(now.getTime() + 7 * 86_400_000));
-  const active = staff.filter((s) => s.status === 'Active' && s.role !== 'Super Admin');
+  const active = activeStaff(staff);
 
   // ── Today ──
-  const views = active.map((m) => ({ m, v: dayView(m.name, today, attendance, leave, now, holidays) }));
+  const views = active.map((m) => ({ m, v: dayView(m.name, today, attendance, leave, now, holidays, m.joinDate) }));
   const count = (...s: DayStatus[]) => views.filter((x) => s.includes(x.v.status)).length;
   const present = views.filter((x) => x.v.record?.checkIn).length;
   const late = count('Late', 'Very Late');

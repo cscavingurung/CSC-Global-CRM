@@ -119,7 +119,7 @@ export default function LateAbsencePage(props: LateAbsencePageProps) {
     : period === 'prev' ? { from: `${prevKey}-01`, to: dateKey(new Date(now.getFullYear(), now.getMonth(), 0)), label: prev.toLocaleDateString('en-GB', { month: 'long' }) }
       : { from: dateKey(new Date(now.getTime() - 29 * 86_400_000)), to: today, label: 'last 30 days' };
 
-  const everyone = activeStaff(staff).filter((p) => p.role !== 'Super Admin');
+  const everyone = activeStaff(staff);
   const people = everyone.filter((p) => (!who || p.name === who) && (!dept || departmentOf(p.role) === dept));
   const explanationFor = (name: string, date: string, kind: 'Late' | 'Absence') =>
     explanations.find((e) => e.staffName === name && e.date === date && e.kind === kind);
@@ -131,7 +131,7 @@ export default function LateAbsencePage(props: LateAbsencePageProps) {
       people.forEach((member) => {
         const start = firstDayOf(attendance, member.name);
         if (start && date < start) return;
-        const v = dayView(member.name, date, attendance, leave, now, holidays);
+        const v = dayView(member.name, date, attendance, leave, now, holidays, member.joinDate);
         if (v.status === 'Late' || v.status === 'Very Late') {
           const explanation = explanationFor(member.name, date, 'Late');
           out.push({ key: `L-${member.name}-${date}`, kind: 'Late', date, member, checkIn: v.record?.checkIn, delay: delayMinutes(v.record), explanation, state: exceptionState('Late', explanation) });
@@ -173,7 +173,7 @@ export default function LateAbsencePage(props: LateAbsencePageProps) {
   const coverage = DEPARTMENTS.map((d) => {
     const team = everyone.filter((p) => departmentOf(p.role) === d);
     const out = team.filter((p) => {
-      const v = dayView(p.name, today, attendance, leave, now, holidays);
+      const v = dayView(p.name, today, attendance, leave, now, holidays, p.joinDate);
       return v.status === 'Absent' || v.status === 'On Leave';
     });
     return { dept: d, total: team.length, available: team.length - out.length, out };
@@ -279,7 +279,7 @@ export default function LateAbsencePage(props: LateAbsencePageProps) {
             <b>Coverage Alert: {c.dept} capacity reduced ({c.available}/{c.total} available)</b>
             <span className="block text-xs text-gray-600">
               Out today: {c.out.map((p) => {
-                const v = dayView(p.name, today, attendance, leave, now, holidays);
+                const v = dayView(p.name, today, attendance, leave, now, holidays, p.joinDate);
                 return `${p.name} (${v.status === 'On Leave' ? 'on leave' : 'absent'})`;
               }).join(', ')}
             </span>

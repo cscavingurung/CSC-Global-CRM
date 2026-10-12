@@ -41,7 +41,7 @@ export default function AttendanceHistory({ currentUser, staff, attendance, corr
         .filter((p) => (!employee || p.name === employee) && (!dept || departmentOf(p.role) === dept))
         .filter((p) => !term || `${p.name} ${p.role}`.toLowerCase().includes(term))
         .filter((p) => (firstDayOf(attendance, p.name) ?? date) <= date)
-        .map((p) => ({ member: p, day: dayView(p.name, date, attendance, leave, now, holidays) }))
+        .map((p) => ({ member: p, day: dayView(p.name, date, attendance, leave, now, holidays, p.joinDate) }))
         .filter(({ day }) => day.status !== 'Off' && day.status !== 'Not in yet' && day.status !== 'Holiday')
         .filter(({ day }) =>
           !status ? true
@@ -56,7 +56,7 @@ export default function AttendanceHistory({ currentUser, staff, attendance, corr
   const current = Math.min(page, pages);
   const shown = rows.slice((current - 1) * PAGE, current * PAGE);
   const sel = selected && rows.find((r) => r.member.name === selected.name && r.day.date === selected.date);
-  const selDay = sel?.day ?? (selected ? dayView(selected.name, selected.date, attendance, leave, now, holidays) : null);
+  const selDay = sel?.day ?? (selected ? dayView(selected.name, selected.date, attendance, leave, now, holidays, staff.find((s) => s.name === selected.name)?.joinDate) : null);
   const anyFilter = employee || dept || status || search || from !== monthStart || to !== today;
 
   const selectClass = 'appearance-none rounded-lg border border-grey-border bg-white py-2.5 pl-3 pr-8 text-sm text-navy focus:border-navy-light focus:outline-none';

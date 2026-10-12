@@ -6,8 +6,8 @@
 // rows without the finance ledger, so no revenue, fees, receipts or payment history exist here.
 // Journey statuses are read-only: they sync from the branch Counselor / V/A Officer modules and
 // there is deliberately no control to set "Client" or "Visa Approved" by hand.
-import { useMemo, useState } from 'react';
-import { AlertTriangle, BellRing, Building2, Check, CheckCircle2, Clock, Flag, Minus, Search, UserPlus, Users, XCircle } from 'lucide-react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { AlertTriangle, BellRing, Building2, Check, CheckCircle2, ChevronDown, Clock, Flag, Minus, Search, UserPlus, Users, XCircle } from 'lucide-react';
 import { QualifyFields, useMarketing } from './mktContext';
 import {
   CampaignTag, Card, Chips, Drawer, EmptyRow, Field, GhostButton, Kpi, PageIntro, Pill, PrimaryButton, ReadOnlyNote,
@@ -19,8 +19,9 @@ import {
 } from '../../marketingDept';
 import { BranchPing, LeadChannel, MarketingLead } from '../../types';
 import { CITY_POOLS, COUNTRIES, needsAttention } from './mktUtils';
-import NewIntakeForm, { IntakeFormData, MarketingSubmitAction } from '../NewIntakeForm';
 import { findClientBranches } from '../../lib/studentsApi';
+import { caretPositionForDigitCount, dialedDigitsBeforeCaret, formatPhoneInput, isValidPhone } from '../../lib/phone';
+import { isValidEmail } from '../../validation';
 import { ExcelSheet, ViewToggle } from './MktSheet';
 import { AlertRow, alertColumns, trackColumns, trackTone } from './mktSheetColumns';
 import { useViewMode } from './mktUtils';
@@ -33,8 +34,10 @@ const DISQUALIFY_REASONS = [
 ];
 
 // ── Add / Qualify Lead form ─────────────────────────────────────────────────
+// An inbox lead's number is put in the Add Client format when that makes it valid; otherwise it's shown as received.
+const formattedPhone = (phone = '') => (isValidPhone(formatPhoneInput(phone)) ? formatPhoneInput(phone) : phone);
 const blank = (lead?: MarketingLead): QualifyFields => ({
-  name: lead?.name ?? '', phone: lead?.phone ?? '', email: lead?.email ?? '',
+  name: lead?.name ?? '', phone: formattedPhone(lead?.phone), email: lead?.email ?? '',
   preferredCountry: lead?.preferredCountry ?? '', interestedProgram: lead?.interestedProgram ?? '', intake: lead?.intake ?? '',
   academicBackground: lead?.academicBackground ?? '', englishTest: lead?.englishTest ?? '', preferredBranch: lead?.preferredBranch ?? '',
   source: lead?.source ?? ('' as LeadChannel), campaignId: lead?.campaignId ?? '', notes: lead?.notes ?? '',
@@ -44,7 +47,12 @@ const clean = (f: QualifyFields): QualifyFields => Object.fromEntries(
   Object.entries(f).map(([k, v]) => [k, typeof v === 'string' ? v.trim() || undefined : v]),
 ) as QualifyFields;
 
-/** Manual entry (no `lead`) or qualification of an inbox lead. */
+const digitsOf = (phone: string) => phone.replace(/\D/g, '').slice(-10);
+
+/**
+ * Manual entry (no `lead`) or qualification of an inbox lead. Asks only what's needed to reach and route
+ * the lead — name, phone, source, where it goes. The rest is optional; the counselor completes the profile.
+ */
 export function LeadForm({ lead, onDone }: { lead?: MarketingLead; onDone: (message: string) => void }) {
   const { store, branches, actions } = useMarketing();
   const [f, setF] = useState<QualifyFields>(() => blank(lead));
@@ -52,13 +60,30 @@ export function LeadForm({ lead, onDone }: { lead?: MarketingLead; onDone: (mess
   const [reason, setReason] = useState('');
   const [destination, setDestination] = useState<'Branch' | 'City Pool'>('Branch');
   const [city, setCity] = useState('');
+  const [more, setMore] = useState(() => Boolean(lead?.academicBackground || lead?.englishTest || lead?.intake));
+  // A manual lead whose phone/email is already known — held until "Add anyway" or Cancel.
+  const [dupe, setDupe] = useState<{ where: string[]; run: () => void } | null>(null);
+  const [checking, setChecking] = useState(false);
   const set = <K extends keyof QualifyFields>(k: K, v: QualifyFields[K]) => setF((p) => ({ ...p, [k]: v }));
+  // Same live formatting as Add Client — the caret is put back after each reformat.
+  const [phoneError, setPhoneError] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const phoneInputRef = useRef<HTMLInputElement>(null);
+  const phoneCaretRef = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    if (phoneCaretRef.current === null || !phoneInputRef.current) return;
+    phoneInputRef.current.setSelectionRange(phoneCaretRef.current, phoneCaretRef.current);
+    phoneCaretRef.current = null;
+  }, [f.phone]);
 
-  const basicsOk = Boolean(f.name.trim() && f.phone.trim() && f.source);
+  const phoneOk = isValidPhone(f.phone);
+  const emailOk = isValidEmail((f.email ?? '').trim());
+  const basicsOk = Boolean(f.name.trim() && phoneOk && emailOk && f.source);
   const destinationOk = destination === 'Branch' ? Boolean(f.preferredBranch) : Boolean(city);
-  const qualified = basicsOk && Boolean(f.preferredCountry && f.interestedProgram?.trim()) && destinationOk;
+  const qualified = basicsOk && destinationOk;
   const branch = f.preferredBranch ?? '';
 
+  const reset = () => { setF(blank()); setCity(''); setMore(false); };
   const save = () => {
     if (!basicsOk) return;
     const data = clean(f);
@@ -69,7 +94,7 @@ export function LeadForm({ lead, onDone }: { lead?: MarketingLead; onDone: (mess
       actions.addLead(data, qualified ? 'Qualified' : 'Raw');
       onDone(`${f.name} was added to the inbox${qualified ? ' as qualified' : ''}.`);
     }
-    setF(blank());
+    reset();
   };
   const assign = () => {
     if (!qualified) return;
@@ -83,7 +108,21 @@ export function LeadForm({ lead, onDone }: { lead?: MarketingLead; onDone: (mess
       else actions.addAndAssign(data, branch);
       onDone(`${f.name} was assigned to ${branch} and is now in that branch's lead queue.`);
     }
-    setF(blank());
+    reset();
+  };
+  // New leads only: warn if this phone/email is already a marketing lead or a client at any branch.
+  const checked = async (run: () => void) => {
+    if (lead) { run(); return; }
+    const phone = digitsOf(f.phone);
+    const email = f.email?.trim().toLowerCase();
+    const inMarketing = store.leads.some((l) => l.stage !== 'Disqualified'
+      && (digitsOf(l.phone) === phone || (!!email && l.email?.trim().toLowerCase() === email)));
+    setChecking(true);
+    const atBranches = (await findClientBranches(f.phone, f.email ?? '')) ?? [];
+    setChecking(false);
+    const where = [...(inMarketing ? ['the Marketing lead list'] : []), ...atBranches.map((b) => `${b} branch`)];
+    if (where.length) setDupe({ where, run });
+    else run();
   };
 
   if (rejecting && lead) {
@@ -104,38 +143,51 @@ export function LeadForm({ lead, onDone }: { lead?: MarketingLead; onDone: (mess
   }
 
   return (
-    <form onSubmit={(e) => { e.preventDefault(); assign(); }} className="space-y-5">
+    <form onSubmit={(e) => { e.preventDefault(); if (qualified && !checking) void checked(assign); }} className="space-y-5">
       {lead?.message && (
         <p className="rounded-lg bg-grey-bg px-3 py-2 text-sm text-gray-600">“{lead.message}” <span className="text-xs text-gray-400">· {lead.source} · {ago(lead.receivedAt)}</span></p>
       )}
-      <fieldset className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <legend className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400">Contact</legend>
-        <Field label="Name" required><TextInput value={f.name} onChange={(e) => set('name', e.target.value)} /></Field>
-        <Field label="Phone" required><TextInput value={f.phone} inputMode="tel" onChange={(e) => set('phone', e.target.value)} /></Field>
-        <Field label="Email"><TextInput type="email" value={f.email ?? ''} onChange={(e) => set('email', e.target.value)} /></Field>
+      <fieldset className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <legend className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400">Lead</legend>
+        <Field label="Name" required><TextInput value={f.name} autoFocus={!lead} onChange={(e) => set('name', e.target.value)} /></Field>
+        <Field label="Phone / WhatsApp" required>
+          <TextInput
+            ref={phoneInputRef}
+            type="tel"
+            value={f.phone}
+            placeholder="+1 or +977 number"
+            onChange={(e) => {
+              const raw = e.target.value;
+              const formatted = formatPhoneInput(raw);
+              phoneCaretRef.current = caretPositionForDigitCount(formatted, dialedDigitsBeforeCaret(raw, e.target.selectionStart ?? raw.length));
+              set('phone', formatted);
+              if (phoneError) setPhoneError('');
+            }}
+            onBlur={() => { if (f.phone && !isValidPhone(f.phone)) setPhoneError('Enter a valid number, e.g. +1 416 272 4274 or +977 98XXXXXXXX'); }}
+          />
+          {phoneError && <p className="mt-1 text-xs text-red-500">{phoneError}</p>}
+        </Field>
+        <Field label="Email" required>
+          <TextInput
+            type="email"
+            value={f.email ?? ''}
+            placeholder="client@email.com"
+            onChange={(e) => { set('email', e.target.value); if (emailError) setEmailError(''); }}
+            onBlur={() => { if (f.email?.trim() && !isValidEmail(f.email.trim())) setEmailError('Enter a valid email, e.g. name@example.com'); }}
+          />
+          {emailError && <p className="mt-1 text-xs text-red-500">{emailError}</p>}
+        </Field>
+        <Field label="Lead Source" required>
+          <SelectInput value={f.source} onChange={(v) => set('source', v as LeadChannel)} label="Lead Source">
+            <option value="">Select source</option>
+            {LEAD_CHANNELS.map((c) => <option key={c}>{c}</option>)}
+          </SelectInput>
+        </Field>
       </fieldset>
+
       <fieldset className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <legend className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400">Study interest</legend>
-        <Field label="Interested Country">
-          <SelectInput value={f.preferredCountry ?? ''} onChange={(v) => set('preferredCountry', v)} label="Interested Country">
-            <option value="">Select country</option>
-            {COUNTRIES.map((c) => <option key={c}>{c}</option>)}
-          </SelectInput>
-        </Field>
-        <Field label="Program"><TextInput value={f.interestedProgram ?? ''} placeholder="e.g. Bachelor of Nursing" onChange={(e) => set('interestedProgram', e.target.value)} /></Field>
-        <Field label="Intake">
-          <SelectInput value={f.intake ?? ''} onChange={(v) => set('intake', v)} label="Intake">
-            <option value="">Not sure yet</option>
-            {INTAKES.map((i) => <option key={i}>{i}</option>)}
-          </SelectInput>
-        </Field>
-        <Field label="Academic Background"><TextInput value={f.academicBackground ?? ''} placeholder="e.g. +2 Science, 3.2 GPA" onChange={(e) => set('academicBackground', e.target.value)} /></Field>
-        <Field label="English Test Status">
-          <TextInput list="english-tests" value={f.englishTest ?? ''} placeholder="e.g. IELTS 6.5" onChange={(e) => set('englishTest', e.target.value)} />
-          <datalist id="english-tests">{ENGLISH.map((e) => <option key={e} value={e} />)}</datalist>
-        </Field>
+        <legend className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400">Send to</legend>
         <div className="sm:col-span-3">
-          <span className="mb-1 block text-xs font-medium text-gray-600">Assign to</span>
           <Chips
             options={['Branch', 'City Pool'] as const}
             value={destination}
@@ -143,8 +195,8 @@ export function LeadForm({ lead, onDone }: { lead?: MarketingLead; onDone: (mess
           />
         </div>
         {destination === 'Branch' ? (
-          <Field label="Preferred Branch">
-            <SelectInput value={branch} onChange={(v) => set('preferredBranch', v)} label="Preferred Branch">
+          <Field label="Branch">
+            <SelectInput value={branch} onChange={(v) => set('preferredBranch', v)} label="Branch">
               <option value="">Select branch</option>
               {branches.map((b) => <option key={b}>{b}</option>)}
             </SelectInput>
@@ -158,35 +210,69 @@ export function LeadForm({ lead, onDone }: { lead?: MarketingLead; onDone: (mess
           </Field>
         )}
       </fieldset>
-      <fieldset className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <legend className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400">Marketing attribution</legend>
-        <Field label="Lead Source" required>
-          <SelectInput value={f.source} onChange={(v) => set('source', v as LeadChannel)} label="Lead Source">
-            <option value="">Select source</option>
-            {LEAD_CHANNELS.map((c) => <option key={c}>{c}</option>)}
+
+      <fieldset className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <legend className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400">If they mentioned it <span className="font-normal normal-case tracking-normal">· optional</span></legend>
+        <Field label="Interested Country">
+          <SelectInput value={f.preferredCountry ?? ''} onChange={(v) => set('preferredCountry', v)} label="Interested Country">
+            <option value="">Not sure yet</option>
+            {COUNTRIES.map((c) => <option key={c}>{c}</option>)}
           </SelectInput>
         </Field>
+        <Field label="Program"><TextInput value={f.interestedProgram ?? ''} placeholder="e.g. Nursing" onChange={(e) => set('interestedProgram', e.target.value)} /></Field>
         <Field label="Campaign">
           <SelectInput value={f.campaignId ?? ''} onChange={(v) => set('campaignId', v)} label="Campaign">
             <option value="">No campaign</option>
             {store.campaigns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </SelectInput>
         </Field>
-        <div className="sm:col-span-2">
-          <Field label="Notes" hint="Marketing's own notes from the enquiry. The branch sees these with the lead.">
-            <TextArea value={f.notes ?? ''} onChange={(e) => set('notes', e.target.value)} />
+        <div className="sm:col-span-3">
+          <Field label="Notes" hint="The branch sees these with the lead.">
+            <TextArea value={f.notes ?? ''} placeholder="e.g. Call after 5pm, asked about scholarships" onChange={(e) => set('notes', e.target.value)} />
           </Field>
         </div>
       </fieldset>
+
+      <div>
+        <button type="button" onClick={() => setMore((m) => !m)} aria-expanded={more} className="inline-flex items-center gap-1 text-xs font-medium text-navy-light hover:underline">
+          <ChevronDown size={14} className={`transition-transform ${more ? 'rotate-180' : ''}`} /> More details (optional)
+        </button>
+        {more && (
+          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Intake">
+              <SelectInput value={f.intake ?? ''} onChange={(v) => set('intake', v)} label="Intake">
+                <option value="">Not sure yet</option>
+                {INTAKES.map((i) => <option key={i}>{i}</option>)}
+              </SelectInput>
+            </Field>
+            <Field label="Academic Background"><TextInput value={f.academicBackground ?? ''} placeholder="e.g. +2 Science, 3.2 GPA" onChange={(e) => set('academicBackground', e.target.value)} /></Field>
+            <Field label="English Test Status">
+              <TextInput list="english-tests" value={f.englishTest ?? ''} placeholder="e.g. IELTS 6.5" onChange={(e) => set('englishTest', e.target.value)} />
+              <datalist id="english-tests">{ENGLISH.map((e) => <option key={e} value={e} />)}</datalist>
+            </Field>
+          </div>
+        )}
+      </div>
+
+      {dupe && (
+        <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <p className="flex items-start gap-2"><AlertTriangle size={16} className="mt-0.5 shrink-0" /> This phone number or email already exists in {dupe.where.join(', ')}. Add it anyway?</p>
+          <div className="mt-2 flex justify-end gap-2">
+            <GhostButton small onClick={() => setDupe(null)}>Cancel</GhostButton>
+            <PrimaryButton small onClick={() => { const { run } = dupe; setDupe(null); run(); }}>Add anyway</PrimaryButton>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col-reverse gap-2 border-t border-grey-border pt-4 sm:flex-row sm:items-center">
         {lead && <GhostButton danger onClick={() => setRejecting(true)}><XCircle size={15} /> Disqualify</GhostButton>}
         <p className="flex-1 text-xs text-gray-400">
-          {qualified
-            ? destination === 'City Pool' ? `Ready to route into the ${city} City Pool.` : `Ready to route to ${branch}.`
-            : `Country, program and a ${destination === 'City Pool' ? 'city pool' : 'preferred branch'} are needed to assign.`}
+          {!basicsOk ? 'Name, phone, email and source are all that\'s needed.'
+            : qualified ? destination === 'City Pool' ? `Ready to route into the ${city} City Pool.` : `Ready to route to ${branch}.`
+              : `Pick a ${destination === 'City Pool' ? 'city pool' : 'branch'} to send it now, or save it to the inbox.`}
         </p>
-        <GhostButton onClick={save}>{lead ? 'Save as qualified' : 'Save to Inbox'}</GhostButton>
-        <PrimaryButton type="submit" disabled={!qualified}>
+        <GhostButton onClick={() => { if (basicsOk && !checking) void checked(save); }}>{lead ? 'Save as qualified' : 'Save to Inbox'}</GhostButton>
+        <PrimaryButton type="submit" disabled={!qualified || checking}>
           {destination === 'City Pool' ? <><Users size={15} /> Assign to City Pool</> : <><Building2 size={15} /> Assign to Branch</>}
         </PrimaryButton>
       </div>
@@ -194,41 +280,23 @@ export function LeadForm({ lead, onDone }: { lead?: MarketingLead; onDone: (mess
   );
 }
 
-/** Front Desk intake fields → a marketing lead carrying the full profile. */
-function leadFromIntake(d: IntakeFormData): Omit<MarketingLead, 'id' | 'receivedAt' | 'stage'> {
-  const academics = d.academics.filter((a) => a.level);
-  return {
-    name: d.name.trim(), phone: d.phone, email: d.email.trim() || undefined,
-    source: (d.platformSource || 'Website') as LeadChannel, campaignId: d.campaignId || undefined,
-    preferredCountry: d.country, purpose: d.purpose, preferredBranch: d.preferredBranch,
-    academicBackground: academics.map((a) => `${a.level}${a.stream ? `, ${a.stream}` : ''}${a.gpa ? ` (${a.gpa})` : ''}`).join(' · ') || undefined,
-    englishTest: d.ieltsPte || undefined,
-    address: d.address, dob: d.dob, gender: d.gender, maritalStatus: d.maritalStatus, academics, workExperience: d.workExperience,
-  };
-}
-
 export function AddLeadPage() {
-  const { store, me, role, branches, actions } = useMarketing();
+  const { store, me, role } = useMarketing();
+  const [flash, setFlash] = useState('');
   const mine = store.leads.filter((l) => l.qualifiedBy === me || l.assignedBy === me)
     .sort((a, b) => (b.assignedAt ?? b.qualifiedAt ?? b.receivedAt).localeCompare(a.assignedAt ?? a.qualifiedAt ?? a.receivedAt))
     .slice(0, 6);
   if (!MKT_CAN.qualify(role)) return <p className="text-sm text-gray-500">Only the Leads Specialist and Marketing Manager add leads.</p>;
 
-  const submit = (data: IntakeFormData, action: MarketingSubmitAction = 'assign') => {
-    const lead = leadFromIntake(data);
-    // Every Add Lead entry has its full profile and a branch, so it's already qualified.
-    if (action === 'assign' && lead.preferredBranch) actions.addAndAssign(lead, lead.preferredBranch);
-    else actions.addLead(lead, 'Qualified');
-  };
-
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_300px]">
-      <NewIntakeForm
-        embedded
-        marketing={{ branches, sources: LEAD_CHANNELS, campaigns: store.campaigns.map((c) => ({ id: c.id, name: c.name })) }}
-        onSubmit={submit}
-        findClientBranches={findClientBranches}
-      />
+      <div className="space-y-3">
+        <p className="text-xs text-gray-400">Name, phone, email and source are enough — the counselor fills in the rest.</p>
+        <Card className="p-5">
+          {flash && <p role="status" className="mb-4 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800"><CheckCircle2 size={15} /> {flash}</p>}
+          <LeadForm onDone={setFlash} />
+        </Card>
+      </div>
       <Card title="Your recent leads" className="h-fit xl:mt-2">
         <ul className="divide-y divide-grey-border">
           {mine.map((l) => (

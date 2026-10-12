@@ -1354,6 +1354,14 @@ export default function App() {
       console.error('Failed to update counselor_students in Supabase', err);
       setSaveError("Couldn't save that change — it will revert on refresh. Try again or check your connection.");
     });
+    // Details the counselor fills in on a lead also update its intake row (same id), so the
+    // front desk and branch lead lists show the completed profile.
+    const intakeKeys = ['name', 'phone', 'email', 'address', 'country', 'purpose', 'dob', 'gender', 'maritalStatus', 'academics', 'ieltsPte', 'workExperience'] as const;
+    const intakeUpdates = Object.fromEntries(intakeKeys.filter((k) => updates[k] !== undefined).map((k) => [k, updates[k]])) as Partial<IntakeStudent>;
+    if (Object.keys(intakeUpdates).length && students.some((s) => s.id === id)) {
+      setStudents((prev) => prev.map((s) => (s.id === id ? { ...s, ...intakeUpdates } : s)));
+      updateStudent(id, intakeUpdates).catch((err) => console.error('Failed to update student in Supabase', err));
+    }
     if (updates.outcome === 'Proceeding') {
       const student = counselorStudents.find((s) => s.id === id);
       if (student) {

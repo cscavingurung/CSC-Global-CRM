@@ -27,15 +27,29 @@ export const DESIGN_STYLES: Record<DesignStage, string> = {
   Scheduled: 'bg-navy/10 text-navy',
 };
 
-export function deadlineTone(deadline: string, done = false) {
+/** "17:00" → "5:00 PM". */
+export function clockTime(hhmm?: string) {
+  if (!hhmm) return '';
+  const [h, m] = hhmm.split(':').map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+}
+/** Past the date, or past the time on the day itself. */
+const isOverdue = (deadline: string, time?: string) => {
+  const today = isoToday();
+  if (deadline !== today) return deadline < today;
+  const now = new Date();
+  return !!time && time < `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+};
+export function deadlineTone(deadline: string, done = false, time?: string) {
   if (done) return 'text-gray-500';
-  const today = isoToday();
-  return deadline < today ? 'text-red-600 font-semibold' : deadline === today ? 'text-amber-700 font-semibold' : 'text-gray-500';
+  return isOverdue(deadline, time) ? 'text-red-600 font-semibold' : deadline === isoToday() ? 'text-amber-700 font-semibold' : 'text-gray-500';
 }
-export function deadlineText(deadline: string) {
-  const today = isoToday();
-  return deadline < today ? `Overdue · ${shortDay(deadline)}` : deadline === today ? 'Due today' : `Due ${shortDay(deadline)}`;
+export function deadlineText(deadline: string, time?: string) {
+  const at = time ? ` · ${clockTime(time)}` : '';
+  return isOverdue(deadline, time) ? `Overdue · ${shortDay(deadline)}${at}` : deadline === isoToday() ? `Due today${at}` : `Due ${shortDay(deadline)}${at}`;
 }
+/** Sort key: date, then time (no time = end of day). */
+export const deadlineKey = (t: { deadline: string; deadlineTime?: string }) => `${t.deadline} ${t.deadlineTime ?? '23:59'}`;
 
 export const COUNTRIES = ['Australia', 'Canada', 'United Kingdom', 'USA', 'New Zealand', 'Europe', 'Japan', 'Other'];
 

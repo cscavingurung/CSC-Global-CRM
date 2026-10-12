@@ -9,6 +9,7 @@ const MARKETING_ROLE_OPTIONS: MarketingRole[] = ['Marketing Manager', 'Leads Spe
 import StaffActivityPanel from './StaffActivityPanel';
 import { isValidEmail, PASSWORD_PATTERN } from '../validation';
 import { COUNTRIES } from '../mockData';
+import { dateKey } from '../dateTime';
 
 const COUNTRY_OPTIONS = [...COUNTRIES, 'Others'];
 
@@ -86,6 +87,14 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
 
   const selectedStaff = staff.find((s) => s.id === selectedStaffId) ?? null;
 
+  // One active Branch Manager per branch (also enforced in the database). Inactive ones don't count.
+  const activeManagerOf = (branch: string, exceptId?: string) =>
+    staff.find((s) => s.role === 'Branch Manager' && s.status === 'Active' && s.branch === branch && s.id !== exceptId);
+  const managerClash = newStaff.role === 'Branch Manager' ? activeManagerOf(newStaff.branch) : undefined;
+  const managerClashText = (branch: string, name: string) =>
+    `${branch} already has a Branch Manager (${name}). Set them Inactive or remove them first.`;
+  const [statusError, setStatusError] = useState<string | null>(null);
+
   // Reset the credentials editor whenever a different staff member is opened (or the panel
   // closes) — intentionally keyed on the id alone, not selectedStaff.email, so it doesn't
   // re-fire (and wipe in-progress edits) on every keystroke while editing.
@@ -95,6 +104,7 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
     setEditPassword('');
     setEditShowPassword(false);
     setEditError(null);
+    setStatusError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedStaffId]);
 
@@ -117,6 +127,10 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
       newStaffEmailRef.current?.reportValidity();
       return;
     }
+    if (managerClash) {
+      setAddError(managerClashText(newStaff.branch, managerClash.name));
+      return;
+    }
     const member: StaffMember = {
       id: `st${Date.now()}`,
       name: newStaff.name,
@@ -124,6 +138,8 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
       role: newStaff.role,
       status: 'Active',
       branch: newStaff.branch,
+      // Attendance counts from here — no absences for days before they were added.
+      joinDate: dateKey(new Date()),
       ...(newStaff.role === 'Marketing' ? { marketingRole: newStaff.marketingRole } : {}),
     };
     const extraCountries = countriesOther.split(',').map((c) => c.trim()).filter(Boolean);
@@ -139,7 +155,10 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
       setShowPassword(false);
       setShowAddForm(false);
     } catch (err) {
-      setAddError(err instanceof Error ? err.message : 'Could not create this account. Please try again.');
+      const message = err instanceof Error ? err.message : '';
+      setAddError(message.includes('staff_one_active_manager_per_branch')
+        ? `${newStaff.branch} already has a Branch Manager.`
+        : message || 'Could not create this account. Please try again.');
     } finally {
       setAddSubmitting(false);
     }
@@ -530,6 +549,7 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
                   </div>
                 </div>
               )}
+              {managerClash && !addError && <p className="text-xs text-amber-700">{managerClashText(newStaff.branch, managerClash.name)}</p>}
               {addError && <p className="text-xs text-red-600">{addError}</p>}
               <div className="flex gap-3 pt-2">
                 <button
@@ -541,7 +561,7 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
                 </button>
                 <button
                   type="submit"
-                  disabled={addSubmitting}
+                  disabled={addSubmitting || !!managerClash}
                   className="flex-1 py-2.5 bg-navy text-white rounded-lg text-sm font-semibold hover:bg-navy-light transition-colors active:scale-[0.98] disabled:opacity-60"
                 >
                   {addSubmitting ? 'Creating…' : 'Add Staff'}
@@ -730,7 +750,12 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
                     <button
                       key={opt}
                       type="button"
-                      onClick={() => onUpdateStaff(selectedStaff.id, { status: opt })}
+                      onClick={() => {
+                        // Reactivating a manager can't give the branch a second active one.
+                        const clash = opt === 'Active' && selectedStaff.role === 'Branch Manager' ? activeManagerOf(selectedStaff.branch, selectedStaff.id) : undefined;
+                        setStatusError(clash ? managerClashText(selectedStaff.branch, clash.name) : null);
+                        if (!clash) onUpdateStaff(selectedStaff.id, { status: opt });
+                      }}
                       className={`px-4 py-1.5 rounded-full border text-sm font-medium transition-colors ${
                         selectedStaff.status === opt
                           ? opt === 'Active'
@@ -743,6 +768,7 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
                     </button>
                   ))}
                 </div>
+                {statusError && <p className="mt-1.5 text-xs text-red-600">{statusError}</p>}
               </div>
             </div>
           </div>

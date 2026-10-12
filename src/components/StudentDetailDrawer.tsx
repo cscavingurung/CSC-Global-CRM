@@ -5,6 +5,7 @@ import {
   Cake, Users, Heart, GraduationCap, Languages, Briefcase, ArrowRightLeft, History,
 } from 'lucide-react';
 import HandoverClientModal from './HandoverClientModal';
+import ClientDetailsEditor, { EditDetailsButton, MissingDetailsNotice, missingDetails } from './ClientDetailsEditor';
 import { CounselorStudent, ConsultationStatus, ConsultationOutcome, EnrolmentChoice, LeadTemperature } from '../types';
 import { LEAD_TEMPERATURES, LEAD_TEMPERATURE_HINTS, LEAD_TEMPERATURE_STYLES } from '../leadTemperature';
 import { isStudyCase, formatAcademic } from '../clientPipeline';
@@ -146,6 +147,8 @@ export default function StudentDetailDrawer({ student, onClose, onUpdate, handov
   const [temperature, setTemperature] = useState<LeadTemperature | ''>(student.leadTemperature ?? '');
   const [followUpNote, setFollowUpNote] = useState(student.followUpNote ?? '');
   const [showEnrolmentModal, setShowEnrolmentModal] = useState(false);
+  const [editingDetails, setEditingDetails] = useState(false);
+  const missing = missingDetails(student);
   const [pendingStatus, setPendingStatus] = useState<ConsultationStatus | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
@@ -213,6 +216,11 @@ export default function StudentDetailDrawer({ student, onClose, onUpdate, handov
     // only forward into Proceeding, never back-and-forth.
     if (outcome === 'Proceeding') return;
     if (outcome === 'Not Proceeding' && newOutcome !== 'Proceeding') return;
+    // Marketing leads arrive with only the basics — the profile must be complete first.
+    if (newOutcome === 'Proceeding' && missing.length) {
+      setEditingDetails(true);
+      return;
+    }
     // Study cases collect their university/program/intake choices first.
     if (newOutcome === 'Proceeding' && isStudyCase(student.purpose)) {
       setShowEnrolmentModal(true);
@@ -320,7 +328,9 @@ export default function StudentDetailDrawer({ student, onClose, onUpdate, handov
               <div className="flex items-center gap-2 mb-4">
                 <User className="text-navy" size={17} />
                 <h3 className="text-sm font-semibold text-navy">Contact & Application Details</h3>
+                {outcome !== 'Proceeding' && <EditDetailsButton onClick={() => setEditingDetails(true)} />}
               </div>
+              {outcome !== 'Proceeding' && <MissingDetailsNotice missing={missing} onEdit={() => setEditingDetails(true)} />}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {detailRows.map((row) => {
                   const Icon = row.icon;
@@ -545,6 +555,10 @@ export default function StudentDetailDrawer({ student, onClose, onUpdate, handov
 
       {showEnrolmentModal && (
         <EnrolmentModal onConfirm={handleConfirmEnrolment} onClose={() => setShowEnrolmentModal(false)} />
+      )}
+
+      {editingDetails && (
+        <ClientDetailsEditor client={student} onSave={onUpdate} onClose={() => setEditingDetails(false)} />
       )}
 
       {pendingStatus && (

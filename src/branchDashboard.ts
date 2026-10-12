@@ -6,7 +6,7 @@ import {
   CounselorStudent, DailyTask, ExpenseRequest, FinTransaction, Holiday, IntakeStudent, LeaveRecord, NavIntent, StaffMember,
 } from './types';
 import { dateKey } from './dateTime';
-import { dayView, DayStatus } from './attendance';
+import { dayView, DayStatus, tracksAttendance } from './attendance';
 import { timeOf } from './branchOps';
 import { clientBalances, isLivePayment } from './finance';
 import { daysInCurrentStatus, getClientStage, isClientInProgress } from './clientPipeline';
@@ -84,8 +84,8 @@ export const STAFF_STATUS_STYLES: Record<DayStatus, string> = {
 
 export function staffToday(src: BranchDashboardSources, now = new Date()): StaffToday[] {
   const today = dateKey(now);
-  return src.staff.filter((s) => s.status === 'Active').map((s) => {
-    const v = dayView(s.name, today, src.attendance, src.leave, now, src.holidays);
+  return src.staff.filter((s) => s.status === 'Active' && tracksAttendance(s)).map((s) => {
+    const v = dayView(s.name, today, src.attendance, src.leave, now, src.holidays, s.joinDate);
     return {
       id: s.id, name: s.name, role: s.role, status: v.status, checkIn: v.record?.checkIn ? timeOf(v.record.checkIn) : undefined,
       pendingTasks: src.tasks.filter((t) => t.assignee === s.name && t.status !== 'Done' && t.date <= today).length,

@@ -1,14 +1,14 @@
 import { useMemo, useState } from 'react';
-import { ArrowRight, Check, Paperclip, ChevronLeft, ChevronRight, Clock, Plus, RotateCcw } from 'lucide-react';
+import { Check, Film, Paperclip, Pencil, ChevronLeft, ChevronRight, Clock, Plus, RotateCcw, Trash2, Undo2 } from 'lucide-react';
 import { useMarketing } from './mktContext';
 import {
-  CampaignTag, Chips, Field, GhostButton, Modal, PageIntro, Pill, PlatformCheckboxes, PrimaryButton, SelectInput,
+  CampaignTag, Chips, Field, GhostButton, Modal, PageIntro, Pill, PlatformCheckboxes, PlatformTags, PrimaryButton, SelectInput,
   SourceTag, TextArea, TextInput,
 } from './MktShared';
 import { DESIGN_STAGES, MKT_CAN, SOCIAL_PLATFORMS, dayOf, isoToday, shortDay } from '../../marketingDept';
 import { parseLeadDate } from '../../marketing';
-import { DeliveredFile, DesignStage, DesignTask, SocialPlatform, VideoStatus, VideoTask } from '../../types';
-import { DESIGN_STYLES, deadlineText, deadlineTone } from './mktUtils';
+import { DeliveredFile, DesignStage, DesignTask, MarketingRole, SocialPlatform, SocialPost, VideoStatus, VideoTask } from '../../types';
+import { DESIGN_STYLES, deadlineKey, deadlineText, deadlineTone } from './mktUtils';
 
 const DESIGN_PLATFORMS: SocialPlatform[] = [...SOCIAL_PLATFORMS, 'Website'];
 const DIMENSIONS: Record<SocialPlatform, string[]> = {
@@ -20,23 +20,32 @@ const DIMENSIONS: Record<SocialPlatform, string[]> = {
 };
 
 // ── Production Queue (designer Kanban) ──────────────────────────────────────
-function NewDesignModal({ onClose }: { onClose: () => void }) {
+/** New design request, or editing one that's still Requested / In Progress. One card covers every platform ticked. */
+function DesignRequestModal({ task, onClose }: { task?: DesignTask; onClose: () => void }) {
   const { store, actions } = useMarketing();
-  const [title, setTitle] = useState('');
-  const [brief, setBrief] = useState('');
-  const [platforms, setPlatforms] = useState<SocialPlatform[]>(['Instagram']);
-  const [sizes, setSizes] = useState<Partial<Record<SocialPlatform, string>>>({});
+  const [title, setTitle] = useState(task?.title ?? '');
+  const [brief, setBrief] = useState(task?.brief ?? '');
+  const [platforms, setPlatforms] = useState<SocialPlatform[]>(task?.platforms ?? ['Instagram']);
+  const [sizes, setSizes] = useState<Partial<Record<SocialPlatform, string>>>(task?.sizes ?? {});
   const sizeOf = (p: SocialPlatform) => sizes[p] ?? DIMENSIONS[p][0];
-  const [deadline, setDeadline] = useState('');
-  const [campaignId, setCampaignId] = useState('');
-  const valid = title.trim() && brief.trim() && deadline && platforms.length > 0;
+  // A size saved earlier may not be one of today's presets — keep it selectable.
+  const sizeOptions = (p: SocialPlatform) => (sizes[p] && !DIMENSIONS[p].includes(sizes[p]!) ? [sizes[p]!, ...DIMENSIONS[p]] : DIMENSIONS[p]);
+  const [deadline, setDeadline] = useState(task?.deadline ?? '');
+  const [deadlineTime, setDeadlineTime] = useState(task?.deadlineTime ?? '17:00');
+  const [campaignId, setCampaignId] = useState(task?.campaignId ?? '');
+  const valid = title.trim() && brief.trim() && deadline && deadlineTime && platforms.length > 0;
+  const submit = () => {
+    const fields = {
+      title: title.trim(), brief: brief.trim(), platforms, deadline, deadlineTime, campaignId: campaignId || undefined,
+      sizes: Object.fromEntries(platforms.map((p) => [p, sizeOf(p)])),
+    };
+    if (task) actions.updateDesignTask(task.id, fields);
+    else actions.createDesignTask(fields);
+    onClose();
+  };
   return (
-    <Modal title="New design request" onClose={onClose}>
-      <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); if (valid) {
-        // One queue card per platform — each needs its own size.
-        platforms.forEach((platform) => actions.createDesignTask({ title: title.trim(), brief: brief.trim(), platform, dimensions: sizeOf(platform), deadline, campaignId: campaignId || undefined }));
-        onClose();
-      } }}>
+    <Modal title={task ? `Edit “${task.title}”` : 'New design request'} onClose={onClose}>
+      <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); if (valid) submit(); }}>
         <Field label="Title" required><TextInput value={title} onChange={(e) => setTitle(e.target.value)} /></Field>
         <Field label="Brief" required><TextArea value={brief} placeholder="Message, must-haves, references" onChange={(e) => setBrief(e.target.value)} /></Field>
         <PlatformCheckboxes options={DESIGN_PLATFORMS} value={platforms} onChange={setPlatforms} />
@@ -45,14 +54,15 @@ function NewDesignModal({ onClose }: { onClose: () => void }) {
             {platforms.map((p) => (
               <Field key={p} label={platforms.length > 1 ? `${p} size` : 'Dimensions'} required>
                 <SelectInput value={sizeOf(p)} onChange={(v) => setSizes((cur) => ({ ...cur, [p]: v }))} label={`${p} size`}>
-                  {DIMENSIONS[p].map((d) => <option key={d}>{d}</option>)}
+                  {sizeOptions(p).map((d) => <option key={d}>{d}</option>)}
                 </SelectInput>
               </Field>
             ))}
           </div>
         )}
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Deadline" required><TextInput type="date" min={isoToday()} value={deadline} onChange={(e) => setDeadline(e.target.value)} /></Field>
+          <Field label="Deadline" required><TextInput type="date" min={task ? undefined : isoToday()} value={deadline} onChange={(e) => setDeadline(e.target.value)} /></Field>
+          <Field label="Time" required><TextInput type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} /></Field>
           <Field label="Campaign">
             <SelectInput value={campaignId} onChange={setCampaignId} label="Campaign">
               <option value="">None</option>
@@ -62,38 +72,114 @@ function NewDesignModal({ onClose }: { onClose: () => void }) {
         </div>
         <div className="flex justify-end gap-2 pt-1">
           <GhostButton onClick={onClose}>Cancel</GhostButton>
-          <PrimaryButton type="submit" disabled={!valid}>{platforms.length > 1 ? `Add ${platforms.length} to queue` : 'Add to queue'}</PrimaryButton>
+          <PrimaryButton type="submit" disabled={!valid}>{task ? 'Save changes' : 'Add to queue'}</PrimaryButton>
         </div>
       </form>
     </Modal>
   );
 }
 
+const VIDEO_PLATFORMS: VideoTask['platforms'] = [...SOCIAL_PLATFORMS, 'YouTube'];
+// 'As per footage' keeps whatever length the raw video supports; 'Other' takes a typed length.
+const VIDEO_LENGTHS = ['As per footage', '15 sec', '30 sec', '60 sec', '90 sec', '2–3 min', '5+ min', 'Other'];
+
+/** Video editing straight to the designer — marketing supplies the footage, no branch involved. */
+function VideoRequestModal({ onClose }: { onClose: () => void }) {
+  const { actions } = useMarketing();
+  const [title, setTitle] = useState('');
+  const [instructions, setInstructions] = useState('');
+  const [sourceLink, setSourceLink] = useState('');
+  const [platforms, setPlatforms] = useState<VideoTask['platforms']>(['Instagram']);
+  const [duration, setDuration] = useState('As per footage');
+  const [customLength, setCustomLength] = useState('');
+  const length = duration === 'Other' ? customLength.trim() : duration;
+  const [deadline, setDeadline] = useState('');
+  const [deadlineTime, setDeadlineTime] = useState('17:00');
+  const [priority, setPriority] = useState<NonNullable<VideoTask['priority']>>('Medium');
+  const link = sourceLink.trim();
+  const linkOk = /^https?:\/\/\S+$/i.test(link);
+  const valid = title.trim() && instructions.trim() && linkOk && deadline && deadlineTime && platforms.length > 0 && length;
+  return (
+    <Modal title="New video request" onClose={onClose}>
+      <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); if (valid) {
+        actions.createVideoTask({ title: title.trim(), instructions: instructions.trim(), sourceLink: link, platforms, duration: length, deadline, deadlineTime, priority });
+        onClose();
+      } }}>
+        <Field label="Title" required><TextInput value={title} onChange={(e) => setTitle(e.target.value)} /></Field>
+        <Field label="Edit instructions" required><TextArea value={instructions} placeholder="Cuts, captions, music, logo, call to action" onChange={(e) => setInstructions(e.target.value)} /></Field>
+        <Field label="Footage link" required>
+          <TextInput value={sourceLink} placeholder="Google Drive / Dropbox link to the raw footage" onChange={(e) => setSourceLink(e.target.value)} />
+          {link && !linkOk && <p className="mt-1 text-xs text-amber-700">Paste a full link starting with https://</p>}
+        </Field>
+        <PlatformCheckboxes options={VIDEO_PLATFORMS} value={platforms} onChange={setPlatforms} />
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Length" required>
+            <SelectInput value={duration} onChange={setDuration} label="Length">{VIDEO_LENGTHS.map((d) => <option key={d}>{d}</option>)}</SelectInput>
+            {duration === 'Other' && <div className="mt-2"><TextInput aria-label="Video length" value={customLength} placeholder="e.g. 45 sec" onChange={(e) => setCustomLength(e.target.value)} /></div>}
+          </Field>
+          <Field label="Deadline" required><TextInput type="date" min={isoToday()} value={deadline} onChange={(e) => setDeadline(e.target.value)} /></Field>
+          <Field label="Time" required><TextInput type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} /></Field>
+          <Field label="Priority">
+            <SelectInput value={priority} onChange={(v) => setPriority(v as NonNullable<VideoTask['priority']>)} label="Priority">
+              {(['High', 'Medium', 'Low'] as const).map((p) => <option key={p}>{p}</option>)}
+            </SelectInput>
+          </Field>
+        </div>
+        <div className="flex justify-end gap-2 pt-1">
+          <GhostButton onClick={onClose}>Cancel</GhostButton>
+          <PrimaryButton type="submit" disabled={!valid}>Send to designer</PrimaryButton>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+/** One approved design → one scheduled post per platform, each with its own caption and time. */
 function SchedulePostModal({ task, onClose }: { task: DesignTask; onClose: () => void }) {
   const { actions } = useMarketing();
-  const [caption, setCaption] = useState(task.title);
-  const [date, setDate] = useState(isoToday());
-  const [time, setTime] = useState('10:00');
-  const valid = caption.trim() && date && time;
+  const [slots, setSlots] = useState(() => task.platforms.map((platform) => ({ platform, caption: task.title, date: isoToday(), time: '10:00' })));
+  const set = (i: number, patch: Partial<(typeof slots)[number]>) => setSlots((cur) => cur.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  const valid = slots.every((x) => x.caption.trim() && x.date && x.time);
   const submit = () => {
-    const [h, m] = time.split(':').map(Number);
-    const stamp = `${date} ${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
-    actions.schedulePost({ platform: task.platform, caption: caption.trim(), scheduledAt: stamp, campaignId: task.campaignId, designTaskId: task.id });
+    slots.forEach(({ platform, caption, date, time }) => {
+      const [h, m] = time.split(':').map(Number);
+      const stamp = `${date} ${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+      actions.schedulePost({ platform, caption: caption.trim(), scheduledAt: stamp, campaignId: task.campaignId, designTaskId: task.id });
+    });
     actions.moveDesign(task.id, 'Scheduled');
     onClose();
   };
   return (
     <Modal title={`Schedule “${task.title}”`} onClose={onClose}>
-      <div className="space-y-3">
-        <p className="text-xs text-gray-500">Posts to <b className="text-navy">{task.platform}</b> · {task.dimensions}</p>
-        <Field label="Caption" required><TextArea value={caption} onChange={(e) => setCaption(e.target.value)} /></Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Date" required><TextInput type="date" min={isoToday()} value={date} onChange={(e) => setDate(e.target.value)} /></Field>
-          <Field label="Time" required><TextInput type="time" value={time} onChange={(e) => setTime(e.target.value)} /></Field>
-        </div>
+      <div className="space-y-4">
+        {slots.map((x, i) => (
+          <div key={x.platform} className={`space-y-3 ${i > 0 ? 'border-t border-grey-border pt-4' : ''}`}>
+            <p className="flex items-center gap-2 text-xs text-gray-500"><SourceTag source={x.platform} /> {task.sizes[x.platform]}</p>
+            <Field label="Caption" required><TextArea value={x.caption} onChange={(e) => set(i, { caption: e.target.value })} /></Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Date" required><TextInput type="date" min={isoToday()} value={x.date} onChange={(e) => set(i, { date: e.target.value })} /></Field>
+              <Field label="Time" required><TextInput type="time" value={x.time} onChange={(e) => set(i, { time: e.target.value })} /></Field>
+            </div>
+          </div>
+        ))}
         <div className="flex justify-end gap-2 pt-1">
           <GhostButton onClick={onClose}>Cancel</GhostButton>
-          <PrimaryButton disabled={!valid} onClick={submit}>Schedule post</PrimaryButton>
+          <PrimaryButton disabled={!valid} onClick={submit}>{slots.length > 1 ? `Schedule ${slots.length} posts` : 'Schedule post'}</PrimaryButton>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/** In-app confirm (no browser dialog) before a request is removed for good. */
+function DeleteTaskModal({ title, kind, onConfirm, onClose }: { title: string; kind: 'design' | 'video'; onConfirm: () => void; onClose: () => void }) {
+  return (
+    <Modal title={`Delete “${title}”?`} onClose={onClose}>
+      <div className="space-y-4">
+        <p className="text-sm text-gray-600">The {kind} request is removed from this queue and from the designer's list. This can't be undone.</p>
+        <div className="flex justify-end gap-2">
+          <GhostButton onClick={onClose}>Cancel</GhostButton>
+          <GhostButton danger onClick={() => { onConfirm(); onClose(); }}><Trash2 size={14} /> Delete</GhostButton>
         </div>
       </div>
     </Modal>
@@ -116,70 +202,163 @@ function SendBackModal({ task, onClose }: { task: DesignTask; onClose: () => voi
   );
 }
 
+const hasPendingPosts = (posts: SocialPost[], t: DesignTask) => t.stage === 'Scheduled' && posts.some((p) => p.designTaskId === t.id && p.status === 'Scheduled');
+
+function UnscheduleModal({ task, then, onClose }: { task: DesignTask; then?: DesignStage; onClose: () => void }) {
+  const { store, actions } = useMarketing();
+  const pending = store.posts.filter((p) => p.designTaskId === task.id && p.status === 'Scheduled');
+  const published = store.posts.some((p) => p.designTaskId === task.id && p.status === 'Published');
+  return (
+    <Modal title={`Unschedule “${task.title}”?`} onClose={onClose}>
+      <div className="space-y-4">
+        <p className="text-sm text-gray-600">These posts will be cancelled:</p>
+        <ul className="space-y-1 text-sm">{pending.map((p) => <li key={p.id} className="flex items-center gap-2"><SourceTag source={p.platform} /> <span className="text-gray-600">{p.scheduledAt}</span></li>)}</ul>
+        <p className="text-sm text-gray-600">{published
+          ? 'Posts already published stay as they are, so the card stays in Scheduled.'
+          : then && then !== 'Approved' ? `The card then moves back to ${then}.`
+            : 'The card goes back to Approved, where you can schedule it again or delete it.'}</p>
+        <div className="flex justify-end gap-2">
+          <GhostButton onClick={onClose}>Keep scheduled</GhostButton>
+          <PrimaryButton onClick={() => { actions.unscheduleDesign(task.id); if (then && then !== 'Approved' && !published) actions.moveDesign(task.id, then); onClose(); }}><Undo2 size={14} /> Unschedule</PrimaryButton>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+type DropMove = 'move' | 'schedule' | 'sendBack' | 'unschedule';
+/**
+ * What dropping a card on a column does. Forward is one step at a time, same as the card's buttons.
+ * Back can go to any earlier column: a reviewer sending work back to In Progress writes a note, and a
+ * Scheduled card is unscheduled first (only while none of its posts have gone out).
+ */
+function dropMove(t: DesignTask, to: DesignStage, role: MarketingRole, posts: SocialPost[]): DropMove | null {
+  const from = t.stage;
+  const step = DESIGN_STAGES.indexOf(to) - DESIGN_STAGES.indexOf(from);
+  const design = MKT_CAN.design(role);
+  const review = MKT_CAN.approveDesign(role);
+  if (step === 1) {
+    if (from === 'Requested' || from === 'In Progress') return design ? 'move' : null;
+    if (from === 'Ready for Review') return review ? 'move' : null;
+    return from === 'Approved' && MKT_CAN.schedulePosts(role) ? 'schedule' : null;
+  }
+  if (step >= 0) return null;
+  if (from === 'Scheduled') {
+    const published = posts.some((p) => p.designTaskId === t.id && p.status === 'Published');
+    return MKT_CAN.schedulePosts(role) && hasPendingPosts(posts, t) && (to === 'Approved' || !published) ? 'unschedule' : null;
+  }
+  if (from === 'Approved' || from === 'Ready for Review') {
+    if (review) return to === 'In Progress' ? 'sendBack' : 'move';
+    // The designer can pull their own submission back, as in their queue.
+    return from === 'Ready for Review' && design ? 'move' : null;
+  }
+  return design ? 'move' : null; // In Progress → Requested
+}
+
 export function DesignCard({ t, compact }: { t: DesignTask; compact?: boolean }) {
   const { store, role, actions } = useMarketing();
-  const [scheduling, setScheduling] = useState(false);
   const [sendingBack, setSendingBack] = useState(false);
+  const [editing, setEditing] = useState(false);
   const done = t.stage === 'Approved' || t.stage === 'Scheduled';
-  const canDesign = MKT_CAN.design(role);
+  const canEdit = MKT_CAN.requestContent(role) && (t.stage === 'Requested' || t.stage === 'In Progress');
+  // Scheduled designs have posts pointing at them, so they stay.
+  const canDelete = MKT_CAN.requestContent(role) && t.stage !== 'Scheduled';
+  const [deleting, setDeleting] = useState(false);
   const canApprove = MKT_CAN.approveDesign(role);
 
-  const next: { label: string; run: () => void } | null =
-    t.stage === 'Requested' && canDesign ? { label: 'Start', run: () => actions.moveDesign(t.id, 'In Progress') }
-      : t.stage === 'In Progress' && canDesign ? { label: 'Send to review', run: () => actions.moveDesign(t.id, 'Ready for Review') }
-        : t.stage === 'Ready for Review' && canApprove ? { label: 'Approve', run: () => actions.moveDesign(t.id, 'Approved') }
-          : t.stage === 'Approved' && MKT_CAN.schedulePosts(role) ? { label: 'Schedule', run: () => setScheduling(true) }
-            : null;
+  // Every other move — start, submit, approve, schedule, unschedule — is done by dragging on the board.
+  const reviewing = t.stage === 'Ready for Review' && canApprove;
 
   return (
     <div className="dissolve-in rounded-lg border border-grey-border bg-white p-3 transition-colors hover:border-navy-light">
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm font-semibold leading-snug text-navy">{t.title}</p>
-        <SourceTag source={t.platform} />
+        {!compact && (canEdit || canDelete) && (
+          <span className="flex shrink-0">
+            {canEdit && <button type="button" aria-label={`Edit ${t.title}`} onClick={() => setEditing(true)} className="rounded p-1 text-gray-400 transition-colors hover:text-navy-light"><Pencil size={13} /></button>}
+            {canDelete && <button type="button" aria-label={`Delete ${t.title}`} onClick={() => setDeleting(true)} className="rounded p-1 text-gray-400 transition-colors hover:text-red-600"><Trash2 size={13} /></button>}
+          </span>
+        )}
       </div>
+      <div className="mt-1.5"><PlatformTags platforms={t.platforms} /></div>
       {!compact && <p className="mt-1 line-clamp-3 text-xs text-gray-600">{t.brief}</p>}
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
-        <span className="rounded bg-grey-bg px-1.5 py-0.5 font-medium text-gray-600">{t.dimensions}</span>
-        <span className={`inline-flex items-center gap-1 ${deadlineTone(t.deadline, done)}`}><Clock size={11} /> {deadlineText(t.deadline)}</span>
+        {t.platforms.map((p) => (
+          <span key={p} className="rounded bg-grey-bg px-1.5 py-0.5 font-medium text-gray-600">{t.platforms.length > 1 ? `${p} ` : ''}{t.sizes[p]}</span>
+        ))}
+        <span className={`inline-flex items-center gap-1 ${deadlineTone(t.deadline, done, t.deadlineTime)}`}><Clock size={11} /> {deadlineText(t.deadline, t.deadlineTime)}</span>
       </div>
       {t.campaignId && !compact && <div className="mt-2"><CampaignTag campaigns={store.campaigns} id={t.campaignId} /></div>}
       {t.reviewNote && t.stage === 'In Progress' && <p className="mt-2 rounded bg-amber-50 px-2 py-1 text-[11px] text-amber-800">Review note: {t.reviewNote}</p>}
       {!compact && !!t.finalFiles?.length && <FileLine files={t.finalFiles} />}
-      {!compact && (next || (t.stage === 'Ready for Review' && canApprove)) && (
+      {!compact && reviewing && (
         <div className="mt-3 flex gap-1.5">
-          {t.stage === 'Ready for Review' && canApprove && <GhostButton small onClick={() => setSendingBack(true)}><RotateCcw size={12} /> Send back</GhostButton>}
-          {next && <PrimaryButton small onClick={next.run}>{next.label} <ArrowRight size={12} /></PrimaryButton>}
+          <GhostButton small onClick={() => setSendingBack(true)}><RotateCcw size={12} /> Send back</GhostButton>
         </div>
       )}
-      {scheduling && <SchedulePostModal task={t} onClose={() => setScheduling(false)} />}
       {sendingBack && <SendBackModal task={t} onClose={() => setSendingBack(false)} />}
+      {editing && <DesignRequestModal task={t} onClose={() => setEditing(false)} />}
+      {deleting && <DeleteTaskModal title={t.title} kind="design" onConfirm={() => actions.deleteDesignTask(t.id)} onClose={() => setDeleting(false)} />}
     </div>
   );
 }
 
 export function ProductionQueue() {
-  const { store, role } = useMarketing();
-  const [adding, setAdding] = useState(false);
+  const { store, role, actions } = useMarketing();
+  const [adding, setAdding] = useState<'design' | 'video' | null>(null);
   const [platform, setPlatform] = useState<'All' | SocialPlatform>('All');
-  const tasks = store.designTasks.filter((t) => platform === 'All' || t.platform === platform);
+  const tasks = store.designTasks.filter((t) => platform === 'All' || t.platforms.includes(platform));
+  const [dragging, setDragging] = useState<DesignTask | null>(null);
+  const [over, setOver] = useState<DesignStage | null>(null);
+  // Drops that need more input open the same dialog the button would.
+  const [dropped, setDropped] = useState<{ task: DesignTask; kind: Exclude<DropMove, 'move'>; to: DesignStage } | null>(null);
+  const canDrag = (t: DesignTask) => DESIGN_STAGES.some((s) => dropMove(t, s, role, store.posts));
+  const drop = (stage: DesignStage) => {
+    const t = dragging;
+    setDragging(null); setOver(null);
+    const kind = t && dropMove(t, stage, role, store.posts);
+    if (!t || !kind) return;
+    if (kind === 'move') actions.moveDesign(t.id, stage);
+    else setDropped({ task: t, kind, to: stage });
+  };
   return (
     <div className="space-y-4">
-      <PageIntro text="Design work from request to scheduled post. Cards show the brief, platform, dimensions and deadline.">
-        {MKT_CAN.requestContent(role) && <PrimaryButton onClick={() => setAdding(true)}><Plus size={15} /> New design request</PrimaryButton>}
+      <PageIntro text="Design and video work for the designer, from request to scheduled post. Video edits are reviewed below the board.">
+        {MKT_CAN.requestContent(role) && (
+          <div className="flex flex-wrap gap-2">
+            <GhostButton onClick={() => setAdding('video')}><Film size={15} /> New video request</GhostButton>
+            <PrimaryButton onClick={() => setAdding('design')}><Plus size={15} /> New design request</PrimaryButton>
+          </div>
+        )}
       </PageIntro>
       <Chips options={['All', ...DESIGN_PLATFORMS] as const} value={platform} onChange={setPlatform} />
       <div className="overflow-x-auto pb-2">
         <div className="grid min-w-[1000px] grid-cols-5 gap-3">
           {DESIGN_STAGES.map((stage) => {
-            const col = tasks.filter((t) => t.stage === stage).sort((a, b) => a.deadline.localeCompare(b.deadline));
+            const col = tasks.filter((t) => t.stage === stage).sort((a, b) => deadlineKey(a).localeCompare(deadlineKey(b)));
+            const target = !!dragging && !!dropMove(dragging, stage, role, store.posts);
             return (
-              <div key={stage} className="rounded-xl border border-grey-border bg-grey-bg/50 p-2">
+              <div key={stage}
+                onDragOver={(e) => { if (target) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (over !== stage) setOver(stage); } }}
+                onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver(null); }}
+                onDrop={(e) => { e.preventDefault(); drop(stage); }}
+                className={`rounded-xl border p-2 transition-colors ${over === stage && target ? 'border-navy-light bg-navy/5' : target ? 'border-dashed border-navy-light/60 bg-grey-bg/50' : 'border-grey-border bg-grey-bg/50'} ${dragging && !target && dragging.stage !== stage ? 'opacity-60' : ''}`}>
                 <div className="mb-2 flex items-center justify-between px-1">
                   <Pill text={stage} cls={DESIGN_STYLES[stage]} />
                   <span className="text-xs font-semibold text-gray-500">{col.length}</span>
                 </div>
                 <div className="space-y-2">
-                  {col.map((t) => <DesignCard key={t.id} t={t} />)}
+                  {col.map((t) => {
+                    const draggable = canDrag(t);
+                    return (
+                      <div key={t.id} draggable={draggable}
+                        onDragStart={(e) => { if (e.target !== e.currentTarget) return; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', t.id); setDragging(t); }}
+                        onDragEnd={() => { setDragging(null); setOver(null); }}
+                        className={`${draggable ? 'cursor-grab active:cursor-grabbing' : ''} ${dragging?.id === t.id ? 'opacity-50' : ''}`}>
+                        <DesignCard t={t} />
+                      </div>
+                    );
+                  })}
                   {col.length === 0 && <p className="px-2 py-6 text-center text-xs text-gray-400">Empty</p>}
                 </div>
               </div>
@@ -188,7 +367,11 @@ export function ProductionQueue() {
         </div>
       </div>
       <VideoReview />
-      {adding && <NewDesignModal onClose={() => setAdding(false)} />}
+      {dropped?.kind === 'schedule' && <SchedulePostModal task={dropped.task} onClose={() => setDropped(null)} />}
+      {dropped?.kind === 'sendBack' && <SendBackModal task={dropped.task} onClose={() => setDropped(null)} />}
+      {dropped?.kind === 'unschedule' && <UnscheduleModal task={dropped.task} then={dropped.to} onClose={() => setDropped(null)} />}
+      {adding === 'design' && <DesignRequestModal onClose={() => setAdding(null)} />}
+      {adding === 'video' && <VideoRequestModal onClose={() => setAdding(null)} />}
     </div>
   );
 }
@@ -213,10 +396,12 @@ const VIDEO_STYLES: Record<VideoStatus, string> = {
 function VideoReview() {
   const { store, role, actions } = useMarketing();
   const [back, setBack] = useState<VideoTask | null>(null);
+  const [removing, setRemoving] = useState<VideoTask | null>(null);
+  const canDelete = MKT_CAN.requestContent(role);
   const [note, setNote] = useState('');
   const canApprove = MKT_CAN.approveDesign(role);
   const order: Record<VideoStatus, number> = { 'Ready for Review': 0, 'In Progress': 1, 'To Edit': 2, Completed: 3 };
-  const rows = [...store.videoTasks].sort((a, b) => order[a.status] - order[b.status] || a.deadline.localeCompare(b.deadline));
+  const rows = [...store.videoTasks].sort((a, b) => order[a.status] - order[b.status] || deadlineKey(a).localeCompare(deadlineKey(b)));
   return (
     <section className="space-y-2">
       <h3 className="text-sm font-semibold text-navy">Video edits <span className="font-normal text-gray-400">· {store.videoTasks.filter((v) => v.status === 'Ready for Review').length} waiting for review</span></h3>
@@ -229,8 +414,8 @@ function VideoReview() {
             {rows.map((v) => (
               <tr key={v.id}>
                 <td className="px-4 py-2.5"><span className="font-medium text-navy">{v.title}</span>{v.person && <span className="block text-[11px] text-gray-400">Footage: {v.person} · {v.branch}</span>}</td>
-                <td className="px-4 py-2.5 text-gray-600"><SourceTag source={v.platform} /> <span className="text-xs">{v.duration}</span></td>
-                <td className={`whitespace-nowrap px-4 py-2.5 text-xs ${deadlineTone(v.deadline, v.status === 'Completed')}`}>{v.status === 'Completed' ? shortDay(v.deadline) : deadlineText(v.deadline)}</td>
+                <td className="px-4 py-2.5 text-gray-600"><PlatformTags platforms={v.platforms} /> <span className="text-xs">{v.duration}</span></td>
+                <td className={`whitespace-nowrap px-4 py-2.5 text-xs ${deadlineTone(v.deadline, v.status === 'Completed', v.deadlineTime)}`}>{v.status === 'Completed' ? shortDay(v.deadline) : deadlineText(v.deadline, v.deadlineTime)}</td>
                 <td className="px-4 py-2.5"><Pill text={v.status} cls={VIDEO_STYLES[v.status]} /></td>
                 <td className="max-w-[200px] px-4 py-2.5">{v.finalFiles?.length ? <FileLine files={v.finalFiles} /> : <span className="text-xs text-gray-400">—</span>}</td>
                 <td className="px-4 py-2.5 text-right">
@@ -240,6 +425,7 @@ function VideoReview() {
                       <PrimaryButton small onClick={() => actions.moveVideo(v.id, 'Completed')}><Check size={12} /> Approve</PrimaryButton>
                     </span>
                   ) : <span className="text-xs text-gray-400">{v.status === 'Completed' ? 'Approved' : 'With designer'}</span>}
+                  {canDelete && v.status !== 'Completed' && <button type="button" aria-label={`Delete ${v.title}`} onClick={() => setRemoving(v)} className="ml-2 rounded p-1 align-middle text-gray-400 transition-colors hover:text-red-600"><Trash2 size={13} /></button>}
                 </td>
               </tr>
             ))}
@@ -247,6 +433,7 @@ function VideoReview() {
           </tbody>
         </table>
       </div>
+      {removing && <DeleteTaskModal title={removing.title} kind="video" onConfirm={() => actions.deleteVideoTask(removing.id)} onClose={() => setRemoving(null)} />}
       {back && (
         <Modal title={`Send back “${back.title}”`} onClose={() => setBack(null)}>
           <div className="space-y-3">
@@ -344,7 +531,7 @@ export function ContentLibrary() {
   const [q, setQ] = useState('');
   const assets = [
     ...store.designTasks.filter((t) => t.stage === 'Approved' || t.stage === 'Scheduled').map((t) => ({
-      id: t.id, type: 'Designs' as const, title: t.title, meta: `${t.platform} · ${t.dimensions}`, campaignId: t.campaignId, tag: t.stage,
+      id: t.id, type: 'Designs' as const, title: t.title, meta: t.platforms.map((p) => `${p} ${t.sizes[p] ?? ''}`.trim()).join(' · '), campaignId: t.campaignId, tag: t.stage,
     })),
     ...store.contentRequests.filter((r) => r.status !== 'Waiting').map((r) => ({
       id: r.id, type: 'Branch content' as const, title: r.topic, meta: `${r.needed} · ${r.targetCounselor}, ${r.targetBranch}`, campaignId: r.campaignId, tag: 'Received',
