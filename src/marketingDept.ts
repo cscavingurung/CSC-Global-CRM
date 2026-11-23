@@ -121,6 +121,8 @@ export function trackMarketingLeads(
     if (lead.stage !== 'Assigned' || !lead.intakeId) return [];
     const intake = intakes.find((s) => s.id === lead.intakeId);
     const cs = consultations.find((c) => c.id === lead.intakeId);
+    // The branch deleted the student — nothing left to track.
+    if (!intake && !cs) return [];
     const app = cs?.clientId ? applications.find((a) => a.clientId === cs.clientId) : undefined;
 
     const counselor = cs?.assignedCounselor ?? intake?.assignedCounselor ?? null;
