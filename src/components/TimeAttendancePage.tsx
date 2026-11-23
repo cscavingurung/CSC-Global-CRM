@@ -3,7 +3,7 @@ import { CalendarDays, History, LogIn, LogOut, X } from 'lucide-react';
 import { AttendanceCorrection, AttendanceExplanation, AttendanceRecord, AttendanceStatus, ExplanationReason, Holiday, LeaveRecord, MockUser } from '../types';
 import { holidayOn } from '../holidays';
 import { EXPLANATION_REASONS, onLeave } from '../attendance';
-import { ATTENDANCE_STYLES, SHIFT_LABEL, attendanceStatus, isWorkingDay, timeOf } from '../branchOps';
+import { ATTENDANCE_STYLES, ShiftHours, attendanceStatus, isWorkingDay, shiftLabel, shiftStartMinutes, timeOf } from '../branchOps';
 import { dateKey, formatSubmittedAt, parseSubmittedAt } from '../dateTime';
 
 // ─── Branch Hub · Time & Attendance ─────────────────────────────────────────
@@ -25,6 +25,8 @@ interface TimeAttendancePageProps {
   onSaveExplanation: (e: AttendanceExplanation) => void;
   /** Branch holidays — shown as Holiday, never Absent. */
   holidays: Holiday[];
+  /** This user's working hours, when their manager set them. */
+  shift?: ShiftHours;
 }
 
 type DayRow = {
@@ -64,7 +66,8 @@ const hoursBetween = (a?: string, b?: string) => {
 const longDate = (key: string) =>
   new Date(`${key}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
 
-export default function TimeAttendancePage({ currentUser, records, corrections, onSaveAttendance, onAddCorrection, leave, explanations, onSaveExplanation, holidays }: TimeAttendancePageProps) {
+export default function TimeAttendancePage({ currentUser, records, corrections, onSaveAttendance, onAddCorrection, leave, explanations, onSaveExplanation, holidays, shift }: TimeAttendancePageProps) {
+  const start = shiftStartMinutes(shift);
   const requested = explanations.filter((e) => e.status === 'Requested');
   const [answers, setAnswers] = useState<Record<string, { reason: ExplanationReason; note: string }>>({});
   const [now, setNow] = useState(() => new Date());
@@ -74,7 +77,7 @@ export default function TimeAttendancePage({ currentUser, records, corrections, 
   }, []);
   const today = dateKey(now);
   const mine = records.find((r) => r.date === today);
-  const myStatus = mine?.checkIn ? attendanceStatus(mine.checkIn) : null;
+  const myStatus = mine?.checkIn ? attendanceStatus(mine.checkIn, start) : null;
 
   const checkIn = () =>
     onSaveAttendance({ id: `att-${Date.now()}`, staffName: currentUser.name, branch: currentUser.branch, date: today, checkIn: formatSubmittedAt(new Date()) });
@@ -91,7 +94,7 @@ export default function TimeAttendancePage({ currentUser, records, corrections, 
       let status: DayRow['status'];
       let missing: DayRow['missing'];
       if (record?.checkIn) {
-        status = attendanceStatus(record.checkIn) ?? 'On Time';
+        status = attendanceStatus(record.checkIn, start) ?? 'On Time';
         if (!record.checkOut) {
           if (isToday) status = 'In progress';
           else missing = 'checkOut';
@@ -110,7 +113,7 @@ export default function TimeAttendancePage({ currentUser, records, corrections, 
       d.setDate(d.getDate() - 1);
     }
     return list;
-  }, [records, now, today, leave, holidays, currentUser.name]);
+  }, [records, now, today, leave, holidays, currentUser.name, start]);
 
   const stats = useMemo(() => {
     const worked = rows.filter((r) => r.record?.checkIn);
@@ -150,7 +153,7 @@ export default function TimeAttendancePage({ currentUser, records, corrections, 
       <section className="rounded-xl border border-grey-border bg-white px-5 py-6 text-center">
         <p className="text-4xl font-semibold tabular-nums tracking-tight text-navy">{clock}</p>
         <p className="mt-1 text-sm text-gray-500">
-          {now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })} · Shift {SHIFT_LABEL} · {currentUser.branch}
+          {now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })} · Shift {shiftLabel(shift)} · {currentUser.branch}
         </p>
 
         <div className="mx-auto mt-5 max-w-sm">

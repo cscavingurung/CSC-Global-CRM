@@ -10,6 +10,7 @@ import StaffActivityPanel from './StaffActivityPanel';
 import { isValidEmail, PASSWORD_PATTERN } from '../validation';
 import { COUNTRIES } from '../mockData';
 import { dateKey } from '../dateTime';
+import { DEFAULT_SHIFT_END, DEFAULT_SHIFT_START, hasCustomShift, shiftLabel } from '../branchOps';
 
 const COUNTRY_OPTIONS = [...COUNTRIES, 'Others'];
 
@@ -94,6 +95,10 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
   const managerClashText = (branch: string, name: string) =>
     `${branch} already has a Branch Manager (${name}). Set them Inactive or remove them first.`;
   const [statusError, setStatusError] = useState<string | null>(null);
+  const [shiftStart, setShiftStart] = useState(DEFAULT_SHIFT_START);
+  const [shiftEnd, setShiftEnd] = useState(DEFAULT_SHIFT_END);
+  const [shiftError, setShiftError] = useState<string | null>(null);
+  const [shiftSaved, setShiftSaved] = useState(false);
 
   // Reset the credentials editor whenever a different staff member is opened (or the panel
   // closes) — intentionally keyed on the id alone, not selectedStaff.email, so it doesn't
@@ -105,8 +110,29 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
     setEditShowPassword(false);
     setEditError(null);
     setStatusError(null);
+    setShiftStart(selectedStaff?.shiftStart ?? DEFAULT_SHIFT_START);
+    setShiftEnd(selectedStaff?.shiftEnd ?? DEFAULT_SHIFT_END);
+    setShiftError(null);
+    setShiftSaved(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedStaffId]);
+
+  const saveShift = async () => {
+    if (!selectedStaff) return;
+    if (!shiftStart || !shiftEnd) return setShiftError('Pick both a start and an end time.');
+    if (shiftEnd <= shiftStart) return setShiftError('End time must be after the start time.');
+    setShiftError(null);
+    await onUpdateStaff(selectedStaff.id, { shiftStart, shiftEnd });
+    setShiftSaved(true);
+  };
+  const resetShift = async () => {
+    if (!selectedStaff) return;
+    setShiftStart(DEFAULT_SHIFT_START);
+    setShiftEnd(DEFAULT_SHIFT_END);
+    setShiftError(null);
+    await onUpdateStaff(selectedStaff.id, { shiftStart: '', shiftEnd: '' });
+    setShiftSaved(true);
+  };
 
   const filtered = useMemo(() => {
     return staff.filter((s) => {
@@ -279,6 +305,7 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
                   <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${ROLE_STYLES[s.role]}`}>
                     {s.role === 'Marketing' && s.marketingRole ? `Marketing · ${s.marketingRole}` : s.role}
                   </span>
+                  {hasCustomShift(s) && <p className="mt-1 text-[11px] tabular-nums text-gray-400">{shiftLabel(s)}</p>}
                 </td>
                 <td className="px-5 py-3.5 text-sm text-gray-600">{s.email}</td>
                 {showBranchFilter && <td className="px-5 py-3.5 text-sm text-gray-600">{s.branch}</td>}
@@ -769,6 +796,55 @@ export default function StaffManagement({ staff, onAddStaff, onUpdateStaff, onRe
                   ))}
                 </div>
                 {statusError && <p className="mt-1.5 text-xs text-red-600">{statusError}</p>}
+              </div>
+
+              {/* Working hours — lateness is measured from this start time */}
+              <div className="mt-5">
+                <label className="block text-sm font-medium text-navy mb-1.5">Working Hours</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="time"
+                    aria-label="Start time"
+                    value={shiftStart}
+                    onChange={(e) => { setShiftStart(e.target.value); setShiftError(null); setShiftSaved(false); }}
+                    className="flex-1 px-3 py-2 border border-grey-border rounded-lg text-sm bg-white focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light"
+                  />
+                  <span className="text-xs text-gray-400">to</span>
+                  <input
+                    type="time"
+                    aria-label="End time"
+                    value={shiftEnd}
+                    onChange={(e) => { setShiftEnd(e.target.value); setShiftError(null); setShiftSaved(false); }}
+                    className="flex-1 px-3 py-2 border border-grey-border rounded-lg text-sm bg-white focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light"
+                  />
+                </div>
+                <div className="mt-2 flex gap-2">
+                  {hasCustomShift(selectedStaff) && (
+                    <button
+                      type="button"
+                      onClick={resetShift}
+                      className="flex-1 py-2 border border-grey-border rounded-lg text-xs font-medium text-navy hover:bg-grey-bg transition-colors"
+                    >
+                      Use default
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={saveShift}
+                    disabled={shiftStart === (selectedStaff.shiftStart ?? DEFAULT_SHIFT_START) && shiftEnd === (selectedStaff.shiftEnd ?? DEFAULT_SHIFT_END)}
+                    className="flex-1 py-2 bg-navy text-white rounded-lg text-xs font-semibold hover:bg-navy-light transition-colors disabled:opacity-60"
+                  >
+                    Save hours
+                  </button>
+                </div>
+                {shiftError ? (
+                  <p className="mt-1.5 text-xs text-red-600">{shiftError}</p>
+                ) : (
+                  <p className="mt-1.5 text-xs text-gray-400">
+                    {shiftSaved ? 'Saved. ' : ''}
+                    {hasCustomShift(selectedStaff) ? `Works ${shiftLabel(selectedStaff)}.` : `Default hours (${shiftLabel()}).`} Late is counted from the start time.
+                  </p>
+                )}
               </div>
             </div>
           </div>

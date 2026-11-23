@@ -442,6 +442,9 @@ export interface StaffMember {
   joinDate?: string;
   /** Marketing Department only. */
   marketingRole?: MarketingRole;
+  /** Working hours set by the branch manager, "HH:MM" 24h. Unset = default 9:00 AM – 6:00 PM. */
+  shiftStart?: string;
+  shiftEnd?: string;
 }
 
 export interface ActivityEntry {

@@ -2247,6 +2247,7 @@ export default function App() {
           corrections={corrections.filter((c) => c.staffName === user.name)}
           leave={leave.filter((l) => l.staffName === user.name)}
           holidays={branchHolidays}
+          shift={staff.find((s) => s.name === user.name && s.branch === user.branch)}
           explanations={explanations.filter((e) => e.staffName === user.name)}
           onSaveExplanation={handleSaveExplanation}
           onSaveAttendance={handleSaveAttendance}

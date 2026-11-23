@@ -85,7 +85,7 @@ export const STAFF_STATUS_STYLES: Record<DayStatus, string> = {
 export function staffToday(src: BranchDashboardSources, now = new Date()): StaffToday[] {
   const today = dateKey(now);
   return src.staff.filter((s) => s.status === 'Active' && tracksAttendance(s)).map((s) => {
-    const v = dayView(s.name, today, src.attendance, src.leave, now, src.holidays, s.joinDate);
+    const v = dayView(s.name, today, src.attendance, src.leave, now, src.holidays, s);
     return {
       id: s.id, name: s.name, role: s.role, status: v.status, checkIn: v.record?.checkIn ? timeOf(v.record.checkIn) : undefined,
       pendingTasks: src.tasks.filter((t) => t.assignee === s.name && t.status !== 'Done' && t.date <= today).length,

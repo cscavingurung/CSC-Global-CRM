@@ -37,6 +37,14 @@ test('check-in lateness: 10-minute grace, late up to 30 minutes, then very late'
   eq(attendanceStatus('2026-09-21 9:31 AM'), 'Very Late');
 });
 
+test('lateness is measured from the staff member\'s own shift start', () => {
+  const shift = { shiftStart: '10:30', shiftEnd: '17:30' };
+  eq(dayView('Asha', '2026-09-23', [{ id: 'a', staffName: 'Asha', branch: 'Kathmandu', date: '2026-09-23', checkIn: '2026-09-23 10:35 AM' }], [], new Date(2026, 8, 23, 12, 0), [], shift).status, 'Present');
+  eq(dayView('Asha', '2026-09-23', [{ id: 'a', staffName: 'Asha', branch: 'Kathmandu', date: '2026-09-23', checkIn: '2026-09-23 10:50 AM' }], [], new Date(2026, 8, 23, 12, 0), [], shift).status, 'Late');
+  // 10:40 is past the default 9:00 cutoff but not past theirs, so they're not absent yet.
+  eq(dayView('Asha', '2026-09-23', [], [], new Date(2026, 8, 23, 10, 40), [], shift).status, 'Not in yet');
+});
+
 test('a day with no check-in: approved leave → On Leave, holiday → Holiday, otherwise Absent', () => {
   const now = new Date('2026-09-26T15:00:00');
   eq(dayView('Asha', '2026-09-21', [], [leave({})], now).status, 'On Leave');
@@ -48,14 +56,14 @@ test('a day with no check-in: approved leave → On Leave, holiday → Holiday, 
 test('no absences before someone joined, nor on the day they joined', () => {
   const now = new Date('2026-09-23T15:00:00');
   // Joined today mid-afternoon, no check-in: not absent.
-  eq(dayView('Asha', '2026-09-23', [], [], now, [], '2026-09-23').status, 'Not in yet');
+  eq(dayView('Asha', '2026-09-23', [], [], now, [], { joinDate: '2026-09-23' }).status, 'Not in yet');
   // Days before joining are not working days for them.
-  eq(dayView('Asha', '2026-09-21', [], [], now, [], '2026-09-23').status, 'Off');
+  eq(dayView('Asha', '2026-09-21', [], [], now, [], { joinDate: '2026-09-23' }).status, 'Off');
   // A past join day without a check-in isn't counted either; the day after is.
-  eq(dayView('Asha', '2026-09-21', [], [], now, [], '2026-09-21').status, 'Off');
-  eq(dayView('Asha', '2026-09-22', [], [], now, [], '2026-09-21').status, 'Absent');
+  eq(dayView('Asha', '2026-09-21', [], [], now, [], { joinDate: '2026-09-21' }).status, 'Off');
+  eq(dayView('Asha', '2026-09-22', [], [], now, [], { joinDate: '2026-09-21' }).status, 'Absent');
   // A check-in still counts, even on the join day.
-  eq(dayView('Asha', '2026-09-23', [{ id: 'a', staffName: 'Asha', branch: 'Kathmandu', date: '2026-09-23', checkIn: '2026-09-23 9:00 AM' }], [], now, [], '2026-09-23').status, 'Present');
+  eq(dayView('Asha', '2026-09-23', [{ id: 'a', staffName: 'Asha', branch: 'Kathmandu', date: '2026-09-23', checkIn: '2026-09-23 9:00 AM' }], [], now, [], { joinDate: '2026-09-23' }).status, 'Present');
 });
 
 test('a past day checked in without a check-out is flagged', () => {

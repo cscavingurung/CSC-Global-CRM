@@ -79,7 +79,7 @@ export default function HrDashboardPage({
   const active = activeStaff(staff);
 
   // ── Today ──
-  const views = active.map((m) => ({ m, v: dayView(m.name, today, attendance, leave, now, holidays, m.joinDate) }));
+  const views = active.map((m) => ({ m, v: dayView(m.name, today, attendance, leave, now, holidays, m) }));
   const count = (...s: DayStatus[]) => views.filter((x) => s.includes(x.v.status)).length;
   const present = views.filter((x) => x.v.record?.checkIn).length;
   const late = count('Late', 'Very Late');

@@ -5,7 +5,7 @@ import {
   AttendanceViewProps, DEPARTMENTS, EXCEPTION_STYLES, EXPLANATION_REASONS, ExceptionState, activeStaff, datesBetween, dayView, delayMinutes,
   departmentOf, exceptionState, firstDayOf, formatMinutes,
 } from '../attendance';
-import { LATE_LIMIT, SHIFT_START_MINUTES, timeOf } from '../branchOps';
+import { LATE_LIMIT, clockLabel, shiftStartMinutes, timeOf } from '../branchOps';
 import { dateKey, formatSubmittedAt } from '../dateTime';
 
 // ─── HRM · Attendance · Late & Absence ──────────────────────────────────────
@@ -18,7 +18,8 @@ interface LateAbsencePageProps extends AttendanceViewProps {
 }
 
 const REPEAT_LATE = 3;
-const SCHEDULED = `${Math.floor(SHIFT_START_MINUTES / 60) % 12 || 12}:${String(SHIFT_START_MINUTES % 60).padStart(2, '0')} AM`;
+/** The member's own scheduled start, e.g. "9:00 AM". */
+const scheduledFor = (m: StaffMember) => clockLabel(shiftStartMinutes(m));
 // Chart colours: categorical slots 1–2 of the reference palette (validated, light surface).
 const SERIES = { late: '#2a78d6', absence: '#eb6834' };
 
@@ -131,10 +132,10 @@ export default function LateAbsencePage(props: LateAbsencePageProps) {
       people.forEach((member) => {
         const start = firstDayOf(attendance, member.name);
         if (start && date < start) return;
-        const v = dayView(member.name, date, attendance, leave, now, holidays, member.joinDate);
+        const v = dayView(member.name, date, attendance, leave, now, holidays, member);
         if (v.status === 'Late' || v.status === 'Very Late') {
           const explanation = explanationFor(member.name, date, 'Late');
-          out.push({ key: `L-${member.name}-${date}`, kind: 'Late', date, member, checkIn: v.record?.checkIn, delay: delayMinutes(v.record), explanation, state: exceptionState('Late', explanation) });
+          out.push({ key: `L-${member.name}-${date}`, kind: 'Late', date, member, checkIn: v.record?.checkIn, delay: delayMinutes(v.record, member), explanation, state: exceptionState('Late', explanation) });
         } else if (v.status === 'Absent' || v.status === 'On Leave') {
           const explanation = explanationFor(member.name, date, 'Absence');
           out.push({ key: `A-${member.name}-${date}`, kind: 'Absence', date, member, delay: 0, leave: v.leave, explanation, state: exceptionState('Absence', explanation, v.leave) });
@@ -173,7 +174,7 @@ export default function LateAbsencePage(props: LateAbsencePageProps) {
   const coverage = DEPARTMENTS.map((d) => {
     const team = everyone.filter((p) => departmentOf(p.role) === d);
     const out = team.filter((p) => {
-      const v = dayView(p.name, today, attendance, leave, now, holidays, p.joinDate);
+      const v = dayView(p.name, today, attendance, leave, now, holidays, p);
       return v.status === 'Absent' || v.status === 'On Leave';
     });
     return { dept: d, total: team.length, available: team.length - out.length, out };
@@ -279,7 +280,7 @@ export default function LateAbsencePage(props: LateAbsencePageProps) {
             <b>Coverage Alert: {c.dept} capacity reduced ({c.available}/{c.total} available)</b>
             <span className="block text-xs text-gray-600">
               Out today: {c.out.map((p) => {
-                const v = dayView(p.name, today, attendance, leave, now, holidays, p.joinDate);
+                const v = dayView(p.name, today, attendance, leave, now, holidays, p);
                 return `${p.name} (${v.status === 'On Leave' ? 'on leave' : 'absent'})`;
               }).join(', ')}
             </span>
@@ -326,7 +327,7 @@ export default function LateAbsencePage(props: LateAbsencePageProps) {
                       <tr key={r.key} onClick={() => openRow(r)} className="cursor-pointer border-t border-grey-border hover:bg-grey-bg/50">
                         <td className="whitespace-nowrap px-4 py-2.5 text-sm text-navy">{r.date === today ? 'Today' : shortDate(r.date)}</td>
                         <td className="px-4 py-2.5 text-sm font-medium text-navy">{r.member.name}<p className="text-[11px] font-normal text-gray-400">{r.member.role}</p></td>
-                        <td className="px-4 py-2.5 text-sm tabular-nums text-gray-500">{SCHEDULED}</td>
+                        <td className="px-4 py-2.5 text-sm tabular-nums text-gray-500">{scheduledFor(r.member)}</td>
                         <td className="px-4 py-2.5 text-sm tabular-nums text-gray-600">{timeOf(r.checkIn)}</td>
                         <td className={`px-4 py-2.5 text-sm font-semibold tabular-nums ${r.delay > LATE_LIMIT ? 'text-red-700' : 'text-amber-700'}`}>{r.delay} min</td>
                         <td className="px-4 py-2.5"><span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${EXCEPTION_STYLES[r.state]}`}>{r.state}</span></td>
@@ -469,7 +470,7 @@ export default function LateAbsencePage(props: LateAbsencePageProps) {
 
               {open.kind === 'Late' ? (
                 <dl className="grid grid-cols-3 gap-3 rounded-lg border border-grey-border px-4 py-3">
-                  <div><dt className="text-[11px] text-gray-400">Scheduled</dt><dd className="text-sm font-semibold tabular-nums text-navy">{SCHEDULED}</dd></div>
+                  <div><dt className="text-[11px] text-gray-400">Scheduled</dt><dd className="text-sm font-semibold tabular-nums text-navy">{scheduledFor(open.member)}</dd></div>
                   <div><dt className="text-[11px] text-gray-400">Checked in</dt><dd className="text-sm font-semibold tabular-nums text-navy">{timeOf(open.checkIn)}</dd></div>
                   <div><dt className="text-[11px] text-gray-400">Delay</dt><dd className={`text-sm font-semibold tabular-nums ${open.delay > LATE_LIMIT ? 'text-red-700' : 'text-amber-700'}`}>{open.delay} min</dd></div>
                 </dl>

@@ -104,7 +104,7 @@ export default function HrReportsPage({ currentUser, staff, joinDates, onboardin
       const list = people
         .filter((s) => s.status === 'Active' && tracksAttendance(s))
         .filter((s) => (!af.employee || s.name === af.employee) && (!af.dept || departmentOf(s.role) === af.dept) && (!af.branch || s.branch === af.branch))
-        .map((s) => ({ s, sum: attendanceSummary(s.name, from, to, attendance, leave, holidays, now, s.joinDate) }))
+        .map((s) => ({ s, sum: attendanceSummary(s.name, from, to, attendance, leave, holidays, now, s) }))
         .filter((x) => x.sum.workingDays > 0)
         .sort((a, b) => a.s.name.localeCompare(b.s.name));
       const num = (n: number, warn?: string) => <span className={`tabular-nums ${n === 0 ? 'text-gray-300' : warn ?? 'text-gray-700'}`}>{n}</span>;

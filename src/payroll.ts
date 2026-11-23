@@ -53,7 +53,7 @@ export function autoFor(
   const out: PayrollAuto = { basic: basicOn(profile, last), workingDays: 0, daysWorked: 0, leaveDays: 0, late: 0, absent: 0 };
   datesBetween(`${month}-01`, last < today ? last : today).forEach((date) => {
     if (first && date < first) return;
-    const v = dayView(member.name, date, attendance, leave, now, holidays, member.joinDate);
+    const v = dayView(member.name, date, attendance, leave, now, holidays, member);
     if (v.status === 'Off' || v.status === 'Holiday' || v.status === 'Not in yet') return;
     out.workingDays += 1;
     // No check-in page for this role — every working day off leave counts as worked.

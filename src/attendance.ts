@@ -4,8 +4,11 @@ import {
   AttendanceCorrection, AttendanceExplanation, AttendanceRecord, ExplanationReason, Holiday, LeaveRecord, MockUser, NavIntent, StaffMember, StaffRole,
 } from './types';
 import { holidayOn } from './holidays';
-import { attendanceStatus, isWorkingDay, LATE_LIMIT, SHIFT_START_MINUTES, minutesOfDay } from './branchOps';
+import { ShiftHours, attendanceStatus, isWorkingDay, LATE_LIMIT, minutesOfDay, shiftStartMinutes } from './branchOps';
 import { dateKey, formatSubmittedAt, parseSubmittedAt } from './dateTime';
+
+/** What dayView needs to know about the person — a StaffMember fits. */
+export type StaffDayInfo = { joinDate?: string } & ShiftHours;
 
 export type DayStatus = 'Present' | 'Late' | 'Very Late' | 'Absent' | 'On Leave' | 'Holiday' | 'Off' | 'Not in yet';
 
@@ -50,25 +53,28 @@ export interface DayView {
  * checked in), in which case a missing check-in is an absence like any other day.
  * A holiday (already filtered to this branch) is never an absence and outranks leave, so leave
  * that overlaps it isn't counted as leave either.
- * `joinDate` (YYYY-MM-DD): days before it read as Off, and the join day itself is never an absence —
- * someone added mid-afternoon hasn't missed a shift. */
+ * `member.joinDate` (YYYY-MM-DD): days before it read as Off, and the join day itself is never an
+ * absence — someone added mid-afternoon hasn't missed a shift. Lateness is measured from the
+ * member's own shift start when they have one. */
 export function dayView(
-  staffName: string, date: string, records: AttendanceRecord[], leave: LeaveRecord[], now: Date, holidays: Holiday[] = [], joinDate?: string,
+  staffName: string, date: string, records: AttendanceRecord[], leave: LeaveRecord[], now: Date, holidays: Holiday[] = [], member?: StaffDayInfo,
 ): DayView {
   const today = dateKey(now);
+  const joinDate = member?.joinDate;
+  const start = shiftStartMinutes(member);
   const record = records.find((r) => r.staffName === staffName && r.date === date);
   const hol = holidayOn(holidays, date);
   const lv = hol ? undefined : onLeave(leave, staffName, date);
   let status: DayStatus;
   if (record?.checkIn) {
-    const s = attendanceStatus(record.checkIn);
+    const s = attendanceStatus(record.checkIn, start);
     status = s === 'On Time' || !s ? 'Present' : s;
   } else if (hol) status = 'Holiday';
   else if (lv) status = 'On Leave';
   else if (joinDate && date < joinDate) status = 'Off';
   else if (joinDate && date === joinDate) status = date === today ? 'Not in yet' : 'Off';
   else if (!isWorkingDay(new Date(`${date}T00:00:00`)) && !records.some((r) => r.date === date && r.checkIn)) status = 'Off';
-  else if (date === today && minutesOfDay(now) <= SHIFT_START_MINUTES + LATE_LIMIT) status = 'Not in yet';
+  else if (date === today && minutesOfDay(now) <= start + LATE_LIMIT) status = 'Not in yet';
   else status = 'Absent';
   return { date, staffName, record, status, missingCheckOut: !!record?.checkIn && !record.checkOut && date < today, leave: lv, holiday: hol };
 }
@@ -91,14 +97,14 @@ export interface AttendanceSummary {
  * Attendance view — Saturdays and holidays aren't working days; days before their first
  * record don't count. */
 export function attendanceSummary(
-  name: string, from: string, to: string, records: AttendanceRecord[], leave: LeaveRecord[], holidays: Holiday[], now: Date, joinDate?: string,
+  name: string, from: string, to: string, records: AttendanceRecord[], leave: LeaveRecord[], holidays: Holiday[], now: Date, member?: StaffDayInfo,
 ): AttendanceSummary {
   const today = dateKey(now);
   const first = firstDayOf(records, name);
   const out: AttendanceSummary = { workingDays: 0, present: 0, late: 0, absent: 0, leave: 0, halfDay: 0, missing: 0 };
   datesBetween(from, to < today ? to : today).forEach((date) => {
     if (!first || date < first) return;
-    const v = dayView(name, date, records, leave, now, holidays, joinDate);
+    const v = dayView(name, date, records, leave, now, holidays, member);
     if (v.status === 'Off' || v.status === 'Holiday' || v.status === 'Not in yet') return;
     out.workingDays += 1;
     if (v.record?.checkIn) out.present += 1;
@@ -220,9 +226,9 @@ export function managerCorrection(
 // ─── Late & Absence ─────────────────────────────────────────────────────────
 
 /** Minutes after the scheduled start the person checked in (0 if on or before time). */
-export function delayMinutes(record?: AttendanceRecord): number {
+export function delayMinutes(record?: AttendanceRecord, shift?: ShiftHours): number {
   const d = record?.checkIn ? parseSubmittedAt(record.checkIn) : null;
-  return d ? Math.max(0, minutesOfDay(d) - SHIFT_START_MINUTES) : 0;
+  return d ? Math.max(0, minutesOfDay(d) - shiftStartMinutes(shift)) : 0;
 }
 
 export const EXPLANATION_REASONS: ExplanationReason[] = ['Traffic', 'Medical', 'Work-related', 'Family / Personal', 'Other'];

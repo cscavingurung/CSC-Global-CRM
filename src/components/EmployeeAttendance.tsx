@@ -29,7 +29,7 @@ export default function EmployeeAttendance({ staff, attendance, corrections, lea
   const days: (DayView | null)[] = useMemo(() => Array.from({ length: daysInMonth }, (_, i) => {
     const date = `${month}-${String(i + 1).padStart(2, '0')}`;
     if (date > today || (started && date < started)) return null;
-    return dayView(name, date, attendance, leave, now, holidays, member?.joinDate);
+    return dayView(name, date, attendance, leave, now, holidays, member);
   }), [month, daysInMonth, name, attendance, leave, holidays, now, today, started, member?.joinDate]);
 
   const stats = useMemo(() => {

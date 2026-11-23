@@ -11,6 +11,8 @@ export interface StaffRow {
   branch: string;
   join_date: string | null;
   marketing_role: StaffMember['marketingRole'] | null;
+  shift_start?: string | null;
+  shift_end?: string | null;
 }
 
 export function fromRow(row: StaffRow): StaffMember {
@@ -24,6 +26,8 @@ export function fromRow(row: StaffRow): StaffMember {
     branch: row.branch,
     joinDate: row.join_date ?? undefined,
     marketingRole: row.marketing_role ?? undefined,
+    shiftStart: row.shift_start ?? undefined,
+    shiftEnd: row.shift_end ?? undefined,
   };
 }
 
@@ -38,6 +42,9 @@ function toRow(member: StaffMember): StaffRow {
     branch: member.branch,
     join_date: member.joinDate ?? null,
     marketing_role: member.marketingRole ?? null,
+    // Only sent when set, so adding staff still works on a database without the shift columns.
+    ...(member.shiftStart ? { shift_start: member.shiftStart } : {}),
+    ...(member.shiftEnd ? { shift_end: member.shiftEnd } : {}),
   };
 }
 
@@ -51,6 +58,8 @@ function toRowUpdates(updates: Partial<StaffMember>): Record<string, unknown> {
   if (updates.branch !== undefined) row.branch = updates.branch;
   if (updates.joinDate !== undefined) row.join_date = updates.joinDate;
   if (updates.marketingRole !== undefined) row.marketing_role = updates.marketingRole;
+  if (updates.shiftStart !== undefined) row.shift_start = updates.shiftStart || null;
+  if (updates.shiftEnd !== undefined) row.shift_end = updates.shiftEnd || null;
   return row;
 }
 

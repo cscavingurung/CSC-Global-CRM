@@ -8,7 +8,7 @@ import {
 } from '../types';
 import {
   ATTENDANCE_STYLES, AutoCheck, CLOSING_CHECKLIST, CLOSING_FROM_HOUR, ChecklistGroup, ChecklistItem, LATE_LIMIT, OPENING_CHECKLIST,
-  SHIFT_START_MINUTES, attendanceStatus, manualItems, minutesOfDay, timeOf,
+  attendanceStatus, manualItems, minutesOfDay, shiftStartMinutes, timeOf,
 } from '../branchOps';
 import { NewIssueInput, buildIssue, isActive } from '../branchIssues';
 import { applyCorrection, onLeave, tracksAttendance } from '../attendance';
@@ -195,13 +195,16 @@ export default function BranchOperationsControl({
   const todayRecords = tracked.map((s) => ({ member: s, record: recordFor(s.name, today) }));
   const present = todayRecords.filter((x) => x.record?.checkIn);
   const lateOnes = present.filter((x) => {
-    const st = attendanceStatus(x.record!.checkIn!);
+    const st = attendanceStatus(x.record!.checkIn!, shiftStartMinutes(x.member));
     return st === 'Late' || st === 'Very Late';
   });
-  const pastCutoff = minutesOfDay(now) > SHIFT_START_MINUTES + LATE_LIMIT;
+  // Someone counts as "not in" only once their own start + the late limit has passed.
+  const pastCutoff = (m: StaffMember) => minutesOfDay(now) > shiftStartMinutes(m) + LATE_LIMIT;
   const leaveToday = todayRecords.filter((x) => !x.record?.checkIn && onLeave(leave, x.member.name, today));
   const todayHoliday = holidayOn(holidays, today);
   const notIn = todayHoliday ? [] : todayRecords.filter((x) => !x.record?.checkIn && !onLeave(leave, x.member.name, today));
+  // The tile reads Absent once anyone not in is past their own cutoff.
+  const absentNow = notIn.some((x) => pastCutoff(x.member));
   const stillIn = present.filter((x) => !x.record?.checkOut);
   const previousDay = useMemo(
     () => attendance.map((r) => r.date).filter((d) => d < today).sort().pop(),
@@ -288,7 +291,7 @@ export default function BranchOperationsControl({
 
   // ── My attendance ────────────────────────────────────────────────────────
   const mine = recordFor(currentUser.name, today);
-  const myStatus = mine?.checkIn ? attendanceStatus(mine.checkIn) : null;
+  const myStatus = mine?.checkIn ? attendanceStatus(mine.checkIn, shiftStartMinutes(team.find((s) => s.name === currentUser.name))) : null;
   const checkIn = () =>
     onSaveAttendance({ id: `att-${Date.now()}`, staffName: currentUser.name, branch: currentUser.branch, date: today, checkIn: formatSubmittedAt(new Date()) });
   const checkOut = () => mine && onSaveAttendance({ ...mine, checkOut: formatSubmittedAt(new Date()) });
@@ -403,10 +406,10 @@ export default function BranchOperationsControl({
   type Exception = { key: string; who: string; role: string; text: string; tone: 'red' | 'amber'; action?: React.ReactNode };
   const exceptions: Exception[] = [
     ...lateOnes.map(({ member, record }) => {
-      const st = attendanceStatus(record!.checkIn!)!;
+      const st = attendanceStatus(record!.checkIn!, shiftStartMinutes(member))!;
       return { key: `late-${member.id}`, who: member.name, role: member.role, text: `${st} — checked in ${timeOf(record!.checkIn)}`, tone: st === 'Very Late' ? 'red' as const : 'amber' as const };
     }),
-    ...(pastCutoff ? notIn.map(({ member }) => ({ key: `absent-${member.id}`, who: member.name, role: member.role, text: 'Not checked in yet', tone: 'red' as const })) : []),
+    ...notIn.filter(({ member }) => pastCutoff(member)).map(({ member }) => ({ key: `absent-${member.id}`, who: member.name, role: member.role, text: 'Not checked in yet', tone: 'red' as const })),
     ...missingOut.map((r) => {
       const member = team.find((s) => s.name === r.staffName);
       const c = correctionFor(r.staffName, r.date, 'checkOut');
@@ -568,7 +571,7 @@ export default function BranchOperationsControl({
                 { label: 'Present', value: `${present.length}/${tracked.length}`, tone: 'bg-navy/5 text-navy' },
                 { label: 'On time', value: present.length - lateOnes.length, tone: 'bg-emerald-50 text-emerald-700' },
                 { label: 'Late', value: lateOnes.length, tone: lateOnes.length ? 'bg-amber-50 text-amber-700' : 'bg-gray-100 text-gray-500' },
-                { label: pastCutoff ? 'Absent' : 'Not in yet', value: notIn.length, tone: notIn.length && pastCutoff ? 'bg-red-50 text-red-700' : 'bg-gray-100 text-gray-500' },
+                { label: absentNow ? 'Absent' : 'Not in yet', value: notIn.length, tone: absentNow ? 'bg-red-50 text-red-700' : 'bg-gray-100 text-gray-500' },
                 { label: 'Missing check-out', value: missingOut.length, tone: missingOut.length ? 'bg-amber-50 text-amber-700' : 'bg-gray-100 text-gray-500' },
                 { label: 'On leave', value: leaveToday.length, tone: leaveToday.length ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-500' },
               ].map((s) => (
@@ -608,7 +611,7 @@ export default function BranchOperationsControl({
                 </thead>
                 <tbody>
                   {todayRecords.map(({ member, record }) => {
-                    const st = record?.checkIn ? attendanceStatus(record.checkIn) : null;
+                    const st = record?.checkIn ? attendanceStatus(record.checkIn, shiftStartMinutes(member)) : null;
                     return (
                       <tr key={member.id} className="border-t border-grey-border">
                         <td className="py-2">
@@ -658,6 +661,15 @@ export default function BranchOperationsControl({
               </button>
               {openingAnswered < openingManual.length && (
                 <p className="mt-2 text-center text-xs text-gray-400">{openingManual.length - openingAnswered} item{openingManual.length - openingAnswered === 1 ? '' : 's'} still to check</p>
+              )}
+              {isManager && openingAnswered < openingManual.length && (
+                <button
+                  type="button"
+                  onClick={() => saveLog({ openedAt: formatSubmittedAt(new Date()), openedBy: currentUser.name })}
+                  className={`${secondaryBtn} mt-3 w-full`}
+                >
+                  Skip checklist &amp; open branch
+                </button>
               )}
             </div>
           )}

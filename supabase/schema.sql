@@ -3033,3 +3033,19 @@ drop trigger if exists staff_default_join_date on public.staff;
 create trigger staff_default_join_date
   before insert on public.staff
   for each row execute function public.staff_default_join_date();
+
+-- ----------------------------------------------------------------------------
+-- Per-staff working hours. A Branch Manager sets each staff member's shift
+-- ("HH:MM", 24h); attendance measures lateness from shift_start. NULL = the
+-- default 9:00 AM – 6:00 PM. Covered by the existing staff_update policy
+-- (Super Admin, or the Branch Manager for their own branch).
+-- ----------------------------------------------------------------------------
+alter table public.staff add column if not exists shift_start text;
+alter table public.staff add column if not exists shift_end text;
+
+alter table public.staff drop constraint if exists staff_shift_format;
+alter table public.staff add constraint staff_shift_format check (
+  (shift_start is null or shift_start ~ '^([01]\d|2[0-3]):[0-5]\d$')
+  and (shift_end is null or shift_end ~ '^([01]\d|2[0-3]):[0-5]\d$')
+  and (shift_start is null or shift_end is null or shift_end > shift_start)
+);

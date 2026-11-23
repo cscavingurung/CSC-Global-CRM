@@ -3,7 +3,7 @@ import { ChevronRight, Info } from 'lucide-react';
 import {
   AttendanceViewProps, DAY_STATUS_STYLES, DEPARTMENTS, activeStaff, dayView, departmentOf, formatMinutes, managerCorrection, workedMinutes,
 } from '../attendance';
-import { ON_TIME_GRACE, SHIFT_LABEL, timeOf } from '../branchOps';
+import { ON_TIME_GRACE, SHIFT_LABEL, hasCustomShift, shiftLabel, timeOf } from '../branchOps';
 import { dateKey } from '../dateTime';
 import AttendanceRecordPanel from './AttendanceRecordPanel';
 
@@ -24,7 +24,7 @@ export default function TodaysAttendance({ currentUser, staff, attendance, corre
   const rows = useMemo(
     () => activeStaff(staff)
       .filter((s) => !dept || departmentOf(s.role) === dept)
-      .map((member) => ({ member, day: dayView(member.name, today, attendance, leave, now, holidays, member.joinDate) }))
+      .map((member) => ({ member, day: dayView(member.name, today, attendance, leave, now, holidays, member) }))
       // Exceptions first, then by check-in time.
       .sort((a, b) => {
         const rank = (s: string) => ['Absent', 'Very Late', 'Late', 'Not in yet', 'On Leave', 'Present', 'Off'].indexOf(s);
@@ -40,7 +40,7 @@ export default function TodaysAttendance({ currentUser, staff, attendance, corre
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <p className="flex-1 text-sm text-gray-500">
-          {now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })} · shift {SHIFT_LABEL}
+          {now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })} · default shift {SHIFT_LABEL}
           <span className="ml-2 inline-flex items-center gap-1 text-xs text-gray-400"><Info size={12} /> On time until {ON_TIME_GRACE} min after start, then Late</span>
         </p>
         <div className="relative">
@@ -75,7 +75,10 @@ export default function TodaysAttendance({ currentUser, staff, attendance, corre
                     {member.name}
                     {day.record?.amendments?.length ? <span className="ml-1.5 rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-700">corrected</span> : null}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{member.role}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600">
+                    {member.role}
+                    {hasCustomShift(member) && <p className="text-[11px] tabular-nums text-gray-400">{shiftLabel(member)}</p>}
+                  </td>
                   <td className="px-4 py-3 text-sm tabular-nums text-gray-600">{timeOf(day.record?.checkIn) || '—'}</td>
                   <td className="px-4 py-3 text-sm tabular-nums text-gray-600">{timeOf(day.record?.checkOut) || (inNow ? <span className="text-blue-700">In office</span> : '—')}</td>
                   <td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-medium ${DAY_STATUS_STYLES[day.status]}`}>{day.status}</span></td>

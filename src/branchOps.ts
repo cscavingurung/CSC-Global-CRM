@@ -3,7 +3,8 @@
 import { AttendanceStatus, IssueCategory, IssueImpact } from './types';
 import { parseSubmittedAt } from './dateTime';
 
-/** Shift starts 9:00 AM. Up to 10 min is On Time, up to 30 min Late, anything later Very Late. */
+/** Default shift starts 9:00 AM (staff can have their own — see ShiftHours). Up to 10 min after
+ * the start is On Time, up to 30 min Late, anything later Very Late. */
 export const SHIFT_START_MINUTES = 9 * 60;
 export const ON_TIME_GRACE = 10;
 export const LATE_LIMIT = 30;
@@ -15,10 +16,36 @@ export const CLOSING_FROM_HOUR = 16;
 
 export const minutesOfDay = (d: Date) => d.getHours() * 60 + d.getMinutes();
 
-export function attendanceStatus(checkIn: string): AttendanceStatus | null {
+// ─── Per-staff working hours ────────────────────────────────────────────────
+// A branch manager can give each staff member their own hours ("HH:MM", 24h, as an
+// <input type="time"> produces). Anyone without them works the default 9:00 AM – 6:00 PM.
+
+export const DEFAULT_SHIFT_START = '09:00';
+export const DEFAULT_SHIFT_END = '18:00';
+
+export type ShiftHours = { shiftStart?: string; shiftEnd?: string };
+
+const hhmmToMinutes = (v: string | undefined, fallback: number) => {
+  const m = v?.match(/^(\d{1,2}):(\d{2})$/);
+  return m ? Number(m[1]) * 60 + Number(m[2]) : fallback;
+};
+
+/** "13:30" → "1:30 PM" */
+export function clockLabel(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  return `${h % 12 || 12}:${String(minutes % 60).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+}
+
+export const shiftStartMinutes = (s?: ShiftHours) => hhmmToMinutes(s?.shiftStart, SHIFT_START_MINUTES);
+export const shiftEndMinutes = (s?: ShiftHours) => hhmmToMinutes(s?.shiftEnd, 18 * 60);
+export const shiftLabel = (s?: ShiftHours) => `${clockLabel(shiftStartMinutes(s))} – ${clockLabel(shiftEndMinutes(s))}`;
+/** Whether someone has hours of their own rather than the default. */
+export const hasCustomShift = (s?: ShiftHours) => !!(s?.shiftStart || s?.shiftEnd);
+
+export function attendanceStatus(checkIn: string, startMinutes = SHIFT_START_MINUTES): AttendanceStatus | null {
   const d = parseSubmittedAt(checkIn);
   if (!d) return null;
-  const late = minutesOfDay(d) - SHIFT_START_MINUTES;
+  const late = minutesOfDay(d) - startMinutes;
   if (late <= ON_TIME_GRACE) return 'On Time';
   if (late <= LATE_LIMIT) return 'Late';
   return 'Very Late';
