@@ -113,6 +113,10 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
   const [phoneError, setPhoneError] = useState('');
   const [emailError, setEmailError] = useState('');
   const [countryError, setCountryError] = useState('');
+  // "Others" in Country of interest — the typed country is stored in form.country like the rest.
+  const [otherCountryOpen, setOtherCountryOpen] = useState(false);
+  // Raw text, so commas and spaces survive while typing; split into countries on change.
+  const [otherCountryText, setOtherCountryText] = useState('');
   const phoneInputRef = useRef<HTMLInputElement>(null);
   const phoneCaretRef = useRef<number | null>(null);
 
@@ -133,6 +137,11 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
 
     if (!isValidEmail(form.email.trim())) {
       setEmailError('Enter a valid email, e.g. name@example.com');
+      return;
+    }
+
+    if (otherCountryOpen && !otherCountry) {
+      setCountryError('Type the other countries, or untick Others');
       return;
     }
 
@@ -190,16 +199,34 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
     setReferredByName('');
     setPhoneError('');
     setCountryError('');
+    setOtherCountryOpen(false);
+    setOtherCountryText('');
     setSubmitted(false);
   };
 
   const selectedCountries = form.country ? form.country.split(',').map((c) => c.trim()).filter(Boolean) : [];
 
+  const listedCountries = selectedCountries.filter((c) => COUNTRIES.includes(c));
+  const otherCountry = selectedCountries.filter((c) => !COUNTRIES.includes(c)).join(', ');
+  const setCountries = (listed: string[], otherText: string) => {
+    const others = otherText.split(',').map((c) => c.trim()).filter((c) => c && !listed.includes(c));
+    setForm({ ...form, country: [...new Set([...listed, ...others])].join(', ') });
+    if (countryError) setCountryError('');
+  };
+
   const toggleCountry = (c: string) => {
-    const next = selectedCountries.includes(c)
-      ? selectedCountries.filter((v) => v !== c)
-      : [...selectedCountries, c];
-    setForm({ ...form, country: next.join(', ') });
+    const next = listedCountries.includes(c)
+      ? listedCountries.filter((v) => v !== c)
+      : [...listedCountries, c];
+    setCountries(next, otherCountryText);
+  };
+
+  const toggleOtherCountry = () => {
+    if (otherCountryOpen) {
+      setCountries(listedCountries, '');
+      setOtherCountryText('');
+    }
+    setOtherCountryOpen(!otherCountryOpen);
     if (countryError) setCountryError('');
   };
 
@@ -422,6 +449,28 @@ export default function NewIntakeForm({ onSubmitted, embedded = false, onSubmit,
                   {c}
                 </label>
               ))}
+              <label className="flex items-center gap-2 text-sm text-navy cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={otherCountryOpen}
+                  onChange={toggleOtherCountry}
+                  className="rounded border-grey-border text-navy focus:ring-navy-light"
+                />
+                Others
+              </label>
+              {otherCountryOpen && (
+                <input
+                  type="text"
+                  autoFocus
+                  value={otherCountryText}
+                  onChange={(e) => {
+                    setOtherCountryText(e.target.value);
+                    setCountries(listedCountries, e.target.value);
+                  }}
+                  placeholder="Type other countries, separated by commas — e.g. Japan, Germany"
+                  className="col-span-2 sm:col-span-3 w-full px-3 py-2 border border-grey-border rounded-lg text-sm text-navy bg-white focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light"
+                />
+              )}
             </div>
             {countryError && <p className="mt-1 text-xs text-red-500">{countryError}</p>}
           </div>
