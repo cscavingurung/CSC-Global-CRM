@@ -1,9 +1,9 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { CalendarDays, History, LogIn, LogOut, X } from 'lucide-react';
-import { AttendanceCorrection, AttendanceExplanation, AttendanceRecord, AttendanceStatus, ExplanationReason, Holiday, LeaveRecord, MockUser } from '../types';
+import { CalendarDays, DoorOpen, History, LogIn, LogOut, Undo2, X } from 'lucide-react';
+import { AttendanceCorrection, AttendanceExplanation, AttendanceRecord, AttendanceStatus, ExplanationReason, Holiday, LeaveRecord, MockUser, StepOut } from '../types';
 import { holidayOn } from '../holidays';
-import { EXPLANATION_REASONS, onLeave } from '../attendance';
-import { ATTENDANCE_STYLES, ShiftHours, attendanceStatus, isWorkingDay, shiftLabel, shiftStartMinutes, timeOf } from '../branchOps';
+import { EXPLANATION_REASONS, StaffDayInfo, onLeave, outOfOfficeSince } from '../attendance';
+import { ATTENDANCE_STYLES, attendanceStatus, isWorkingDay, shiftLabel, shiftStartMinutes, timeOf } from '../branchOps';
 import { dateKey, formatSubmittedAt, parseSubmittedAt } from '../dateTime';
 
 // ─── Branch Hub · Time & Attendance ─────────────────────────────────────────
@@ -25,8 +25,8 @@ interface TimeAttendancePageProps {
   onSaveExplanation: (e: AttendanceExplanation) => void;
   /** Branch holidays — shown as Holiday, never Absent. */
   holidays: Holiday[];
-  /** This user's working hours, when their manager set them. */
-  shift?: ShiftHours;
+  /** This user's working hours (when their manager set them) and join date. */
+  shift?: StaffDayInfo;
 }
 
 type DayRow = {
@@ -63,6 +63,9 @@ const hoursBetween = (a?: string, b?: string) => {
   return `${Math.floor(mins / 60)}h ${String(Math.round(mins % 60)).padStart(2, '0')}m`;
 };
 
+// "11:00 AM–11:30 AM, 3:00 PM–…"
+const stepOutsLabel = (trips: StepOut[]) => trips.map((t) => `${timeOf(t.out)}–${t.back ? timeOf(t.back) : '…'}`).join(', ');
+
 const longDate = (key: string) =>
   new Date(`${key}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
 
@@ -81,14 +84,26 @@ export default function TimeAttendancePage({ currentUser, records, corrections, 
 
   const checkIn = () =>
     onSaveAttendance({ id: `att-${Date.now()}`, staffName: currentUser.name, branch: currentUser.branch, date: today, checkIn: formatSubmittedAt(new Date()) });
-  const checkOut = () => mine && onSaveAttendance({ ...mine, checkOut: formatSubmittedAt(new Date()) });
+  const outSince = outOfOfficeSince(mine);
+  // Checking out while stepped out closes the open step-out at the same time.
+  const checkOut = () => {
+    if (!mine) return;
+    const at = formatSubmittedAt(new Date());
+    onSaveAttendance({ ...mine, checkOut: at, stepOuts: (mine.stepOuts ?? []).map((t) => (t.back ? t : { ...t, back: at })) });
+  };
+  const stepOut = () => mine && onSaveAttendance({ ...mine, stepOuts: [...(mine.stepOuts ?? []), { out: formatSubmittedAt(new Date()) }] });
+  const stepBack = () =>
+    mine && onSaveAttendance({ ...mine, stepOuts: (mine.stepOuts ?? []).map((t) => (t.back ? t : { ...t, back: formatSubmittedAt(new Date()) })) });
 
-  // Every day of this month so far, newest first.
+  // Every day of this month so far, newest first — none before they joined, so a new hire
+  // doesn't start with a month of absences.
+  const joinDate = shift?.joinDate;
   const rows: DayRow[] = useMemo(() => {
     const list: DayRow[] = [];
     const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     while (d.getMonth() === now.getMonth()) {
       const key = dateKey(d);
+      if (joinDate && key < joinDate) break;
       const record = records.find((r) => r.date === key);
       const isToday = key === today;
       let status: DayRow['status'];
@@ -113,7 +128,7 @@ export default function TimeAttendancePage({ currentUser, records, corrections, 
       d.setDate(d.getDate() - 1);
     }
     return list;
-  }, [records, now, today, leave, holidays, currentUser.name, start]);
+  }, [records, now, today, leave, holidays, currentUser.name, start, joinDate]);
 
   const stats = useMemo(() => {
     const worked = rows.filter((r) => r.record?.checkIn);
@@ -161,10 +176,24 @@ export default function TimeAttendancePage({ currentUser, records, corrections, 
             <button type="button" onClick={checkIn} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-navy px-6 py-4 text-lg font-semibold text-white hover:bg-navy-light">
               <LogIn size={22} /> CHECK IN
             </button>
+          ) : outSince ? (
+            <>
+              <p className="mb-3 rounded-xl border border-violet-200 bg-violet-50 px-6 py-3 text-base font-semibold text-violet-700">
+                Out of office since {timeOf(outSince)}
+              </p>
+              <button type="button" onClick={stepBack} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-navy px-6 py-4 text-lg font-semibold text-white hover:bg-navy-light">
+                <Undo2 size={22} /> I'M BACK
+              </button>
+            </>
           ) : !mine.checkOut ? (
-            <button type="button" onClick={checkOut} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-navy px-6 py-4 text-lg font-semibold text-white hover:bg-navy-light">
-              <LogOut size={22} /> CHECK OUT
-            </button>
+            <>
+              <button type="button" onClick={checkOut} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-navy px-6 py-4 text-lg font-semibold text-white hover:bg-navy-light">
+                <LogOut size={22} /> CHECK OUT
+              </button>
+              <button type="button" onClick={stepOut} className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-grey-border bg-white px-6 py-2.5 text-sm font-semibold text-navy hover:bg-grey-bg">
+                <DoorOpen size={16} /> Step out of office
+              </button>
+            </>
           ) : (
             <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-6 py-4 text-base font-semibold text-emerald-700">Day complete — see you tomorrow</p>
           )}
@@ -176,6 +205,7 @@ export default function TimeAttendancePage({ currentUser, records, corrections, 
             {mine.checkOut && <>· out at <span className="font-semibold tabular-nums text-navy">{timeOf(mine.checkOut)}</span> · {hoursBetween(mine.checkIn, mine.checkOut)}</>}
           </p>
         )}
+        {mine?.stepOuts?.length ? <p className="mt-1 text-xs text-gray-500">Stepped out: {stepOutsLabel(mine.stepOuts)}</p> : null}
       </section>
 
       {/* Explanations the manager asked for */}
@@ -256,6 +286,7 @@ export default function TimeAttendancePage({ currentUser, records, corrections, 
                       <td className="px-4 py-2.5">
                         <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_PILL[row.status]}`}>{row.status}</span>
                         {row.record?.amendments?.length ? <span className="ml-1.5 text-[11px] text-gray-400" title={`Approved by ${row.record.amendments[row.record.amendments.length - 1].approvedBy}`}>corrected</span> : null}
+                        {row.record?.stepOuts?.length ? <span className="mt-0.5 block text-[11px] text-gray-400">Out {stepOutsLabel(row.record.stepOuts)}</span> : null}
                       </td>
                       <td className="px-4 py-2.5 text-right">
                         {correction?.status === 'Pending' ? (

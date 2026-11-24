@@ -6,7 +6,7 @@ import {
   CounselorStudent, DailyTask, ExpenseRequest, FinTransaction, Holiday, IntakeStudent, LeaveRecord, NavIntent, StaffMember,
 } from './types';
 import { dateKey } from './dateTime';
-import { dayView, DayStatus, tracksAttendance } from './attendance';
+import { dayView, DayStatus, outOfOfficeSince, tracksAttendance } from './attendance';
 import { timeOf } from './branchOps';
 import { clientBalances, isLivePayment } from './finance';
 import { daysInCurrentStatus, getClientStage, isClientInProgress } from './clientPipeline';
@@ -68,6 +68,8 @@ export interface StaffToday {
   role: string;
   status: DayStatus;
   checkIn?: string;
+  /** When they stepped out, if they're out of the office right now. */
+  outSince?: string;
   pendingTasks: number;
 }
 
@@ -88,6 +90,7 @@ export function staffToday(src: BranchDashboardSources, now = new Date()): Staff
     const v = dayView(s.name, today, src.attendance, src.leave, now, src.holidays, s);
     return {
       id: s.id, name: s.name, role: s.role, status: v.status, checkIn: v.record?.checkIn ? timeOf(v.record.checkIn) : undefined,
+      outSince: timeOf(outOfOfficeSince(v.record)) || undefined,
       pendingTasks: src.tasks.filter((t) => t.assignee === s.name && t.status !== 'Done' && t.date <= today).length,
     };
   }).sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status) || a.name.localeCompare(b.name));

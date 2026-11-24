@@ -167,6 +167,7 @@ function Dashboard({ sources, managerName }: Omit<BranchDashboardProps, 'onNavig
                   <td className="px-2 py-2.5">
                     <span className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${STAFF_STATUS_STYLES[p.status]}`}>{p.status}</span>
                     {p.checkIn && <span className="ml-1.5 hidden text-[11px] text-gray-400 md:inline">{p.checkIn}</span>}
+                    {p.outSince && <span className="ml-1.5 whitespace-nowrap rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-800" title={`Stepped out at ${p.outSince}`}>Out of office</span>}
                   </td>
                   <td className="px-4 py-2.5 text-right">
                     {p.pendingTasks > 0

@@ -118,6 +118,12 @@ export function attendanceSummary(
   return out;
 }
 
+/** When they stepped out, if they're out of the office right now (checked in, not back yet). */
+export const outOfOfficeSince = (record?: AttendanceRecord) => {
+  const last = record?.checkIn && !record.checkOut ? record.stepOuts?.[record.stepOuts.length - 1] : undefined;
+  return last && !last.back ? last.out : undefined;
+};
+
 /** Minutes between check-in and check-out (or now, if still in today). */
 export function workedMinutes(record: AttendanceRecord | undefined, now: Date): number | null {
   const a = record?.checkIn ? parseSubmittedAt(record.checkIn) : null;

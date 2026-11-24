@@ -560,6 +560,9 @@ create policy partners_delete on public.partners for delete using (public.is_sup
 -- 5. HR (docx §20 — sensitive). All keyed by staff_name (text) + branch.
 -- ----------------------------------------------------------------------------
 
+-- Times the employee stepped out of the office during the day: [{ out, back? }, ...].
+alter table public.attendance add column if not exists step_outs jsonb not null default '[]'::jsonb;
+
 alter table public.attendance enable row level security;
 
 drop policy if exists attendance_select on public.attendance;

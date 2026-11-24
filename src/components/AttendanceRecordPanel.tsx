@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CircleDot, Clock, History, LogIn, LogOut, PenLine, ShieldCheck, X, XCircle } from 'lucide-react';
+import { CircleDot, Clock, DoorOpen, History, LogIn, LogOut, PenLine, ShieldCheck, Undo2, X, XCircle } from 'lucide-react';
 import { AttendanceCorrection, StaffMember } from '../types';
 import { DAY_STATUS_STYLES, DayView, correctionIssue, formatMinutes, workedMinutes } from '../attendance';
 import { timeOf } from '../branchOps';
@@ -42,6 +42,10 @@ export default function AttendanceRecordPanel({ day, member, corrections, now, o
   const entries: Entry[] = [];
   if (original.checkIn) entries.push({ at: original.checkIn, icon: <LogIn size={13} />, tone: 'text-navy', title: <>Checked in <b>{timeOf(original.checkIn)}</b></>, detail: 'Original punch' });
   if (original.checkOut) entries.push({ at: original.checkOut, icon: <LogOut size={13} />, tone: 'text-navy', title: <>Checked out <b>{timeOf(original.checkOut)}</b></>, detail: 'Original punch' });
+  (r?.stepOuts ?? []).forEach((t) => {
+    entries.push({ at: t.out, icon: <DoorOpen size={13} />, tone: 'text-violet-600', title: <>Stepped out <b>{timeOf(t.out)}</b></> });
+    if (t.back) entries.push({ at: t.back, icon: <Undo2 size={13} />, tone: 'text-violet-600', title: <>Back in office <b>{timeOf(t.back)}</b></> });
+  });
   corrections.forEach((c) => {
     entries.push({
       at: c.requestedAt, icon: <PenLine size={13} />, tone: 'text-gray-500',

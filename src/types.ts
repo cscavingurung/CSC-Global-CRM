@@ -648,6 +648,15 @@ export interface AttendanceRecord {
   /** Punches exactly as recorded, before any correction. */
   original?: { checkIn?: string; checkOut?: string };
   amendments?: AttendanceAmendment[];
+  /** Times the employee stepped out of the office during the day, oldest first. `back` is
+   * missing while they're still out. */
+  stepOuts?: StepOut[];
+}
+
+export interface StepOut {
+  /** "YYYY-MM-DD h:mm AM/PM" */
+  out: string;
+  back?: string;
 }
 
 export interface AttendanceAmendment {

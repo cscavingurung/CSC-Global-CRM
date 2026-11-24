@@ -10,6 +10,7 @@ export interface AttendanceRow {
   check_out: string | null;
   original: AttendanceRecord['original'] | null;
   amendments: NonNullable<AttendanceRecord['amendments']>;
+  step_outs: NonNullable<AttendanceRecord['stepOuts']>;
 }
 
 export function fromRow(row: AttendanceRow): AttendanceRecord {
@@ -22,6 +23,7 @@ export function fromRow(row: AttendanceRow): AttendanceRecord {
     checkOut: row.check_out ?? undefined,
     original: row.original ?? undefined,
     amendments: row.amendments,
+    stepOuts: row.step_outs ?? [],
   };
 }
 
@@ -35,6 +37,7 @@ function toRow(record: AttendanceRecord): AttendanceRow {
     check_out: record.checkOut ?? null,
     original: record.original ?? null,
     amendments: record.amendments ?? [],
+    step_outs: record.stepOuts ?? [],
   };
 }
 
