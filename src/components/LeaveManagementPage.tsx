@@ -79,7 +79,7 @@ export default function LeaveManagementPage({ currentUser, staff, leave, holiday
   const forStaff = isManager ? team.find((s) => s.name === forName && s.name !== currentUser.name) : undefined;
   const applicant = forStaff?.name ?? currentUser.name;
   const myBalances = balancesFor(applicant, leave, year, holidays);
-  const [form, setForm] = useState<{ type: LeaveType; from: string; to: string; reason: string }>({ type: 'Annual', from: shift(today, 7), to: shift(today, 7), reason: '' });
+  const [form, setForm] = useState<{ type: LeaveType; from: string; to: string; reason: string }>({ type: 'Annual', from: today, to: today, reason: '' });
   const [tried, setTried] = useState(false);
   // Auto-calculated as the dates change: Saturdays (weekly day off) and holidays aren't counted.
   const breakdown = countDays(form.from, form.to, holidays);
