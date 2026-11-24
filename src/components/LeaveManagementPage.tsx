@@ -73,32 +73,41 @@ export default function LeaveManagementPage({ currentUser, staff, leave, holiday
   const lowAnnual = balances.filter((b) => b.bal[0].remaining <= 3);
 
   // ── Apply ────────────────────────────────────────────────────────────────
-  const myBalances = balancesFor(currentUser.name, leave, year, holidays);
+  // A manager can also record leave for a staff member (e.g. someone who phoned in sick) —
+  // that goes in already approved, under the manager's name.
+  const [forName, setForName] = useState('');
+  const forStaff = isManager ? team.find((s) => s.name === forName && s.name !== currentUser.name) : undefined;
+  const applicant = forStaff?.name ?? currentUser.name;
+  const myBalances = balancesFor(applicant, leave, year, holidays);
   const [form, setForm] = useState<{ type: LeaveType; from: string; to: string; reason: string }>({ type: 'Annual', from: shift(today, 7), to: shift(today, 7), reason: '' });
   const [tried, setTried] = useState(false);
   // Auto-calculated as the dates change: Saturdays (weekly day off) and holidays aren't counted.
   const breakdown = countDays(form.from, form.to, holidays);
   const totalDays = breakdown.working;
   const bal = myBalances.find((b) => b.type === form.type);
-  const clash = form.from && form.to ? overlapping(leave, currentUser.name, form.from, form.to) : undefined;
+  const clash = form.from && form.to ? overlapping(leave, applicant, form.from, form.to) : undefined;
   const errors = {
     dates: (!form.from || !form.to) ? 'Choose both dates.' : form.to < form.from ? 'The end date is before the start date.' : totalDays === 0 ? 'That range is only a day off — nothing to request.' : null,
     balance: bal && totalDays > bal.remaining - bal.pending
       ? `Only ${Math.max(0, bal.remaining - bal.pending)} ${form.type} day${bal.remaining - bal.pending === 1 ? '' : 's'} available${bal.pending ? ` (${bal.pending} already pending)` : ''}.` : null,
-    clash: clash ? `Overlaps your ${clash.status.toLowerCase()} ${clash.type} leave (${rangeLabel(clash)}).` : null,
+    clash: clash ? `Overlaps ${forStaff ? `${forStaff.name}'s` : 'your'} ${clash.status.toLowerCase()} ${clash.type} leave (${rangeLabel(clash)}).` : null,
     reason: !form.reason.trim() ? 'Add a short reason.' : null,
   };
   const valid = !Object.values(errors).some(Boolean);
   const submit = () => {
     setTried(true);
     if (!valid) return;
+    const now = formatSubmittedAt(new Date());
     onAddLeave({
-      id: `lv-${Date.now()}`, staffName: currentUser.name, branch: currentUser.branch, from: form.from, to: form.to, type: form.type,
-      status: 'Pending', days: totalDays, reason: form.reason.trim(), requestedAt: formatSubmittedAt(new Date()),
+      id: `lv-${Date.now()}`, staffName: applicant, branch: forStaff?.branch ?? currentUser.branch, from: form.from, to: form.to, type: form.type,
+      days: totalDays, reason: form.reason.trim(), requestedAt: now,
+      ...(forStaff ? { status: 'Approved', decidedBy: currentUser.name, decidedAt: now } : { status: 'Pending' }),
     });
     setForm({ ...form, reason: '' });
     setTried(false);
-    flash(`Leave request sent — ${totalDays} day${totalDays === 1 ? '' : 's'} of ${form.type} leave awaiting approval.`);
+    flash(forStaff
+      ? `Leave recorded for ${forStaff.name} — ${totalDays} day${totalDays === 1 ? '' : 's'} of ${form.type} leave, approved.`
+      : `Leave request sent — ${totalDays} day${totalDays === 1 ? '' : 's'} of ${form.type} leave awaiting approval.`);
   };
 
   // ── Requests ─────────────────────────────────────────────────────────────
@@ -239,7 +248,7 @@ export default function LeaveManagementPage({ currentUser, staff, leave, holiday
         {tab === 'Apply Leave' && (
           <div className="max-w-2xl space-y-5">
             <section className="rounded-xl border border-grey-border bg-white px-5 py-4">
-              <p className="text-xs font-semibold text-gray-500">My balance · {year}</p>
+              <p className="text-xs font-semibold text-gray-500">{forStaff ? `${forStaff.name}'s balance` : 'My balance'} · {year}</p>
               <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-base text-navy">
                 {myBalances.map((b, i) => (
                   <span key={b.type} className="whitespace-nowrap">
@@ -254,6 +263,19 @@ export default function LeaveManagementPage({ currentUser, staff, leave, holiday
             </section>
 
             <section className="space-y-4 rounded-xl border border-grey-border bg-white px-5 py-5">
+              {isManager && (
+                <div>
+                  <label htmlFor="lv-for" className="mb-1.5 block text-xs font-semibold text-navy">Employee</label>
+                  <div className="relative">
+                    <select id="lv-for" value={forStaff?.name ?? ''} onChange={(e) => setForName(e.target.value)} className={`${inputClass} appearance-none pr-9`}>
+                      <option value="">Myself</option>
+                      {team.filter((s) => s.name !== currentUser.name).map((s) => <option key={s.id} value={s.name}>{s.name} · {s.role}</option>)}
+                    </select>
+                    <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  </div>
+                  {forStaff && <p className="mt-1 text-xs text-gray-500">Recorded as approved by you — no request goes to {forStaff.name}.</p>}
+                </div>
+              )}
               <div>
                 <label htmlFor="lv-type" className="mb-1.5 block text-xs font-semibold text-navy">Leave type</label>
                 <div className="relative">
@@ -298,7 +320,7 @@ export default function LeaveManagementPage({ currentUser, staff, leave, holiday
               </div>
 
               <button type="button" onClick={submit} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-navy py-2.5 text-sm font-semibold text-white hover:bg-navy-light sm:w-auto sm:px-6">
-                <Send size={15} /> Submit request
+                {forStaff ? <><CheckCircle size={15} /> Record approved leave</> : <><Send size={15} /> Submit request</>}
               </button>
             </section>
 
